@@ -7,7 +7,6 @@ ARG BASE_TAG="1.18.0-rolling-weekly"
 # DEV NOTE: IF an Ubuntu version changes you should be making a new dockerfile!
 ARG BASE_IMAGE="core-ubuntu-noble"
 FROM kasmweb/$BASE_IMAGE:$BASE_TAG
-
 USER root
 
 ENV HOME /home/kasm-default-profile
