@@ -27,7 +27,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
                   #120225 1237 - removed temporarily for SSL error even though gpg exists /ubuntu/install/sublime_text/install_sublime_text.sh \
                   /ubuntu/install/vs_code/install_vs_code.sh \
                   /ubuntu/install/remmina/install_remmina.sh \
-                  /ubuntu/install/only_office/install_only_office.sh \
+                  /ubuntu/install/libre_office/install_libre_office.sh \
+
+                  #BROKE HERE AT SIGNAL, PGP error!!!!!
                   /ubuntu/install/signal/install_signal.sh \
                   /ubuntu/install/gimp/install_gimp.sh \
                   /ubuntu/install/ansible/install_ansible.sh \

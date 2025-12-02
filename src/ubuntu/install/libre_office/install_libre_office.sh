@@ -5,8 +5,6 @@ set -ex
 # Install LibreOffice
 apt-get update
 apt-get install -y software-properties-common
-add-apt-repository ppa:libreoffice/ppa
-apt-get update
 apt-get install -y libreoffice
 
 # Desktop icon

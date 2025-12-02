@@ -10,7 +10,7 @@ apt-get install -y ./vs_code.deb
 
 # Desktop icon
 mkdir -p /usr/share/icons/hicolor/apps
-cp /ubuntu/install/vs_code/vscode.svg /usr/share/icons/hicolor/apps/vscode.svg
+wget -qO /usr/share/icons/hicolor/apps/vscode.svg https://code.visualstudio.com/assets/branding/code-stable.png --no-check-certificate
 sed -i '/Icon=/c\Icon=/usr/share/icons/hicolor/apps/vscode.svg' /usr/share/applications/code.desktop
 sed -i 's#/usr/share/code/code#/usr/share/code/code --no-sandbox##' /usr/share/applications/code.desktop
 cp /usr/share/applications/code.desktop $HOME/Desktop
