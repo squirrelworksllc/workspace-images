@@ -8,7 +8,7 @@ apt-get update
 
 EDGE_BUILD=$(curl -q https://packages.microsoft.com/repos/edge/pool/main/m/microsoft-edge-stable/ | grep href | grep .deb | sed 's/.*href="//g'  | cut -d '"' -f1 | sort --version-sort | tail -1)
 
-wget -q -O edge.deb https://packages.microsoft.com/repos/edge/pool/main/m/microsoft-edge-stable/$EDGE_BUILD
+wget -q -O edge.deb https://packages.microsoft.com/repos/edge/pool/main/m/microsoft-edge-stable/$EDGE_BUILD --no-check-certificate
 apt-get install -y ./edge.deb
 rm edge.deb
 

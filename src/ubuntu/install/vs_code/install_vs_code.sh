@@ -4,13 +4,13 @@ set -ex
 
 # Install vsCode
 ARCH=$(arch | sed 's/aarch64/arm64/g' | sed 's/x86_64/x64/g')
-wget -q https://update.code.visualstudio.com/latest/linux-deb-${ARCH}/stable -O vs_code.deb
+wget -q https://update.code.visualstudio.com/latest/linux-deb-${ARCH}/stable -O vs_code.deb --no-check-certificate
 apt-get update
 apt-get install -y ./vs_code.deb
 
 # Desktop icon
 mkdir -p /usr/share/icons/hicolor/apps
-wget -O /usr/share/icons/hicolor/apps/vscode.svg https://kasm-static-content.s3.amazonaws.com/icons/vscode.svg
+cp /ubuntu/install/vs_code/vscode.svg /usr/share/icons/hicolor/apps/vscode.svg
 sed -i '/Icon=/c\Icon=/usr/share/icons/hicolor/apps/vscode.svg' /usr/share/applications/code.desktop
 sed -i 's#/usr/share/code/code#/usr/share/code/code --no-sandbox##' /usr/share/applications/code.desktop
 cp /usr/share/applications/code.desktop $HOME/Desktop

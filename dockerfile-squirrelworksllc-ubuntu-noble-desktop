@@ -23,8 +23,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
                   /ubuntu/install/misc/install_tools.sh \
                   /ubuntu/install/chrome/install_chrome.sh \
                   /ubuntu/install/chromium/install_chromium.sh \
-                  /ubuntu/install/firefox/install_firefox.sh \
-                  /ubuntu/install/sublime_text/install_sublime_text.sh \
+                  #120225 1113AM - removed temporarily to see if build works /ubuntu/install/firefox/install_firefox.sh \
+                  #120225 1237 - removed temporarily for SSL error even though gpg exists /ubuntu/install/sublime_text/install_sublime_text.sh \
                   /ubuntu/install/vs_code/install_vs_code.sh \
                   /ubuntu/install/remmina/install_remmina.sh \
                   /ubuntu/install/only_office/install_only_office.sh \

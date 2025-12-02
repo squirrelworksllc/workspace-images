@@ -3,4 +3,6 @@
 set -ex
 
 apt-get update
+apt-get upgrade -y
+apt-get autoremove -y
 apt-get install -y vlc git tmux
