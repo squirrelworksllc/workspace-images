@@ -1,25 +1,18 @@
 # Copied from official KasmTech repo at "https://github.com/kasmtech/workspaces-images/blob/develop/src/ubuntu/install/"
+# Modified to remove non-ubuntu references and apply updated logic
 #!/usr/bin/env bash
 set -ex
 
-if [[ "${DISTRO}" == @(oracle8|oracle9|rhel9|rockylinux9|rockylinux8|almalinux9|almalinux8|fedora39|fedora40|fedora41) ]]; then
-  if [[ "${DISTRO}" == @(oracle8|rockylinux8|almalinux8) ]]; then
-    dnf install -y remmina remmina-plugins-rdp remmina-plugins-secret remmina-plugins-spice xdotool
-    if [ -z ${SKIP_CLEAN+x} ]; then
-      dnf clean all
-    fi
-  elif [[ "${DISTRO}" == @(rockylinux9|oracle9|rhel9|almalinux9|fedora39|fedora40|fedora41) ]]; then
-    dnf install -y remmina remmina-plugins-rdp remmina-plugins-secret xdotool
-    if [ -z ${SKIP_CLEAN+x} ]; then
-      dnf clean all
-    fi
-  fi
-elif [ "${DISTRO}" == "opensuse" ]; then
-  zypper install -yn remmina remmina-plugin-rdp remmina-plugin-secret remmina-plugin-spice xdotool
-  if [ -z ${SKIP_CLEAN+x} ]; then
-    zypper clean --all
-  fi
-elif grep -q "ID=debian" /etc/os-release || grep -q "VERSION_CODENAME=noble" /etc/os-release; then
+echo "======= Installing Remmina ======="
+
+
+
+
+
+
+echo "Step 1: Install the app..."
+# If this is Ubuntu Noble...
+if grep -q "ID=debian" /etc/os-release || grep -q "VERSION_CODENAME=noble" /etc/os-release; then
   apt-get update
   apt-get install -y remmina remmina-plugin-rdp remmina-plugin-secret xdotool
   if [ -z ${SKIP_CLEAN+x} ]; then
@@ -28,7 +21,7 @@ elif grep -q "ID=debian" /etc/os-release || grep -q "VERSION_CODENAME=noble" /et
     /var/lib/apt/lists/* \
     /var/tmp/*
   fi
-else
+else # If this is another Ubuntu version...
   apt-get update
   apt-get install -y software-properties-common
   apt-add-repository -y ppa:remmina-ppa-team/remmina-next
@@ -41,13 +34,17 @@ else
     /var/tmp/*
   fi
 fi
+
+echo "Step 2: Adjust the desktop icon..."
 cp /usr/share/applications/org.remmina.Remmina.desktop $HOME/Desktop/
 chmod +x $HOME/Desktop/org.remmina.Remmina.desktop
 chown 1000:1000 $HOME/Desktop/org.remmina.Remmina.desktop
 
+echo "Step 3: Create user profile and directory..."
 DEFAULT_PROFILE_DIR=$HOME/.local/share/remmina/defaults
 
 mkdir -p $DEFAULT_PROFILE_DIR
+# create the VNC profile
 cat >>  $DEFAULT_PROFILE_DIR/default.vnc.remmina <<EOF
 [remmina]
 name=vnc-connection
@@ -87,7 +84,7 @@ disableserverinput=0
 ignore-tls-errors=1
 disableclipboard=0
 EOF
-
+# create the RDP profile
 cat >>  $DEFAULT_PROFILE_DIR/default.rdp.remmina <<EOF
 [remmina]
 disableclipboard=0
@@ -178,6 +175,9 @@ viewmode=4
 EOF
 
 # Cleanup for app layer
+echo "Step 4: Cleaning up..."
 chown -R 1000:0 $HOME
 find /usr/share/ -name "icon-theme.cache" -exec rm -f {} \;
 chown -R 1000:1000 $DEFAULT_PROFILE_DIR
+
+echo "Remmina is now Installed!"

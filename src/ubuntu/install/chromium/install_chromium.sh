@@ -2,25 +2,21 @@
 #!/usr/bin/env bash
 set -ex
 
+echo "======= Installing Chromium ======="
+
+echo "Step 1: Check CPU Architecture and set arguments..."
+# set arguments
 CHROME_ARGS="--password-store=basic --no-sandbox  --ignore-gpu-blocklist --user-data-dir --no-first-run --simulate-outdated-no-au='Tue, 31 Dec 2099 23:59:59 GMT'"
 ARCH=$(arch | sed 's/aarch64/arm64/g' | sed 's/x86_64/amd64/g')
-
+# check architecture
 if [[ "${DISTRO}" == @(debian|opensuse|ubuntu) ]] && [ ${ARCH} = 'amd64' ] && [ ! -z ${SKIP_CLEAN+x} ]; then
   echo "not installing chromium on x86_64 desktop build"
   exit 0
 fi
 
-if [[ "${DISTRO}" == @(oracle8|rockylinux9|rockylinux8|oracle9|rhel9|almalinux9|almalinux8|fedora39|fedora40|fedora41) ]]; then
-  dnf install -y chromium
-  if [ -z ${SKIP_CLEAN+x} ]; then
-    dnf clean all
-  fi
-elif [ "${DISTRO}" == "opensuse" ]; then
-  zypper install -yn chromium
-  if [ -z ${SKIP_CLEAN+x} ]; then
-    zypper clean --all
-  fi
-elif grep -q "ID=debian" /etc/os-release || grep -q "ID=kali" /etc/os-release || grep -q "ID=parrot" /etc/os-release; then
+echo "Step 2: Download and Install..."
+# if this is Kali, ParrotOS or regular Debian...
+if grep -q "ID=debian" /etc/os-release || grep -q "ID=kali" /etc/os-release || grep -q "ID=parrot" /etc/os-release; then
   apt-get update
   apt-get install -y chromium
   if [ -z ${SKIP_CLEAN+x} ]; then
@@ -29,7 +25,7 @@ elif grep -q "ID=debian" /etc/os-release || grep -q "ID=kali" /etc/os-release ||
     /var/lib/apt/lists/* \
     /var/tmp/*
   fi
-else
+else # else assume Ubuntu...
   apt-get update
   apt-get install -y software-properties-common ttf-mscorefonts-installer
   apt-get remove -y chromium-browser-l10n chromium-codecs-ffmpeg chromium-browser
@@ -56,14 +52,15 @@ else
   fi
 
 fi
-
+# set the bin path
 if grep -q "ID=debian" /etc/os-release || grep -q "ID=kali" /etc/os-release || grep -q "ID=parrot" /etc/os-release || grep -q "ID=ubuntu" /etc/os-release; then
   REAL_BIN=chromium
 else
   REAL_BIN=chromium-browser
 fi
 
-
+# Modify desktop icon
+echo "Step 3: Modify the Desktop icon..."
 sed -i 's/-stable//g' /usr/share/applications/${REAL_BIN}.desktop
 
 if ! grep -q "ID=kali" /etc/os-release; then
@@ -72,6 +69,8 @@ if ! grep -q "ID=kali" /etc/os-release; then
   chown 1000:1000 $HOME/Desktop/${REAL_BIN}.desktop
 fi
 
+# Set and configure Bin
+echo "Step 4: Set up the Bin..."
 mv /usr/bin/${REAL_BIN} /usr/bin/${REAL_BIN}-orig
 cat >/usr/bin/${REAL_BIN} <<EOL
 #!/usr/bin/env bash
@@ -107,31 +106,11 @@ fi
 EOL
 chmod +x /usr/bin/${REAL_BIN}
 
-if [ "${DISTRO}" != "opensuse" ] && ! grep -q "ID=debian" /etc/os-release && ! grep -q "ID=kali" /etc/os-release && ! grep -q "ID=parrot" /etc/os-release && ! grep -q "ID=ubuntu" /etc/os-release; then
-  cp /usr/bin/chromium-browser /usr/bin/chromium
-fi
-
-if [[ "${DISTRO}" == @(oracle8|rockylinux9|rockylinux8|oracle9|rhel9|almalinux9|almalinux8|opensuse|fedora39|fedora40|fedora41) ]]; then
-  cat >> $HOME/.config/mimeapps.list <<EOF
-    [Default Applications]
-    x-scheme-handler/http=${REAL_BIN}.desktop
-    x-scheme-handler/https=${REAL_BIN}.desktop
-    x-scheme-handler/ftp=${REAL_BIN}.desktop
-    x-scheme-handler/chrome=${REAL_BIN}.desktop
-    text/html=${REAL_BIN}.desktop
-    application/x-extension-htm=${REAL_BIN}.desktop
-    application/x-extension-html=${REAL_BIN}.desktop
-    application/x-extension-shtml=${REAL_BIN}.desktop
-    application/xhtml+xml=${REAL_BIN}.desktop
-    application/x-extension-xhtml=${REAL_BIN}.desktop
-    application/x-extension-xht=${REAL_BIN}.desktop
-EOF
-else
-  sed -i 's@exec -a "$0" "$HERE/chromium-browser" "$\@"@@g' /usr/bin/x-www-browser
-  cat >>/usr/bin/x-www-browser <<EOL
-  exec -a "\$0" "\$HERE/chromium" "${CHROME_ARGS}"  "\$@"
-EOL
-fi
+# final configurations
+echo "Step 5: Final Configurations..."
+sed -i 's@exec -a "$0" "$HERE/chromium-browser" "$\@"@@g' /usr/bin/x-www-browser
+cat >>/usr/bin/x-www-browser <<EOL
+exec -a "\$0" "\$HERE/chromium" "${CHROME_ARGS}"  "\$@"
 
 mkdir -p /etc/chromium/policies/managed/
 cat >>/etc/chromium/policies/managed/default_managed_policy.json <<EOL
@@ -139,5 +118,8 @@ cat >>/etc/chromium/policies/managed/default_managed_policy.json <<EOL
 EOL
 
 # Cleanup for app layer
+echo "Step 6: Cleaning Up..."
 chown -R 1000:0 $HOME
 find /usr/share/ -name "icon-theme.cache" -exec rm -f {} \;
+
+echo "Chromium is now Installed!"

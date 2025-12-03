@@ -9,8 +9,8 @@ ARG BASE_IMAGE="core-ubuntu-noble"
 FROM kasmweb/$BASE_IMAGE:$BASE_TAG
 USER root
 
-ENV HOME /home/kasm-default-profile
-ENV STARTUPDIR /dockerstartup
+ENV HOME=/home/kasm-default-profile
+ENV STARTUPDIR=/dockerstartup
 WORKDIR $HOME
 
 ### Envrionment config 
@@ -22,14 +22,11 @@ ENV DEBIAN_FRONTEND=noninteractive \
     INST_SCRIPTS="/ubuntu/install/tools/install_tools_deluxe.sh \
                   /ubuntu/install/misc/install_tools.sh \
                   /ubuntu/install/chrome/install_chrome.sh \
-                  /ubuntu/install/chromium/install_chromium.sh \
-                  #120225 1113AM - removed temporarily to see if build works /ubuntu/install/firefox/install_firefox.sh \
-                  #120225 1237 - removed temporarily for SSL error even though gpg exists /ubuntu/install/sublime_text/install_sublime_text.sh \
+                  /ubuntu/install/firefox/install_firefox.sh \
+                  #Temporary disabled on 120325 because STILL get gpg error! /ubuntu/install/sublime_text/install_sublime_text.sh \
                   /ubuntu/install/vs_code/install_vs_code.sh \
                   /ubuntu/install/remmina/install_remmina.sh \
                   /ubuntu/install/libre_office/install_libre_office.sh \
-
-                  #BROKE HERE AT SIGNAL, PGP error!!!!!
                   /ubuntu/install/signal/install_signal.sh \
                   /ubuntu/install/gimp/install_gimp.sh \
                   /ubuntu/install/ansible/install_ansible.sh \
@@ -53,7 +50,7 @@ RUN \
   rm -Rf ${INST_DIR}
 
 # Userspace Runtime
-ENV HOME /home/kasm-user
+ENV HOME=/home/kasm-user
 WORKDIR $HOME
 USER 1000
 
