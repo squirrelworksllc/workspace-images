@@ -1,3 +1,4 @@
+# KONDERLA NOTE - UNTESTED AS OF 12/04/2025
 # Copied from official KasmTech repo at "https://github.com/kasmtech/workspaces-images/blob/develop/src/ubuntu/install/"
 #!/usr/bin/env bash
 set -ex
