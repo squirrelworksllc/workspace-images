@@ -1,8 +1,12 @@
 # Copied from official KasmTech repo at "https://github.com/kasmtech/workspaces-images/blob/develop/src/ubuntu/install/"
+# Modified to remove non-ubuntu references and apply updated logic
 #!/usr/bin/env bash
 set -ex
 
+echo "======= Running Final Cleanups ======="
+
 # Distro package cleanup
+echo "Step 1: Distro package cleanup..."
 if [[ "${DISTRO}" == @(almalinux8|almalinux9|fedora39|fedora40|fedora41|oracle8|oracle9|rhel9|rockylinux8|rockylinux9) ]]; then
   dnf clean all
 elif [ "${DISTRO}" == "opensuse" ]; then
@@ -13,6 +17,7 @@ elif [[ "${DISTRO}" == @(debian|kali|parrotos6|ubuntu) ]]; then
 fi
 
 # File cleanups
+echo "Step 2: File cleanup..."
 rm -Rf \
   /home/kasm-default-profile/.cache \
   /home/kasm-user/.cache \
@@ -22,6 +27,7 @@ rm -Rf \
 mkdir -m 1777 /tmp
 
 # Services we don't want to start disable in xfce init
+echo "Step 3: Services cleanup..."
 rm -f \
   /etc/xdg/autostart/blueman.desktop \
   /etc/xdg/autostart/geoclue-demo-agent.desktop \
@@ -55,6 +61,9 @@ rm -f \
   /etc/xdg/autostart/xscreensaver.desktop
 
 # Bins we don't want in the final image
+echo "Step 4: Bins cleanup..."
 if which gnome-keyring-daemon; then
   rm -f $(which gnome-keyring-daemon)
 fi
+
+echo "Cleanup is complete!"

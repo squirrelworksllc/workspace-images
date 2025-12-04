@@ -47,22 +47,9 @@ chown -R 0:0 $HOME
 firefox -headless -CreateProfile "kasm $HOME/.mozilla/firefox/kasm"
 
 
-# ERROR IN STEP 3:
-#
-#[2385] Sandbox: CanCreateUserNamespace() clone() failure: EPERM
-#*** You are running in headless mode.
-#+ echo 'Step 3: FInalize some Customizations...'
-#+ echo 'user_pref("security.sandbox.warn_unprivileged_namespaces", false);'
-#Step 3: FInalize some Customizations...
-#+ chown 1000:1000 /home/kasm-default-profile/.mozilla/firefox/kasm/user.js
-#/dockerstartup/install/ubuntu/install/firefox/install_firefox.sh: line 94: syntax error: unexpected end of file 
-#
-#
-echo "Step 3: FInalize some Customizations..."
-# Silence Firefox security nag "Some of Firefox's features may offer less protection on your current operating system".
-echo 'user_pref("security.sandbox.warn_unprivileged_namespaces", false);' > $HOME/.mozilla/firefox/kasm/user.js
-chown 1000:1000 $HOME/.mozilla/firefox/kasm/user.js
 
+
+echo "Step 3: FInalize some Customizations..."
 # Starting with version 67, Firefox creates a unique profile mapping per installation which is hash generated
 #   based off the installation path. Because that path will be static for our deployments we can assume the hash
 #   and thus assign our profile to the default for the installation
