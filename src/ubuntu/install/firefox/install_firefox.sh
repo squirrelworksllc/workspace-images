@@ -46,9 +46,6 @@ fi
 chown -R 0:0 $HOME
 firefox -headless -CreateProfile "kasm $HOME/.mozilla/firefox/kasm"
 
-
-
-
 echo "Step 3: FInalize some Customizations..."
 # Starting with version 67, Firefox creates a unique profile mapping per installation which is hash generated
 #   based off the installation path. Because that path will be static for our deployments we can assume the hash
