@@ -8,8 +8,8 @@ ARG BASE_IMAGE="core-ubuntu-noble"
 FROM kasmweb/$BASE_IMAGE:$BASE_TAG
 USER root
 
-ENV HOME /home/kasm-default-profile
-ENV STARTUPDIR /dockerstartup
+ENV HOME=/home/kasm-default-profile
+ENV STARTUPDIR=/dockerstartup
 WORKDIR $HOME
 
 ### Envrionment config
@@ -23,12 +23,10 @@ ENV DEBUG=false \
                   /ubuntu/install/tools/install_tools_deluxe.sh \
                   /ubuntu/install/misc/install_tools.sh \
                   /ubuntu/install/chrome/install_chrome.sh \
-                  /ubuntu/install/chromium/install_chromium.sh \
-                  /ubuntu/install/sublime_text/install_sublime_text.sh \
                   /ubuntu/install/vs_code/install_vs_code.sh \
                   /ubuntu/install/cleanup/cleanup.sh"
 
-# Startup Scripts
+# Startup Scripts specific to DIND
 COPY ./src/ubuntu/install/dind/custom_startup.sh $STARTUPDIR/custom_startup.sh
 RUN chmod 755 $STARTUPDIR/custom_startup.sh
 COPY ./src/ubuntu/install/dind/dockerd.conf /etc/supervisor/conf.d/
@@ -49,8 +47,12 @@ RUN \
   rm -Rf ${INST_DIR}
 
 # Userspace Runtime
-ENV HOME /home/kasm-user
+ENV HOME=/home/kasm-user
 WORKDIR $HOME
 USER 1000
 
 CMD ["--tail-log"]
+
+#TODO in Workspace file following modification/update of THIS file:
+# 1 - recalculate the docker size via commandline with "docker inspect -f "{{ .Size }}" squirrelworksllc/ubuntu-noble-dind:1.18.0"
+# 2 - adjust the variable "uncompressed_size_mb"

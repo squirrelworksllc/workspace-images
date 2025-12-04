@@ -55,6 +55,6 @@ USER 1000
 
 CMD ["--tail-log"]
 
-#TODO in Workspace file:
+#TODO in Workspace file following modification/update of THIS file:
 # 1 - recalculate the docker size via commandline with "docker inspect -f "{{ .Size }}" squirrelworksllc/ubuntu-noble-desktop:1.18.0"
 # 2 - adjust the variable "uncompressed_size_mb"
