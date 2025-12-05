@@ -1,12 +1,8 @@
-# Slightly skinned down version of the official KASM Ubuntu Noble workspace dockerfile.
-# Installs Ubuntu and gives root access to OS.
-# Does NOT give DIND (Docker in a Docker).
+# Custom script to create a REMnux Docker. Remnux only supports Ubuntu 20.04 (Focal) as of December 2025
+# so we have to use an older Kasm repo's image to build this. This docker WILL have root.
 
-# DEV NOTE: The tag can change as Kasm changes
-ARG BASE_TAG="1.18.0-rolling-weekly"
-# DEV NOTE: IF an Ubuntu version changes you should be making a new dockerfile!
-ARG BASE_IMAGE="core-ubuntu-noble"
-FROM kasmweb/$BASE_IMAGE:$BASE_TAG
+# DEV NOTE: If REMnux updated to use a newer LTS version we should fix this
+FROM kasmweb/ubuntu-focal-desktop:1.16.1-rolling-weekly
 
 USER root
 
@@ -14,7 +10,6 @@ ENV HOME /home/kasm-default-profile
 ENV STARTUPDIR /dockerstartup
 WORKDIR $HOME
 
-# TODO 12012025 - Copy down environmental scripts from official repo and put them in proper folders
 ### Envrionment config 
 ENV DEBIAN_FRONTEND=noninteractive \
     SKIP_CLEAN=true \
@@ -23,19 +18,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
     INST_DIR=$STARTUPDIR/install \
     INST_SCRIPTS="/ubuntu/install/tools/install_tools_deluxe.sh \
                   /ubuntu/install/misc/install_tools.sh \
-                  /ubuntu/install/chromium/install_chromium.sh \
-                  /ubuntu/install/firefox/install_firefox.sh \
-                  /ubuntu/install/sublime_text/install_sublime_text.sh \
+                  # CRITICAL - ERRORS AND SAYS MUST BE ROOT TO EXECUTE REMNUX'S INSTALL SCRIPT!!!!! /ubuntu/install/remnux/install_remnux.sh \
                   /ubuntu/install/vs_code/install_vs_code.sh \
-                  /ubuntu/install/remmina/install_remmina.sh \
-                  /ubuntu/install/only_office/install_only_office.sh \
-                  /ubuntu/install/signal/install_signal.sh \
-                  /ubuntu/install/gimp/install_gimp.sh \
-                  /ubuntu/install/ansible/install_ansible.sh \
-                  /ubuntu/install/thunderbird/install_thunderbird.sh \
-                  /ubuntu/install/slack/install_slack.sh \
-                  /ubuntu/install/cleanup/cleanup.sh \
-                  /ubuntu/install/remnux/install_remnux.sh"
+                  /ubuntu/install/cleanup/cleanup.sh"
 
 # Copy install scripts
 COPY ./src/ $INST_DIR

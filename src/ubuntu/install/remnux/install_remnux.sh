@@ -1,32 +1,45 @@
 # This script installs the Remnux tools using the "Add to an existing system". 
+# It is meant to be run/installed into a pre-configured Kasm workspace's
+# Dockerfile and was not developed to work as standalone. 
 # For official documentation see "https://docs.remnux.org/install-distro/"
+#!/usr/bin/env bash
+set -ex
 
-#!/bin/bash
-set -x
+echo "======= Installing REMnux Malware Analysis Environment ======="
 
-# Download and install dependancies
-sudo apt update
-sudo apt upgrade -y
-sudo apt autoremove -y
-sudo apt install -y gnupg curl
+export DEBIAN_FRONTEND=noninteractive
+export HOME=/root   # ensure HOME is correct for REMnux
 
-# Download and run the remnux tools
+# Step 1: Installing dependencies
+echo "Step 1: Installing dependencies..."
+apt-get update
+apt-get upgrade -y
+apt-get autoremove -y
+
+# Step 2: Downloading and running REMnux tools
+echo "Step 2: Downloading and running REMnux tools..."
 cd /tmp
-wget https://REMnux.org/remnux-cli
-mv remnux-cli remnux
+curl -sSLo remnux https://remnux.org/remnux-cli
 chmod +x remnux
-sudo remnux install --mode=addon --user=kasm-user
 
-# Cleanup
+# Must run with HOME=/root and /root must exist
+./remnux install --mode=addon --user=kasm-user
+
+# Step 3: Cleaning up
+echo "Step 3: Cleaning up..."
+
+# DO NOT remove /root before REMnux install
 rm -f /usr/share/xfce4/panel/plugins/power-manager-plugin.desktop
-rm -rf \
-  /root \
-  /tmp/*
-mkdir /root
+rm -rf /tmp/*
+
+# Reset HOME **after** REMnux installation
 export HOME=/home/kasm-default-profile
-if [ -z ${SKIP_CLEAN+x} ]; then
+
+if [ -z "${SKIP_CLEAN+x}" ]; then
   apt-get autoclean
   rm -rf \
     /var/lib/apt/lists/* \
     /var/tmp/*
 fi
+
+echo "The REMnux Malware Analysis Environment is configured. Use responsibly!"
