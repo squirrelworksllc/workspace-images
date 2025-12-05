@@ -1,15 +1,19 @@
-# KONDERLA NOTE - UNTESTED AS OF 12/04/2025
 # Copied from official KasmTech repo at "https://github.com/kasmtech/workspaces-images/blob/develop/src/ubuntu/install/"
+# Modified to remove non-ubuntu references and apply updated logic
 #!/usr/bin/env bash
 set -ex
 ARCH=$(arch | sed 's/aarch64/arm64/g' | sed 's/x86_64/amd64/g')
 
+echo "======= Installing Docker-In-A-Docker ======="
+
 # Enable Docker repo
+echo "Step 1: Enabling Docker repo..."
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
 echo "deb [arch=${ARCH}] https://download.docker.com/linux/ubuntu "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" > \
     /etc/apt/sources.list.d/docker.list && \
 
 # Install deps
+echo "Step 2: Installing dependancies..."
 apt-get update
 apt-get install -y \
     ca-certificates \
@@ -29,6 +33,7 @@ apt-get install -y \
     wget
 
 # Install dind init and hacks
+echo "Step 3: Installing DIND..."
 useradd -U dockremap
 usermod -G dockremap dockremap
 echo 'dockremap:165536:65536' >> /etc/subuid
@@ -45,6 +50,7 @@ echo 'hosts: files dns' > /etc/nsswitch.conf
 usermod -aG docker kasm-user
 
 # Install k3d tools
+echo "Step 4: Install k3d tools..."
 wget -q -O - https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
 curl -o \
     /usr/local/bin/kubectl -L \
@@ -52,10 +58,12 @@ curl -o \
 chmod +x /usr/local/bin/kubectl
 
 # Passwordless Sudo
+echo "Step 5: Passwordless sudo..."
 echo 'kasm-user:kasm-user' | chpasswd
 echo 'kasm-user ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 
 # Cleanup
+echo "Step 6: Cleaning up..."
 if [ -z ${SKIP_CLEAN+x} ]; then
     apt-get autoclean
     rm -rf \
@@ -63,3 +71,5 @@ if [ -z ${SKIP_CLEAN+x} ]; then
         /var/tmp/* \
         /tmp/*
 fi
+
+echo "Docker-In-A-Docker is installed! Please practice Inception Responsibly."
