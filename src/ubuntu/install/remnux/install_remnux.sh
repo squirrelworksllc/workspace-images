@@ -22,8 +22,8 @@ cd /tmp
 curl -sSLo remnux https://remnux.org/remnux-cli
 chmod +x remnux
 
-# Must run with HOME=/root and /root must exist
-./remnux install --mode=addon --user=kasm-user
+# Must run with the sudo command, with HOME=/root and /root must exist
+sudo ./remnux install --mode=addon --user=kasm-user
 
 # Step 3: Cleaning up
 echo "Step 3: Cleaning up..."

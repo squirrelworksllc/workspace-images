@@ -6,8 +6,8 @@ FROM kasmweb/ubuntu-focal-desktop:1.16.1-rolling-weekly
 
 USER root
 
-ENV HOME /home/kasm-default-profile
-ENV STARTUPDIR /dockerstartup
+ENV HOME=/home/kasm-default-profile
+ENV STARTUPDIR=/dockerstartup
 WORKDIR $HOME
 
 ### Envrionment config 
@@ -18,8 +18,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     INST_DIR=$STARTUPDIR/install \
     INST_SCRIPTS="/ubuntu/install/tools/install_tools_deluxe.sh \
                   /ubuntu/install/misc/install_tools.sh \
-                  # CRITICAL - ERRORS AND SAYS MUST BE ROOT TO EXECUTE REMNUX'S INSTALL SCRIPT!!!!! /ubuntu/install/remnux/install_remnux.sh \
-                  /ubuntu/install/vs_code/install_vs_code.sh \
+                  /ubuntu/install/remnux/install_remnux.sh \
                   /ubuntu/install/cleanup/cleanup.sh"
 
 # Copy install scripts
@@ -38,7 +37,7 @@ RUN \
   rm -Rf ${INST_DIR}
 
 # Userspace Runtime
-ENV HOME /home/kasm-user
+ENV HOME=/home/kasm-user
 WORKDIR $HOME
 USER 1000
 
