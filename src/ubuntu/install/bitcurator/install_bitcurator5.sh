@@ -19,11 +19,11 @@ echo "Step 2: Downloading and prepping the Bitcurator CLI..."
 cd /tmp
 wget https://github.com/BitCurator/bitcurator-cli/releases/download/v3.0.0/bitcurator-cli-linux
 chmod +x /tmp/bitcurator-cli-linux
-groupadd bcadmin && usermod -aG sudo,bcadmin kasm-user
+groupadd bcadmin && usermod -aG sudo,bcadmin,docker kasm-user
 
 # Step 3: Installing Bitcurator (this will take some time)
 echo "Step 3: Installing Bitcurator. This will take a while, go get some coffee..."
-sudo /tmp/bitcurator install --mode=addon --user=kasm-user
+sudo /tmp/bitcurator-cli-linux install --mode=addon --user=kasm-user
 
 # Step 4: Cleaning up
 echo "Step 4: Cleaning up..."
@@ -41,3 +41,12 @@ if [ -z "${SKIP_CLEAN+x}" ]; then
 fi
 
 echo "Bitcurator 5 is successfully installed!"
+
+
+#Keep getting "timedatectl failed: System has not been booted with systemd as init system (PID 1). Can't operate.
+# 1740.3 Failed to connect to bus: Host is down"
+
+#Let's try this...
+# Do "Manual Builds of the BitCurator Environment" (https://github.com/BitCurator/bitcurator-salt/blob/main/BUILD.md):
+#-set the username to "kasm_user"
+#-should  I use dedicated or addon? Try dedicated first and see if all Kasm functionality works properly...
