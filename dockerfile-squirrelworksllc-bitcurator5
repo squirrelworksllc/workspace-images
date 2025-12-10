@@ -19,7 +19,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     INST_DIR=$STARTUPDIR/install \
     INST_SCRIPTS="/ubuntu/install/tools/install_tools_deluxe.sh \
                   /ubuntu/install/misc/install_tools.sh \
-                  #UNTESTED - Need to divest sh script of the docker stuff and reconfigure /ubuntu/install/bitcurator/install_bitcurator.sh \
+                  /ubuntu/install/bitcurator/install_bitcurator.sh \
                   /ubuntu/install/cleanup/cleanup.sh"
 
 # Copy install scripts
