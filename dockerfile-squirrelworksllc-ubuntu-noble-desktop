@@ -1,6 +1,17 @@
+# ----------------------------- DESCRIPTION -----------------------------
 # Slightly skinned down version of the official KASM Ubuntu Noble workspace dockerfile.
 # Installs Ubuntu and gives root access to OS.
 # Does NOT give DIND (Docker in a Docker).
+#
+# ----------------------------- INSTRUCTIONS -----------------------------
+# In Dockerfile
+# 1 - Decide if you are using the "1.18.0" or "develop" branch.
+# 2 - When you build the dockerfile, be sure you specify the correct branch: squirrelworksllc/ubuntu-noble-dind:BRANCH-GOES-HERE
+# In Workspace file following modification/update of THIS file:
+# 1 - recalculate the docker size via commandline with one of the following (depending on docker tag used):
+#     production: "docker inspect -f "{{ .Size }}" squirrelworksllc/ubuntu-noble-desktop:1.18.0"
+#     development: "docker inspect -f "{{ .Size }}" squirrelworksllc/ubuntu-noble-desktop:develop"
+# 2 - adjust the variable "uncompressed_size_mb"
 
 # DEV NOTE: The tag can change as Kasm changes
 ARG BASE_TAG="1.18.0-rolling-weekly"
@@ -58,7 +69,3 @@ WORKDIR $HOME
 USER 1000
 
 CMD ["--tail-log"]
-
-#TODO in Workspace file following modification/update of THIS file:
-# 1 - recalculate the docker size via commandline with "docker inspect -f "{{ .Size }}" squirrelworksllc/ubuntu-noble-desktop:1.18.0"
-# 2 - adjust the variable "uncompressed_size_mb"

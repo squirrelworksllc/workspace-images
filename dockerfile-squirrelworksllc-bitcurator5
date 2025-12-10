@@ -1,5 +1,16 @@
+# ----------------------------- DESCRIPTION -----------------------------
 # Custom script to create a Bitcurator5 Docker. Bitcurator 5's newest version supports up to Ubuntu Noble so
 # this script will base the "root OS" off of the kasmweb ubuntu noble "Docker In a Docker" desktop.
+#
+# ----------------------------- INSTRUCTIONS -----------------------------
+# In Dockerfile
+# 1 - Decide if you are using the "1.18.0" or "develop" branch.
+# 2 - When you build the dockerfile, be sure you specify the correct branch: squirrelworksllc/ubuntu-noble-dind:BRANCH-GOES-HERE
+# In Workspace file following modification/update of THIS file:
+# 1 - recalculate the docker size via commandline with one of the following (depending on docker tag used):
+#     production: "docker inspect -f "{{ .Size }}" squirrelworksllc/bitcurator5:latest"
+#     development: "docker inspect -f "{{ .Size }}" squirrelworksllc/bitcurator5:develop"
+# 2 - adjust the variable "uncompressed_size_mb"
 
 # DEV NOTE: The tag can change as Kasm changes
 ARG BASE_TAG="1.18.0-rolling-weekly"
@@ -43,7 +54,3 @@ WORKDIR $HOME
 USER 1000
 
 CMD ["--tail-log"]
-
-#TODO in Workspace file following modification/update of THIS file:
-# 1 - recalculate the docker size via commandline with "docker inspect -f "{{ .Size }}" squirrelworksllc/bitcurator5:1.18.0"
-# 2 - adjust the variable "uncompressed_size_mb"

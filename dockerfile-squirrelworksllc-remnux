@@ -1,5 +1,16 @@
+# ----------------------------- DESCRIPTION -----------------------------
 # Custom script to create a REMnux Docker. Remnux only supports Ubuntu 20.04 (Focal) as of December 2025
 # so we have to use an older Kasm repo's image to build this. This docker WILL have root.
+#
+# ----------------------------- INSTRUCTIONS -----------------------------
+# In Dockerfile
+# 1 - Decide if you are using the "1.18.0" or "develop" branch.
+# 2 - When you build the dockerfile, be sure you specify the correct branch: squirrelworksllc/ubuntu-noble-dind:BRANCH-GOES-HERE
+# In Workspace file following modification/update of THIS file:
+# 1 - recalculate the docker size via commandline with one of the following (depending on docker tag used):
+#     production: "docker inspect -f "{{ .Size }}" squirrelworksllc/remnux:1.18.0"
+#     development: "docker inspect -f "{{ .Size }}" squirrelworksllc/remnux:develop"
+# 2 - adjust the variable "uncompressed_size_mb"
 
 # DEV NOTE: If REMnux updated to use a newer LTS version we should fix this
 FROM kasmweb/ubuntu-focal-desktop:1.16.1-rolling-weekly
