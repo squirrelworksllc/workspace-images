@@ -1,9 +1,10 @@
-# Custom script to create a REMnux Docker. Remnux only supports Ubuntu 20.04 (Focal) as of December 2025
-# so we have to use an older Kasm repo's image to build this. This docker WILL have root.
+# Custom script to create a Bitcurator5 Docker. Bitcurator 5's newest version supports up to Ubuntu Noble so
+# this script will base the "root OS" off of the kasmweb ubuntu noble desktop weekly rolling.
 
-# DEV NOTE: If REMnux updated to use a newer LTS version we should fix this
-FROM kasmweb/ubuntu-focal-desktop:1.16.1-rolling-weekly
-
+# DEV NOTE: The tag can change as Kasm changes
+ARG BASE_TAG="1.18.0-rolling-weekly"
+# DEV NOTE: If Bitcurator is updated to use a newer LTS version, create a new dockerfile!
+FROM kasmweb/core-ubuntu-noble:$BASE_TAG
 USER root
 
 ENV HOME=/home/kasm-default-profile
@@ -18,13 +19,13 @@ ENV DEBIAN_FRONTEND=noninteractive \
     INST_DIR=$STARTUPDIR/install \
     INST_SCRIPTS="/ubuntu/install/tools/install_tools_deluxe.sh \
                   /ubuntu/install/misc/install_tools.sh \
-                  #There is an issue when installing "remnux-perl-packages" BUT the script works properly otherwise...might need to execute in a Kasm myself to get logs /ubuntu/install/remnux/install_remnux.sh \
+                  #UNTESTED - Need to divest sh script of the docker stuff and reconfigure /ubuntu/install/bitcurator/install_bitcurator.sh \
                   /ubuntu/install/cleanup/cleanup.sh"
 
 # Copy install scripts
 COPY ./src/ $INST_DIR
 
-# Run script installations
+# Run installations
 RUN \
   for SCRIPT in $INST_SCRIPTS; do \
     bash ${INST_DIR}${SCRIPT} || exit 1; \
@@ -42,3 +43,7 @@ WORKDIR $HOME
 USER 1000
 
 CMD ["--tail-log"]
+
+#TODO in Workspace file following modification/update of THIS file:
+# 1 - recalculate the docker size via commandline with "docker inspect -f "{{ .Size }}" squirrelworksllc/bitcurator5:1.18.0"
+# 2 - adjust the variable "uncompressed_size_mb"
