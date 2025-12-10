@@ -23,13 +23,14 @@ ENV DEBIAN_FRONTEND=noninteractive \
                   /ubuntu/install/misc/install_tools.sh \
                   /ubuntu/install/chrome/install_chrome.sh \
                   /ubuntu/install/firefox/install_firefox.sh \
+                  #TODO - Fix why thunderbird isn't running properly and instead throwing a needs snap error
+                  /ubuntu/install/thunderbird/install_thunderbird.sh \
                   /ubuntu/install/vs_code/install_vs_code.sh \
                   /ubuntu/install/remmina/install_remmina.sh \
                   /ubuntu/install/libre_office/install_libre_office.sh \
                   /ubuntu/install/signal/install_signal.sh \
                   /ubuntu/install/gimp/install_gimp.sh \
                   /ubuntu/install/ansible/install_ansible.sh \
-                  /ubuntu/install/thunderbird/install_thunderbird.sh \
                   /ubuntu/install/slack/install_slack.sh \
                   /ubuntu/install/discord/install_discord.sh \
                   /ubuntu/install/teams/install_teams.sh \
