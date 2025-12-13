@@ -34,7 +34,6 @@ ENV DEBIAN_FRONTEND=noninteractive \
                   /ubuntu/install/misc/install_tools.sh \
                   /ubuntu/install/chrome/install_chrome.sh \
                   /ubuntu/install/firefox/install_firefox.sh \
-                  #TODO - Fix why thunderbird isn't running properly and instead throwing a needs snap error
                   /ubuntu/install/thunderbird/install_thunderbird.sh \
                   /ubuntu/install/vs_code/install_vs_code.sh \
                   /ubuntu/install/remmina/install_remmina.sh \
