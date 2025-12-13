@@ -1,3 +1,4 @@
+WIP - NOT WORKING
 # ----------------------------- DESCRIPTION -----------------------------
 # Custom script to create a REMnux Docker. Remnux only supports Ubuntu 20.04 (Focal) as of December 2025
 # so we have to use an older Kasm repo's image to build this. This docker WILL have root.

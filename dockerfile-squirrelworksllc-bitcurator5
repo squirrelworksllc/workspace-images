@@ -1,3 +1,4 @@
+WIP - NOT WORKING
 # ----------------------------- DESCRIPTION -----------------------------
 # Custom script to create a Bitcurator5 Docker. Bitcurator 5's newest version supports up to Ubuntu Noble so
 # this script will base the "root OS" off of the kasmweb ubuntu noble "Docker In a Docker" desktop.
