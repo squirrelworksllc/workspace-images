@@ -20,7 +20,7 @@ ENV INST_SCRIPTS=$STARTUPDIR/install
 WORKDIR $HOME
 ######### Customize Container Here ###########
 RUN apt-get update && apt-get update -y
-RUN apt-get install python3 python3-pip libssl-dev wget gpg apt-transport-https automake libtool yara -y
+RUN apt-get install libssl-dev automake libtool yara -y
 RUN pip3 install yara-python
 RUN pip3 install -U yls-yara
 # Begin Step: Add VSCode to repository
