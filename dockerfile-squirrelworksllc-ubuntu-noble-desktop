@@ -45,6 +45,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
                   /ubuntu/install/discord/install_discord.sh \
                   /ubuntu/install/teams/install_teams.sh \
                   /ubuntu/install/obsidian/install_obsidian.sh \
+                  /ubuntu/install/infosec_yara/install_infosec_yara.sh \
                   /ubuntu/install/cleanup/cleanup.sh"
 
 # Copy install scripts
