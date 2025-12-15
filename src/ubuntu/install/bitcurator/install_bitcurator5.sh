@@ -3,13 +3,14 @@
 # Dockerfile and was not developed to work as standalone. 
 # For official documentation see "https://github.com/BitCurator/bitcurator-distro/wiki/BitCurator-Quick-Start-Guide"
 #!/usr/bin/env bash
-set -ex
+set -euo pipefail
+source /dockerstartup/install/ubuntu/install/common/00_apt_helper.sh
 
 echo "======= Installing Bitcurator 5 Environment ======="
 
 # Step 1: Installing depencencies
 echo "Step 1: Installing dependencies..."
-apt update
+apt_update_if_needed
 apt upgrade -y
 apt install nano build-essential gcc make perl curl gnupg -y
 apt install --reinstall ca-certificates -y

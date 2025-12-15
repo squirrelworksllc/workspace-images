@@ -1,101 +1,78 @@
-# Copied from official KasmTech repo at "https://github.com/kasmtech/workspaces-images/blob/develop/src/ubuntu/install/"
-# Modified to remove non-ubuntu references and apply updated logic
+# This script is meant to install Firefox browser and to be called from a Dockerfile.
+# Modified to remove non-ubuntu references and apply updated logic.
 #!/usr/bin/env bash
-set -xe
-
-# Helper to strip any stray CR characters (in case of CRLF line endings)
-clean() { printf '%s' "$1" | tr -d '\r'; }
+set -euo pipefail
+source /dockerstartup/install/ubuntu/install/common/00_apt_helper.sh
 
 echo "======= Install Firefox ======="
-echo "Step 1: Install dependencies and configure Mozilla repo..."
 
-# 1) Dependencies
-apt-get update
-apt-get install -y wget gnupg ca-certificates
+. /etc/os-release
+ARCH="$(dpkg --print-architecture)"
 
-# 2) Paths (sanitized to avoid trailing \r)
-KEYRING_PATH=$(clean "/usr/share/keyrings/mozilla-archive-keyring.gpg")
-LIST_FILE=$(clean "/etc/apt/sources.list.d/mozilla-firefox.list")
-PREF_FILE=$(clean "/etc/apt/preferences.d/mozilla-firefox")
+apt_update_if_needed
+apt_install gnupg
 
-# 3) Download and dearmor GPG key
-mkdir -p /usr/share/keyrings
-wget -qO /tmp/mozilla.gpg https://packages.mozilla.org/apt/repo-signing-key.gpg
-gpg --dearmor -o "$KEYRING_PATH" /tmp/mozilla.gpg
-rm /tmp/mozilla.gpg
+if [ "${ID}" = "ubuntu" ]; then
+  echo "Ubuntu detected: installing Firefox from Mozilla APT repo (non-snap)."
 
-# 4) Add Mozilla Firefox APT repo
-echo "deb [signed-by=$KEYRING_PATH] https://packages.mozilla.org/apt mozilla main" | \
-  tee "$LIST_FILE" > /dev/null
+  KEYRING_PATH="/etc/apt/keyrings/mozilla.gpg"
+  LIST_FILE="/etc/apt/sources.list.d/mozilla-firefox.list"
+  PREF_FILE="/etc/apt/preferences.d/mozilla-firefox"
 
-# 5) Pin Mozilla repo so its Firefox wins over Ubuntu's
-cat <<EOF | tee "$PREF_FILE" > /dev/null
-Package: *
+  install -m 0755 -d /etc/apt/keyrings
+
+  wget -qO /tmp/mozilla.gpg https://packages.mozilla.org/apt/repo-signing-key.gpg
+  gpg --dearmor -o "${KEYRING_PATH}" /tmp/mozilla.gpg
+  rm -f /tmp/mozilla.gpg
+  chmod a+r "${KEYRING_PATH}"
+
+  cat >"${LIST_FILE}" <<EOF
+deb [signed-by=${KEYRING_PATH}] https://packages.mozilla.org/apt mozilla main
+EOF
+
+  # Pin only Firefox packages, not Package: *
+  cat >"${PREF_FILE}" <<'EOF'
+Package: firefox*
 Pin: origin packages.mozilla.org
 Pin-Priority: 1000
 EOF
 
-# 6) Install Firefox
-apt-get update
-apt-get install -y firefox
+  apt_refresh_after_repo_change
+  apt_install firefox
 
-# 7) Print the Firefox version JUST to be sure
+else
+  echo "${ID} detected: installing Firefox ESR from distro repos."
+  apt_install firefox-esr
+fi
+
 echo "Firefox version installed:"
-firefox --version || true
+(firefox --version || firefox-esr --version) || true
 
-echo "Step 2: Create the Static Default profile..."
-if grep -q "ID=debian" /etc/os-release || grep -q "ID=parrot" /etc/os-release; then
-  if [ "${ARCH}" = "amd64" ]; then
-    preferences_file=/usr/lib/firefox/defaults/pref/firefox.js
-  else
-    preferences_file=/usr/lib/firefox-esr/defaults/pref/firefox.js
-  fi
-else # else if any other Debian/Ubuntu variant
-  preferences_file=/usr/lib/firefox/browser/defaults/preferences/firefox.js
+# Optional: create a default profile for the Kasm user home
+echo "Creating default profile..."
+mkdir -p "$HOME/.mozilla/firefox"
+
+# Use whichever binary exists
+FF_BIN=""
+if command -v firefox >/dev/null 2>&1; then
+  FF_BIN="firefox"
+elif command -v firefox-esr >/dev/null 2>&1; then
+  FF_BIN="firefox-esr"
 fi
 
-chown -R 0:0 "$HOME"
-firefox -headless -CreateProfile "kasm $HOME/.mozilla/firefox/kasm"
-
-echo "Step 3: Finalize some Customizations..."
-# Starting with version 67, Firefox creates a unique profile mapping per installation which is hash generated
-#   based off the installation path. Because that path will be static for our deployments we can assume the hash
-#   and thus assign our profile to the default for the installation
-
-# if Kali
-if grep -q "ID=kali" /etc/os-release; then
-  cat >>"$HOME/.mozilla/firefox/profiles.ini" <<EOL
-[Install3B6073811A6ABF12]
-Default=kasm
-Locked=1
-EOL
-
-# if Debian OR ParrotOS
-elif grep -q "ID=debian" /etc/os-release || grep -q "ID=parrot" /etc/os-release; then
-  if [ "${ARCH}" != "amd64" ]; then
-    cat >>"$HOME/.mozilla/firefox/profiles.ini" <<EOL
-[Install3B6073811A6ABF12]
-Default=kasm
-Locked=1
-EOL
-  else
-    cat >>"$HOME/.mozilla/firefox/profiles.ini" <<EOL
-[Install4F96D1932A9F858E]
-Default=kasm
-Locked=1
-EOL
-  fi
+if [ -n "$FF_BIN" ]; then
+  "$FF_BIN" -headless -CreateProfile "kasm $HOME/.mozilla/firefox/kasm" || true
 fi
 
-# Cleanup for app layer
-echo "Step 4: Cleaning Up..."
-chown -R 1000:0 "$HOME"
-find /usr/share/ -name "icon-theme.cache" -exec rm -f {} \;
-
-if [ -f "$HOME/Desktop/firefox.desktop" ]; then
-  chmod +x "$HOME/Desktop/firefox.desktop"
+# Desktop shortcut (if available)
+mkdir -p "$HOME/Desktop"
+if [ -f /usr/share/applications/firefox.desktop ]; then
+  cp /usr/share/applications/firefox.desktop "$HOME/Desktop/firefox.desktop"
+elif [ -f /usr/share/applications/firefox-esr.desktop ]; then
+  cp /usr/share/applications/firefox-esr.desktop "$HOME/Desktop/firefox.desktop"
 fi
 
-chown -R 1000:1000 "$HOME/.mozilla"
+chmod +x "$HOME/Desktop/firefox.desktop" 2>/dev/null || true
+chown 1000:1000 "$HOME/Desktop/firefox.desktop" 2>/dev/null || true
 
-echo "Firefox is now installed!"
+echo "Firefox installed!"

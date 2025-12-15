@@ -1,75 +1,70 @@
 # Copied from official KasmTech repo at "https://github.com/kasmtech/workspaces-images/blob/develop/src/ubuntu/install/"
 # Modified to remove non-ubuntu references and apply updated logic
 #!/usr/bin/env bash
-set -ex
-ARCH=$(arch | sed 's/aarch64/arm64/g' | sed 's/x86_64/amd64/g')
+set -euo pipefail
+source /dockerstartup/install/ubuntu/install/common/00_apt_helper.sh
+
+ARCH="$(dpkg --print-architecture)"
+. /etc/os-release
 
 echo "======= Installing Docker-In-A-Docker ======="
 
-# Enable Docker repo
 echo "Step 1: Enabling Docker repo..."
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
-echo "deb [arch=${ARCH}] https://download.docker.com/linux/ubuntu "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" > \
-    /etc/apt/sources.list.d/docker.list && \
+apt_update_if_needed
+apt_install ca-certificates curl
 
-# Install deps
-echo "Step 2: Installing dependancies..."
-apt-get update
-apt-get install -y \
-    ca-certificates \
-    curl \
-    dbus-user-session \
-    docker-buildx-plugin \
-    docker-ce \
-    docker-ce-cli \
-    docker-compose-plugin \
-    fuse-overlayfs \
-    iptables \
-    kmod \
-    openssh-client \
-    sudo \
-    supervisor \
-    uidmap \
-    wget
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+chmod a+r /etc/apt/keyrings/docker.gpg
 
-# Install dind init and hacks
+cat >/etc/apt/sources.list.d/docker.list <<EOF
+deb [arch=${ARCH} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu ${VERSION_CODENAME} stable
+EOF
+
+apt_refresh_after_repo_change
+
+echo "Step 2: Installing dependencies..."
+apt_install \
+  dbus-user-session \
+  docker-buildx-plugin \
+  docker-ce \
+  docker-ce-cli \
+  docker-compose-plugin \
+  fuse-overlayfs \
+  iptables \
+  kmod \
+  openssh-client \
+  sudo \
+  supervisor \
+  uidmap \
+  wget \
+  gnupg
+
 echo "Step 3: Installing DIND..."
-useradd -U dockremap
-usermod -G dockremap dockremap
-echo 'dockremap:165536:65536' >> /etc/subuid
-echo 'dockremap:165536:65536' >> /etc/subgid
-curl -o \
-    /usr/local/bin/dind -L \
-    https://raw.githubusercontent.com/moby/moby/master/hack/dind
-chmod +x /usr/local/bin/dind
-curl -o \
-    /usr/local/bin/dockerd-entrypoint.sh -L \
-    https://kasm-ci.s3.amazonaws.com/dockerd-entrypoint.sh
-chmod +x /usr/local/bin/dockerd-entrypoint.sh
-echo 'hosts: files dns' > /etc/nsswitch.conf
-usermod -aG docker kasm-user
+useradd -U dockremap || true
+grep -q '^dockremap:165536:65536$' /etc/subuid || echo 'dockremap:165536:65536' >> /etc/subuid
+grep -q '^dockremap:165536:65536$' /etc/subgid || echo 'dockremap:165536:65536' >> /etc/subgid
 
-# Install k3d tools
+curl -fsSL -o /usr/local/bin/dind https://raw.githubusercontent.com/moby/moby/master/hack/dind
+chmod +x /usr/local/bin/dind
+
+curl -fsSL -o /usr/local/bin/dockerd-entrypoint.sh https://kasm-ci.s3.amazonaws.com/dockerd-entrypoint.sh
+chmod +x /usr/local/bin/dockerd-entrypoint.sh
+
+echo 'hosts: files dns' > /etc/nsswitch.conf
+usermod -aG docker kasm-user || true
+
 echo "Step 4: Install k3d tools..."
 wget -q -O - https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
-curl -o \
-    /usr/local/bin/kubectl -L \
-    "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/${ARCH}/kubectl"
+curl -fsSL -o /usr/local/bin/kubectl \
+  "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/${ARCH}/kubectl"
 chmod +x /usr/local/bin/kubectl
 
-# Passwordless Sudo
 echo "Step 5: Passwordless sudo..."
 echo 'kasm-user:kasm-user' | chpasswd
 echo 'kasm-user ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 
-# Cleanup
 echo "Step 6: Cleaning up..."
-if [ -z ${SKIP_CLEAN+x} ]; then
-    apt-get autoclean
-    rm -rf \
-        /var/lib/apt/lists/* \
-        /var/tmp/* \
-        /tmp/*
-fi
+apt_cleanup
 
 echo "Docker-In-A-Docker is installed! Please practice Inception Responsibly."

@@ -22,6 +22,8 @@ USER root
 
 ENV HOME=/home/kasm-default-profile
 ENV STARTUPDIR=/dockerstartup
+# If Chrome is being installed in the image, manually set to true. else set to false!
+ENV INSTALL_CHROME=true
 WORKDIR $HOME
 
 ### Envrionment config 
@@ -30,8 +32,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     KASM_RX_HOME=$STARTUPDIR/kasmrx \
     DONT_PROMPT_WSL_INSTALL="No_Prompt_please" \
     INST_DIR=$STARTUPDIR/install \
-    INST_SCRIPTS="/ubuntu/install/tools/install_tools_deluxe.sh \
-                  /ubuntu/install/misc/install_tools.sh \
+    INST_SCRIPTS="/ubuntu/install/tools/install_tools.sh \
                   /ubuntu/install/chrome/install_chrome.sh \
                   /ubuntu/install/firefox/install_firefox.sh \
                   /ubuntu/install/thunderbird/install_thunderbird.sh \
@@ -46,22 +47,24 @@ ENV DEBIAN_FRONTEND=noninteractive \
                   /ubuntu/install/teams/install_teams.sh \
                   /ubuntu/install/obsidian/install_obsidian.sh \
                   /ubuntu/install/infosec_yara/install_infosec_yara.sh \
-                  /ubuntu/install/cleanup/cleanup.sh"
+                  /ubuntu/install/tesseract_ocr/install_tesseract_ocr.sh \
+                  /ubuntu/install/common/01_cleanup.sh"
 
 # Copy install scripts
 COPY ./src/ $INST_DIR
 
 # Run installations
-RUN \
+RUN set -eux; \
+  apt-get update; \
   for SCRIPT in $INST_SCRIPTS; do \
-    bash ${INST_DIR}${SCRIPT} || exit 1; \
-  done && \
-  $STARTUPDIR/set_user_permission.sh $HOME && \
-  rm -f /etc/X11/xinit/Xclients && \
-  chown 1000:0 $HOME && \
-  mkdir -p /home/kasm-user && \
-  chown -R 1000:0 /home/kasm-user && \
-  rm -Rf ${INST_DIR}
+    bash "${INST_DIR}${SCRIPT}"; \
+  done; \
+  "$STARTUPDIR/set_user_permission.sh" "$HOME"; \
+  rm -f /etc/X11/xinit/Xclients; \
+  chown 1000:0 "$HOME"; \
+  mkdir -p /home/kasm-user; \
+  chown -R 1000:0 /home/kasm-user; \
+  rm -rf "${INST_DIR}"
 
 # Userspace Runtime
 ENV HOME=/home/kasm-user

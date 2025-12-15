@@ -1,44 +1,39 @@
-# Copied from official KasmTech repo at "https://github.com/kasmtech/workspaces-images/blob/develop/src/ubuntu/install/"
-# Modified to remove non-ubuntu references and apply updated logic
+# This script installs Slack. It is meant to be called from a Dockerfile
+# and installed on Ubuntu and/or a debian variant.
 #!/usr/bin/env bash
-set -ex
+set -euo pipefail
+source /dockerstartup/install/ubuntu/install/common/00_apt_helper.sh
 
 echo "======= Installing Slack ======="
-echo "Step 1: Checking the CPU Architecture..."
-ARCH=$(arch | sed 's/aarch64/arm64/g' | sed 's/x86_64/amd64/g')
 
-if [ "${ARCH}" == "arm64" ] ; then
-    echo "Slack for arm64 currently not supported, skipping install"
-    exit 0
+ARCH="$(dpkg --print-architecture)"
+if [ "${ARCH}" != "amd64" ]; then
+  echo "Slack .deb is amd64-only; skipping on ${ARCH}."
+  exit 0
 fi
 
-# This might prove fragile depending on how often slack changes it's website.
-echo "Step 2: Download and install the app..."
-version=$(curl -q https://slack.com/downloads/linux | grep page-downloads__hero__meta-text__version | sed 's/.*Version //g' | cut -d "<" -f1 | head -1)
-echo Detected slack version $version
+apt_update_if_needed
+# wget/curl should already exist from install_tools, but this is safe if not:
+# apt_install wget ca-certificates
 
-wget -q https://downloads.slack-edge.com/desktop-releases/linux/x64/${version}/slack-desktop-${version}-amd64.deb
-apt-get update
-apt-get install -y ./slack-desktop-${version}-${ARCH}.deb
-rm slack-desktop-${version}-${ARCH}.deb
-if [ -z ${SKIP_CLEAN+x} ]; then
-  apt-get autoclean
-  rm -rf \
-    /var/lib/apt/lists/* \
-    /var/tmp/* \
-    /tmp/*
+echo "Downloading Slack..."
+wget -qO /tmp/slack.deb https://downloads.slack-edge.com/linux_releases/slack-desktop-latest-amd64.deb
+
+echo "Installing Slack..."
+apt-get install -y /tmp/slack.deb
+rm -f /tmp/slack.deb
+
+echo "Desktop shortcut..."
+mkdir -p "$HOME/Desktop"
+
+DESKTOP_FILE="/usr/share/applications/slack.desktop"
+if [ -f "$DESKTOP_FILE" ]; then
+  # Add --no-sandbox (best-effort)
+  sed -i 's@^Exec=/usr/bin/slack@Exec=/usr/bin/slack --no-sandbox@' "$DESKTOP_FILE" || true
+
+  cp "$DESKTOP_FILE" "$HOME/Desktop/slack.desktop"
+  chmod +x "$HOME/Desktop/slack.desktop"
+  chown 1000:1000 "$HOME/Desktop/slack.desktop" 2>/dev/null || true
 fi
 
-# Modify the desktop icon
-echo "Step 3: Modify the desktop icon..."
-sed -i 's,/usr/bin/slack,/usr/bin/slack --no-sandbox,g' /usr/share/applications/slack.desktop
-cp /usr/share/applications/slack.desktop $HOME/Desktop/
-chmod +x $HOME/Desktop/slack.desktop
-chown 1000:1000 $HOME/Desktop/slack.desktop
-
-# Cleanup for app layer
-echo "Step 4: Cleaning up..."
-chown -R 1000:0 $HOME
-find /usr/share/ -name "icon-theme.cache" -exec rm -f {} \;
-
-echo "Slack is now Installed!"
+echo "Slack installed!"

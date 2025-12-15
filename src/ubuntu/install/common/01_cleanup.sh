@@ -1,32 +1,43 @@
-# Copied from official KasmTech repo at "https://github.com/kasmtech/workspaces-images/blob/develop/src/ubuntu/install/"
-# Modified to remove non-ubuntu references and apply updated logic
+# This is the cleanup script that runs following app installs.
 #!/usr/bin/env bash
-set -ex
+set -euo pipefail
+set -x
 
 echo "======= Running Final Cleanups ======="
 
-# Distro package cleanup
-echo "Step 1: Distro package cleanup..."
-if [[ "${DISTRO}" == @(almalinux8|almalinux9|fedora39|fedora40|fedora41|oracle8|oracle9|rhel9|rockylinux8|rockylinux9) ]]; then
-  dnf clean all
-elif [ "${DISTRO}" == "opensuse" ]; then
-  zypper clean --all
-elif [[ "${DISTRO}" == @(debian|kali|parrotos6|ubuntu) ]]; then
-  apt-get autoremove -y
-  apt-get autoclean -y
+: "${SKIP_CLEAN:=false}"
+
+. /etc/os-release
+case "${ID}" in
+  ubuntu|debian|kali) echo "Detected distro: ${ID}" ;;
+  *) echo "Unsupported distro for this cleanup script: ${ID}" >&2; exit 1 ;;
+esac
+
+if [ "${SKIP_CLEAN}" = "true" ]; then
+  echo "SKIP_CLEAN=true; skipping final cleanup."
+  exit 0
 fi
 
-# File cleanups
+echo "Step 1: Distro package cleanup..."
+apt-get autoremove -y
+apt-get autoclean -y
+apt-get clean
+
 echo "Step 2: File cleanup..."
-rm -Rf \
+rm -rf /root/.cache || true
+rm -rf \
   /home/kasm-default-profile/.cache \
   /home/kasm-user/.cache \
-  /tmp \
   /var/lib/apt/lists/* \
   /var/tmp/*
-mkdir -m 1777 /tmp
 
-# Services we don't want to start disable in xfce init
+rm -rf /tmp/*
+mkdir -p /tmp
+chmod 1777 /tmp
+
+echo "Step 2b: Remove icon caches..."
+find /usr/share/ -name "icon-theme.cache" -exec rm -f {} \; || true
+
 echo "Step 3: Services cleanup..."
 rm -f \
   /etc/xdg/autostart/blueman.desktop \
@@ -60,10 +71,13 @@ rm -f \
   /etc/xdg/autostart/xfce-polkit.desktop \
   /etc/xdg/autostart/xscreensaver.desktop
 
-# Bins we don't want in the final image
 echo "Step 4: Bins cleanup..."
-if which gnome-keyring-daemon; then
-  rm -f $(which gnome-keyring-daemon)
+if command -v gnome-keyring-daemon >/dev/null 2>&1; then
+  rm -f "$(command -v gnome-keyring-daemon)"
 fi
+
+echo "Step 5: Ownership fix..."
+chown -R 1000:0 /home/kasm-user/.config /home/kasm-user/Desktop 2>/dev/null || true
+chown -R 1000:0 /home/kasm-default-profile/.config /home/kasm-default-profile/Desktop 2>/dev/null || true
 
 echo "Cleanup is complete!"

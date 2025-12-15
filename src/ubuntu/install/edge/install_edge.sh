@@ -1,79 +1,122 @@
-# KONDERLA NOTE - UNTESTED AS OF 12/04/2025
-# Copied from official KasmTech repo at "https://github.com/kasmtech/workspaces-images/blob/develop/src/ubuntu/install/"
+# Script to install Microsoft Edge. This script is meant to be called from a Dockerfile
+# and may not work on it's own.
 #!/usr/bin/env bash
-set -ex
+set -euo pipefail
+source /dockerstartup/install/ubuntu/install/common/00_apt_helper.sh
+
+echo "======= Installing Microsoft Edge ======="
 
 CHROME_ARGS="--password-store=basic --no-sandbox --ignore-gpu-blocklist --user-data-dir --no-first-run --simulate-outdated-no-au='Tue, 31 Dec 2099 23:59:59 GMT'"
 
-apt-get update
+# deps
+apt_update_if_needed
+apt_install curl ca-certificates gnupg
 
-EDGE_BUILD=$(curl -q https://packages.microsoft.com/repos/edge/pool/main/m/microsoft-edge-stable/ | grep href | grep .deb | sed 's/.*href="//g'  | cut -d '"' -f1 | sort --version-sort | tail -1)
+. /etc/os-release
 
-wget -q -O edge.deb https://packages.microsoft.com/repos/edge/pool/main/m/microsoft-edge-stable/$EDGE_BUILD --no-check-certificate
-apt-get install -y ./edge.deb
-rm edge.deb
+# Determine Microsoft repo config package URL (packages-microsoft-prod.deb)
+# Microsoft publishes per-distro config packages under:
+# https://packages.microsoft.com/config/<distribution>/<version>/packages-microsoft-prod.deb :contentReference[oaicite:2]{index=2}
+MSCFG_URL=""
 
-cp /usr/share/applications/microsoft-edge.desktop $HOME/Desktop/
-chown 1000:1000 $HOME/Desktop/microsoft-edge.desktop
-chmod +x $HOME/Desktop/microsoft-edge.desktop
+case "${ID}" in
+  ubuntu)
+    # VERSION_ID is like "24.04"
+    if [ -z "${VERSION_ID:-}" ]; then
+      echo "VERSION_ID missing; cannot determine Microsoft repo config package for Ubuntu." >&2
+      exit 1
+    fi
+    MSCFG_URL="https://packages.microsoft.com/config/ubuntu/${VERSION_ID}/packages-microsoft-prod.deb"
+    ;;
+  debian)
+    # VERSION_ID is like "12"
+    if [ -z "${VERSION_ID:-}" ]; then
+      echo "VERSION_ID missing; cannot determine Microsoft repo config package for Debian." >&2
+      exit 1
+    fi
+    DEB_MAJOR="${VERSION_ID%%.*}"
+    MSCFG_URL="https://packages.microsoft.com/config/debian/${DEB_MAJOR}/packages-microsoft-prod.deb"
+    ;;
+  kali)
+    # Kali is Debian-based; use Debian major version if available.
+    # If Kali doesn't provide VERSION_ID, default to Debian 12 (current common base).
+    DEB_MAJOR="${VERSION_ID:-12}"
+    DEB_MAJOR="${DEB_MAJOR%%.*}"
+    MSCFG_URL="https://packages.microsoft.com/config/debian/${DEB_MAJOR}/packages-microsoft-prod.deb"
+    ;;
+  *)
+    echo "Unsupported distro for Edge installer: ${ID}" >&2
+    exit 1
+    ;;
+esac
 
-mv /usr/bin/microsoft-edge-stable  /usr/bin/microsoft-edge-stable-orig
+echo "Using Microsoft repo config: ${MSCFG_URL}"
+
+# Install Microsoft repo config package
+curl -fsSL -o /tmp/packages-microsoft-prod.deb "${MSCFG_URL}"
+dpkg -i /tmp/packages-microsoft-prod.deb
+rm -f /tmp/packages-microsoft-prod.deb
+
+# Repo changed -> refresh
+apt_refresh_after_repo_change
+
+# Install Edge
+apt_install microsoft-edge-stable
+
+# Desktop shortcut
+mkdir -p "$HOME/Desktop"
+if [ -f /usr/share/applications/microsoft-edge.desktop ]; then
+  cp /usr/share/applications/microsoft-edge.desktop "$HOME/Desktop/microsoft-edge.desktop"
+  chmod +x "$HOME/Desktop/microsoft-edge.desktop"
+  chown 1000:1000 "$HOME/Desktop/microsoft-edge.desktop" || true
+fi
+
+# Wrapper (idempotent-ish)
+if [ -f /usr/bin/microsoft-edge-stable ] && [ ! -f /usr/bin/microsoft-edge-stable-orig ]; then
+  mv /usr/bin/microsoft-edge-stable /usr/bin/microsoft-edge-stable-orig
+fi
+
 cat >/usr/bin/microsoft-edge-stable <<EOL
 #!/usr/bin/env bash
 
 supports_vulkan() {
-  # Needs the CLI tool
   command -v vulkaninfo >/dev/null 2>&1 || return 1
-
-  # Look for any non-CPU device
   DISPLAY= vulkaninfo --summary 2>/dev/null |
     grep -qE 'PHYSICAL_DEVICE_TYPE_(INTEGRATED_GPU|DISCRETE_GPU|VIRTUAL_GPU)'
 }
 
-sed -i 's/"exited_cleanly":false/"exited_cleanly":true/' ~/.config/microsoft-edge/Default/Preferences
-sed -i 's/"exit_type":"Crashed"/"exit_type":"None"/' ~/.config/microsoft-edge/Default/Preferences
+PREF="\$HOME/.config/microsoft-edge/Default/Preferences"
+if [ -f "\$PREF" ]; then
+  sed -i 's/"exited_cleanly":false/"exited_cleanly":true/' "\$PREF" || true
+  sed -i 's/"exit_type":"Crashed"/"exit_type":"None"/' "\$PREF" || true
+fi
 
 VULKAN_FLAGS=
 if supports_vulkan; then
   VULKAN_FLAGS="--use-angle=vulkan"
-  echo 'vulkan supported'
 fi
 
-if [ -f /opt/VirtualGL/bin/vglrun ] && [ ! -z "\${KASM_EGL_CARD}" ] && [ ! -z "\${KASM_RENDERD}" ] && [ -O "\${KASM_RENDERD}" ] && [ -O "\${KASM_EGL_CARD}" ] ; then
-    echo "Starting Edge with GPU Acceleration on EGL device \${KASM_EGL_CARD}"
-    vglrun -d "\${KASM_EGL_CARD}" /opt/microsoft/msedge/microsoft-edge ${CHROME_ARGS} "\${VULKAN_FLAGS}" "\$@" 
+if [ -f /opt/VirtualGL/bin/vglrun ] && [ -n "\${KASM_EGL_CARD:-}" ] && [ -n "\${KASM_RENDERD:-}" ] && [ -O "\${KASM_RENDERD}" ] && [ -O "\${KASM_EGL_CARD}" ]; then
+  exec vglrun -d "\${KASM_EGL_CARD}" /opt/microsoft/msedge/microsoft-edge ${CHROME_ARGS} \${VULKAN_FLAGS} "\$@"
 else
-    echo "Starting Edge"
-    /opt/microsoft/msedge/microsoft-edge ${CHROME_ARGS} "\${VULKAN_FLAGS}" "\$@"
+  exec /opt/microsoft/msedge/microsoft-edge ${CHROME_ARGS} \${VULKAN_FLAGS} "\$@"
 fi
 EOL
 chmod +x /usr/bin/microsoft-edge-stable
 
-sed -i 's@exec -a "$0" "$HERE/microsoft-edge" "$\@"@@g' /usr/bin/x-www-browser
-cat >>/usr/bin/x-www-browser <<EOL
-exec -a "\$0" "\$HERE/microsoft-edge" "${CHROME_ARGS}"  "\$@"
-EOL
+# Default browser: remove old edge lines, then add one
+sed -i '/\$HERE\/microsoft-edge/d' /usr/bin/x-www-browser || true
+echo "exec -a \"\$0\" \"\$HERE/microsoft-edge\" ${CHROME_ARGS} \"\$@\"" >> /usr/bin/x-www-browser
 
-
+# Edge policies (overwrite, don’t append)
 mkdir -p /etc/opt/edge/policies/managed/
-cat >>/etc/opt/edge/policies/managed/default_managed_policy.json <<EOL
+cat >/etc/opt/edge/policies/managed/default_managed_policy.json <<'JSON'
 {"CommandLineFlagSecurityWarningsEnabled": false, "DefaultBrowserSettingEnabled": false}
-EOL
+JSON
 
-# Vanilla Chrome looks for policies in /etc/opt/chrome/policies/managed which is used by web filtering.
-#   Create a symlink here so filter is applied to edge as well.
-mkdir -p /etc/opt/chrome/policies/
+# Symlink Chrome policies into Edge so your web filtering policy path applies
+mkdir -p /etc/opt/chrome/policies
 mkdir -p /etc/opt/edge
-ln -s /etc/opt/chrome/policies /etc/opt/edge/policies
-mkdir -p /etc/opt/edge/policies/managed
+ln -sfn /etc/opt/chrome/policies /etc/opt/edge/policies
 
-if [ -z ${SKIP_CLEAN+x} ]; then
-  apt-get autoclean
-  rm -rf \
-    /var/lib/apt/lists/* \
-    /var/tmp/*
-fi
-
-# Cleanup for app layer
-chown -R 1000:0 $HOME
-find /usr/share/ -name "icon-theme.cache" -exec rm -f {} \;
+echo "Edge installed!"

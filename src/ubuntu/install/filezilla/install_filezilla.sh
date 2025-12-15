@@ -1,28 +1,26 @@
-# KONDERLA NOTE - UNTESTED AS OF 12/04/2025
-# Copied from official KasmTech repo at "https://github.com/kasmtech/workspaces-images/blob/develop/src/ubuntu/install/"
+# This script installs Filezilla. It is meant to be called from a Dockerfile.
 #!/usr/bin/env bash
-set -ex
+set -euo pipefail
+source /dockerstartup/install/ubuntu/install/common/00_apt_helper.sh
 
-# Install Filezilla
-apt-get update
-apt-get install -y filezilla
-rm -rf \
-  /var/lib/apt/lists/* \
-  /var/tmp/*
+echo "======= Installing FileZilla ======="
+
+apt_update_if_needed
+apt_install filezilla
 
 # Default settings and desktop icon
-mkdir -p $HOME/.config/filezilla
-cp /dockerstartup/install/filezilla/filezilla.xml $HOME/.config/filezilla
-cp /usr/share/applications/filezilla.desktop $HOME/Desktop/
-chmod +x $HOME/Desktop/filezilla.desktop
+mkdir -p "$HOME/.config/filezilla" "$HOME/Desktop"
 
-# Cleanup for app layer
-chown -R 1000:0 $HOME
-find /usr/share/ -name "icon-theme.cache" -exec rm -f {} \;
-if [ -z ${SKIP_CLEAN+x} ]; then
-  apt-get autoclean
-  rm -rf \
-    /var/lib/apt/lists/* \
-    /var/tmp/* \
-    /tmp/*
+# Copy default config if it exists in the image
+if [ -f /dockerstartup/install/filezilla/filezilla.xml ]; then
+  cp /dockerstartup/install/filezilla/filezilla.xml "$HOME/.config/filezilla/filezilla.xml"
+  chown 1000:1000 "$HOME/.config/filezilla/filezilla.xml" 2>/dev/null || true
 fi
+
+if [ -f /usr/share/applications/filezilla.desktop ]; then
+  cp /usr/share/applications/filezilla.desktop "$HOME/Desktop/filezilla.desktop"
+  chmod +x "$HOME/Desktop/filezilla.desktop"
+  chown 1000:1000 "$HOME/Desktop/filezilla.desktop" 2>/dev/null || true
+fi
+
+echo "FileZilla installed!"

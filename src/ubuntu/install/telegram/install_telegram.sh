@@ -1,29 +1,47 @@
-# Copied from official KasmTech repo at "https://github.com/kasmtech/workspaces-images/blob/develop/src/ubuntu/install/"
+# This script installs Telegram. It is meant to be called from a Dockerfile
+# and installed on Ubuntu and/or a debian variant.
 #!/usr/bin/env bash
-set -ex
+set -euo pipefail
+source /dockerstartup/install/ubuntu/install/common/00_apt_helper.sh
 
-# Install Telegram
-ARCH=$(arch | sed 's/aarch64/arm64/g' | sed 's/x86_64/amd64/g')
-if [ "${ARCH}" == "arm64" ] ; then
-  # Telegram is not available for noble and trixie aarch64
-  if grep -q "VERSION_CODENAME=noble" /etc/os-release || grep -q "VERSION_CODENAME=trixie" /etc/os-release; then
+echo "======= Installing Telegram ======="
+
+ARCH="$(dpkg --print-architecture)"
+. /etc/os-release
+
+mkdir -p "$HOME/Desktop"
+
+if [ "${ARCH}" = "arm64" ]; then
+  # Telegram Desktop deb may be missing on some new suites for arm64
+  if [ "${VERSION_CODENAME:-}" = "noble" ] || [ "${VERSION_CODENAME:-}" = "trixie" ]; then
+    echo "Telegram not available for ${VERSION_CODENAME} on arm64; skipping."
     exit 0
   fi
-  apt-get update
-  apt-get install -y telegram-desktop
-  if grep -q bookworm /etc/os-release; then
-    cp /usr/share/applications/org.telegram.desktop.desktop $HOME/Desktop/telegram.desktop
-  else
-    cp /usr/share/applications/telegramdesktop.desktop $HOME/Desktop/telegram.desktop
-  fi
-  chmod +x $HOME/Desktop/telegram.desktop
-else
-  curl -L https://telegram.org/dl/desktop/linux -o /tmp/telegram.tgz
-  tar -xvf /tmp/telegram.tgz -C /opt/
-  rm -rf /tmp/telegram.tgz
 
-  curl -L https://kasm-static-content.s3.amazonaws.com/icons/telegram.png -o /opt/Telegram/telegram_icon.png
-  cat >/usr/share/applications/telegram.desktop <<EOL
+  apt_update_if_needed
+  apt_install telegram-desktop
+
+  # Desktop file name differs by distro/package
+  if [ -f /usr/share/applications/org.telegram.desktop.desktop ]; then
+    cp /usr/share/applications/org.telegram.desktop.desktop "$HOME/Desktop/telegram.desktop"
+  elif [ -f /usr/share/applications/telegramdesktop.desktop ]; then
+    cp /usr/share/applications/telegramdesktop.desktop "$HOME/Desktop/telegram.desktop"
+  else
+    echo "Could not find Telegram desktop entry to copy." >&2
+  fi
+
+  chmod +x "$HOME/Desktop/telegram.desktop" 2>/dev/null || true
+  chown 1000:1000 "$HOME/Desktop/telegram.desktop" 2>/dev/null || true
+
+else
+  # Use official Telegram tarball
+  curl -fsSL https://telegram.org/dl/desktop/linux -o /tmp/telegram.tgz
+  tar -xf /tmp/telegram.tgz -C /opt/
+  rm -f /tmp/telegram.tgz
+
+  curl -fsSL https://kasm-static-content.s3.amazonaws.com/icons/telegram.png -o /opt/Telegram/telegram_icon.png
+
+  cat >/usr/share/applications/telegram.desktop <<'EOL'
 [Desktop Entry]
 Version=1.0
 Name=Telegram Desktop
@@ -39,17 +57,11 @@ MimeType=x-scheme-handler/tg;
 Keywords=tg;chat;im;messaging;messenger;sms;tdesktop;
 X-GNOME-UsesNotifications=true
 EOL
+
   chmod +x /usr/share/applications/telegram.desktop
-  cp /usr/share/applications/telegram.desktop $HOME/Desktop/telegram.desktop
+  cp /usr/share/applications/telegram.desktop "$HOME/Desktop/telegram.desktop"
+  chmod +x "$HOME/Desktop/telegram.desktop" 2>/dev/null || true
+  chown 1000:1000 "$HOME/Desktop/telegram.desktop" 2>/dev/null || true
 fi
 
-# Cleanup for app layer
-chown -R 1000:0 $HOME
-find /usr/share/ -name "icon-theme.cache" -exec rm -f {} \;
-if [ -z ${SKIP_CLEAN+x} ]; then
-  apt-get autoclean
-  rm -rf \
-    /var/lib/apt/lists/* \
-    /var/tmp/* \
-    /tmp/*
-fi
+echo "Telegram install complete."

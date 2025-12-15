@@ -1,125 +1,110 @@
-# Copied from official KasmTech repo at "https://github.com/kasmtech/workspaces-images/blob/develop/src/ubuntu/install/"
+# Customized script to install Chromium. Depends on an environmental of "Install_Chrome" being either true/false
+# in the dockerfile this script is invoked from.
 #!/usr/bin/env bash
-set -ex
+set -euo pipefail
+source /dockerstartup/install/ubuntu/install/common/00_apt_helper.sh
 
 echo "======= Installing Chromium ======="
 
-echo "Step 1: Check CPU Architecture and set arguments..."
-# set arguments
-CHROME_ARGS="--password-store=basic --no-sandbox  --ignore-gpu-blocklist --user-data-dir --no-first-run --simulate-outdated-no-au='Tue, 31 Dec 2099 23:59:59 GMT'"
-ARCH=$(arch | sed 's/aarch64/arm64/g' | sed 's/x86_64/amd64/g')
-# check architecture
-if [[ "${DISTRO}" == @(debian|opensuse|ubuntu) ]] && [ ${ARCH} = 'amd64' ] && [ ! -z ${SKIP_CLEAN+x} ]; then
-  echo "not installing chromium on x86_64 desktop build"
+. /etc/os-release
+ARCH="$(dpkg --print-architecture)"
+
+echo "Step 1: Set arguments..."
+CHROME_ARGS="--password-store=basic --no-sandbox --ignore-gpu-blocklist --user-data-dir --no-first-run --simulate-outdated-no-au='Tue, 31 Dec 2099 23:59:59 GMT'"
+
+# If Chrome is installed in this image, Chromium is redundant.
+# Set INSTALL_CHROME=true (or SKIP_CHROMIUM=true) from the Dockerfile to skip.
+: "${INSTALL_CHROME:=false}"
+: "${SKIP_CHROMIUM:=false}"
+
+if [ "${INSTALL_CHROME}" = "true" ] || [ "${SKIP_CHROMIUM}" = "true" ]; then
+  echo "Chrome is installed (or SKIP_CHROMIUM=true); skipping Chromium."
   exit 0
 fi
 
-echo "Step 2: Download and Install..."
-# if this is Kali, ParrotOS or regular Debian...
-if grep -q "ID=debian" /etc/os-release || grep -q "ID=kali" /etc/os-release || grep -q "ID=parrot" /etc/os-release; then
-  apt-get update
-  apt-get install -y chromium
-  if [ -z ${SKIP_CLEAN+x} ]; then
-  apt-get autoclean
-  rm -rf \
-    /var/lib/apt/lists/* \
-    /var/tmp/*
-  fi
-else # else assume Ubuntu...
-  apt-get update
-  apt-get install -y software-properties-common ttf-mscorefonts-installer
-  apt-get remove -y chromium-browser-l10n chromium-codecs-ffmpeg chromium-browser
 
-  # Install from debian bookworm repos
-  mkdir -p /etc/apt/keyrings
-  curl -fsSL https://ftp-master.debian.org/keys/archive-key-12.asc | sudo tee /etc/apt/keyrings/debian-archive-key-12.asc
-  echo "deb [signed-by=/etc/apt/keyrings/debian-archive-key-12.asc] http://deb.debian.org/debian bookworm main" | sudo tee /etc/apt/sources.list.d/debian-bookworm.list
-  echo -e "Package: *\nPin: release a=bookworm\nPin-Priority: 100" | sudo tee /etc/apt/preferences.d/debian-bookworm
-  apt-get update
-  apt install -y chromium --no-install-recommends
+echo "Step 2: Install..."
+apt_update_if_needed
 
-  # Cleanup debian bookworm repos
-  rm /etc/apt/sources.list.d/debian-bookworm.list
-  rm /etc/apt/preferences.d/debian-bookworm
-  rm /etc/apt/keyrings/debian-archive-key-12.asc
-  apt-get update
-
-  if [ -z ${SKIP_CLEAN+x} ]; then
-  apt-get autoclean
-  rm -rf \
-    /var/lib/apt/lists/* \
-    /var/tmp/*
-  fi
-
-fi
-# set the bin path
-if grep -q "ID=debian" /etc/os-release || grep -q "ID=kali" /etc/os-release || grep -q "ID=parrot" /etc/os-release || grep -q "ID=ubuntu" /etc/os-release; then
-  REAL_BIN=chromium
+if [ "${ID}" = "debian" ] || [ "${ID}" = "kali" ] || [ "${ID}" = "parrot" ]; then
+  apt_install chromium
 else
-  REAL_BIN=chromium-browser
+  # Ubuntu path: avoid snap chromium by using Debian repo workaround (if that's your intent)
+  apt_install curl ca-certificates software-properties-common ttf-mscorefonts-installer
+
+  # Remove any conflicting ubuntu chromium packages (ok if absent)
+  apt-get remove -y chromium-browser-l10n chromium-codecs-ffmpeg chromium-browser || true
+
+  # Add Debian bookworm repo JUST for chromium (tight pinning recommended)
+  mkdir -p /etc/apt/keyrings
+  curl -fsSL https://ftp-master.debian.org/keys/archive-key-12.asc \
+    -o /etc/apt/keyrings/debian-archive-key-12.asc
+
+  cat >/etc/apt/sources.list.d/debian-bookworm.list <<'EOF'
+deb [signed-by=/etc/apt/keyrings/debian-archive-key-12.asc] http://deb.debian.org/debian bookworm main
+EOF
+
+  # TODO: tighten pinning to only chromium packages
+  cat >/etc/apt/preferences.d/debian-bookworm <<'EOF'
+Package: chromium chromium-common chromium-sandbox chromium-l10n
+Pin: release n=bookworm
+Pin-Priority: 990
+EOF
+
+  apt_refresh_after_repo_change
+  apt_install chromium
+
+  # remove bookworm repo + pins
+  rm -f /etc/apt/sources.list.d/debian-bookworm.list \
+        /etc/apt/preferences.d/debian-bookworm \
+        /etc/apt/keyrings/debian-archive-key-12.asc
+
+  apt_refresh_after_repo_change
 fi
 
-# Modify desktop icon
-echo "Step 3: Modify the Desktop icon..."
-sed -i 's/-stable//g' /usr/share/applications/${REAL_BIN}.desktop
-
-if ! grep -q "ID=kali" /etc/os-release; then
-  cp /usr/share/applications/${REAL_BIN}.desktop $HOME/Desktop/
-  chmod +x $HOME/Desktop/${REAL_BIN}.desktop
-  chown 1000:1000 $HOME/Desktop/${REAL_BIN}.desktop
+REAL_BIN="chromium"
+# some distros use chromium-browser; adjust only if you truly support them
+if [ "${ID}" != "ubuntu" ] && [ "${ID}" != "debian" ] && [ "${ID}" != "kali" ] && [ "${ID}" != "parrot" ]; then
+  REAL_BIN="chromium-browser"
 fi
 
-# Set and configure Bin
-echo "Step 4: Set up the Bin..."
-mv /usr/bin/${REAL_BIN} /usr/bin/${REAL_BIN}-orig
-cat >/usr/bin/${REAL_BIN} <<EOL
+echo "Step 3: Modify desktop icon..."
+mkdir -p "$HOME/Desktop"
+sed -i 's/-stable//g' "/usr/share/applications/${REAL_BIN}.desktop" || true
+
+if [ "${ID}" != "kali" ]; then
+  cp "/usr/share/applications/${REAL_BIN}.desktop" "$HOME/Desktop/"
+  chmod +x "$HOME/Desktop/${REAL_BIN}.desktop"
+  chown 1000:1000 "$HOME/Desktop/${REAL_BIN}.desktop" || true
+fi
+
+echo "Step 4: Setting wrapper..."
+mv "/usr/bin/${REAL_BIN}" "/usr/bin/${REAL_BIN}-orig"
+cat >"/usr/bin/${REAL_BIN}" <<EOL
 #!/usr/bin/env bash
-
-supports_vulkan() {
-  # Needs the CLI tool
-  command -v vulkaninfo >/dev/null 2>&1 || return 1
-
-  # Look for any non-CPU device
-  DISPLAY= vulkaninfo --summary 2>/dev/null |
-    grep -qE 'PHYSICAL_DEVICE_TYPE_(INTEGRATED_GPU|DISCRETE_GPU|VIRTUAL_GPU)'
-}
-
-if ! pgrep chromium > /dev/null;then
-  rm -f \$HOME/.config/chromium/Singleton*
+if ! pgrep chromium >/dev/null 2>&1; then
+  rm -f "\$HOME/.config/chromium/Singleton"* 2>/dev/null || true
 fi
-sed -i 's/"exited_cleanly":false/"exited_cleanly":true/' ~/.config/chromium/Default/Preferences
-sed -i 's/"exit_type":"Crashed"/"exit_type":"None"/' ~/.config/chromium/Default/Preferences
 
 VULKAN_FLAGS=
-if supports_vulkan; then
-  VULKAN_FLAGS="--use-angle=vulkan"
-  echo 'vulkan supported'
+if command -v vulkaninfo >/dev/null 2>&1; then
+  if DISPLAY= vulkaninfo --summary 2>/dev/null | grep -qE 'PHYSICAL_DEVICE_TYPE_(INTEGRATED_GPU|DISCRETE_GPU|VIRTUAL_GPU)'; then
+    VULKAN_FLAGS="--use-angle=vulkan"
+  fi
 fi
 
-if [ -f /opt/VirtualGL/bin/vglrun ] && [ ! -z "\${KASM_EGL_CARD}" ] && [ ! -z "\${KASM_RENDERD}" ] && [ -O "\${KASM_RENDERD}" ] && [ -O "\${KASM_EGL_CARD}" ] ; then
-    echo "Starting Chrome with GPU Acceleration on EGL device \${KASM_EGL_CARD}"
-    vglrun -d "\${KASM_EGL_CARD}" /usr/bin/${REAL_BIN}-orig ${CHROME_ARGS} "\${VULKAN_FLAGS}" "\$@" 
+if [ -f /opt/VirtualGL/bin/vglrun ] && [ -n "\${KASM_EGL_CARD:-}" ] && [ -n "\${KASM_RENDERD:-}" ] && [ -O "\${KASM_RENDERD}" ] && [ -O "\${KASM_EGL_CARD}" ]; then
+  exec vglrun -d "\${KASM_EGL_CARD}" /usr/bin/${REAL_BIN}-orig ${CHROME_ARGS} \${VULKAN_FLAGS} "\$@"
 else
-    echo "Starting Chrome"
-    /usr/bin/${REAL_BIN}-orig ${CHROME_ARGS} "\${VULKAN_FLAGS}" "\$@"
+  exec /usr/bin/${REAL_BIN}-orig ${CHROME_ARGS} \${VULKAN_FLAGS} "\$@"
 fi
 EOL
-chmod +x /usr/bin/${REAL_BIN}
+chmod +x "/usr/bin/${REAL_BIN}"
 
-# final configurations
-echo "Step 5: Final Configurations..."
-sed -i 's@exec -a "$0" "$HERE/chromium-browser" "$\@"@@g' /usr/bin/x-www-browser
-cat >>/usr/bin/x-www-browser <<EOL
-exec -a "\$0" "\$HERE/chromium" "${CHROME_ARGS}"  "\$@"
-
+echo "Step 5: Configuring any added policies..."
 mkdir -p /etc/chromium/policies/managed/
-cat >>/etc/chromium/policies/managed/default_managed_policy.json <<EOL
+cat >/etc/chromium/policies/managed/default_managed_policy.json <<'JSON'
 {"CommandLineFlagSecurityWarningsEnabled": false, "DefaultBrowserSettingEnabled": false}
-EOL
-
-# Cleanup for app layer
-echo "Step 6: Cleaning Up..."
-chown -R 1000:0 $HOME
-find /usr/share/ -name "icon-theme.cache" -exec rm -f {} \;
+JSON
 
 echo "Chromium is now Installed!"

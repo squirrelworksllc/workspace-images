@@ -1,20 +1,36 @@
-# Copied from official KasmTech repo at "https://github.com/kasmtech/workspaces-images/blob/develop/src/ubuntu/install/"
-# Modified to remove non-ubuntu references and apply updated logic
+# This script installs Microsoft Teams. It is meant to be called from a Dockerfile
+# and installed on Ubuntu and/or a debian variant.
 #!/usr/bin/env bash
-set -ex
+set -euo pipefail
+source /dockerstartup/install/ubuntu/install/common/00_apt_helper.sh
 
 echo "======= Install Microsoft Teams (teams-for-linux) ======="
-echo "Step 1: Install dependencies and add teams-for-linux repo..."
 
-# 1) Dependencies
-apt-get update
-apt-get install -y wget gnupg ca-certificates
+ARCH="$(dpkg --print-architecture)"
+if [ "${ARCH}" != "amd64" ]; then
+  echo "teams-for-linux repo is amd64-only; skipping on ${ARCH}."
+  exit 0
+fi
 
-# 2) Repo key + sources (Debian/Ubuntu, amd64)
-mkdir -p /etc/apt/keyrings
+. /etc/os-release
+case "${ID}" in
+  ubuntu|debian|kali) ;;
+  *)
+    echo "Unsupported distro for teams-for-linux installer: ${ID}" >&2
+    exit 1
+    ;;
+esac
+
+echo "Step 1: Install deps..."
+apt_update_if_needed
+apt_install wget gnupg ca-certificates
+
+echo "Step 2: Add teams-for-linux repo..."
+install -m 0755 -d /etc/apt/keyrings
 wget -qO /etc/apt/keyrings/teams-for-linux.asc https://repo.teamsforlinux.de/teams-for-linux.asc
+chmod a+r /etc/apt/keyrings/teams-for-linux.asc
 
-cat <<'EOF' | tee /etc/apt/sources.list.d/teams-for-linux-packages.sources > /dev/null
+cat >/etc/apt/sources.list.d/teams-for-linux-packages.sources <<'EOF'
 Types: deb
 URIs: https://repo.teamsforlinux.de/debian/
 Suites: stable
@@ -23,35 +39,19 @@ Signed-By: /etc/apt/keyrings/teams-for-linux.asc
 Architectures: amd64
 EOF
 
-# 3) Install latest teams-for-linux .deb via APT
-apt-get update
-apt-get install -y teams-for-linux
+apt_refresh_after_repo_change
 
-echo "Step 2: Basic config and desktop shortcut..."
+echo "Step 3: Install teams-for-linux..."
+apt_install teams-for-linux
 
-# Create config dir (if you want to drop defaults later)
-mkdir -p "$HOME/.config/teams-for-linux"
+echo "Step 4: Desktop shortcut..."
+mkdir -p "$HOME/Desktop" "$HOME/.config/teams-for-linux"
 
-# Desktop file setup (if present)
 DESKTOP_FILE="/usr/share/applications/teams-for-linux.desktop"
 if [ -f "$DESKTOP_FILE" ]; then
-  mkdir -p "$HOME/Desktop"
   cp "$DESKTOP_FILE" "$HOME/Desktop/"
   chmod +x "$HOME/Desktop/teams-for-linux.desktop"
+  chown 1000:1000 "$HOME/Desktop/teams-for-linux.desktop" 2>/dev/null || true
 fi
 
-echo "Step 3: Optional cleanup..."
-
-if [ -z "${SKIP_CLEAN+x}" ]; then
-  apt-get autoclean
-  rm -rf \
-    /var/lib/apt/lists/* \
-    /var/tmp/* \
-    /tmp/*
-fi
-
-# App-layer cleanup (only do this if you're in a container image!)
-chown -R 1000:0 "$HOME" || true
-find /usr/share/ -name "icon-theme.cache" -exec rm -f {} \; || true
-
-echo "teams-for-linux (Microsoft Teams client) is now installed!"
+echo "teams-for-linux installed!"

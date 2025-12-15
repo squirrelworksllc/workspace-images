@@ -28,19 +28,19 @@ ENV DEBIAN_FRONTEND=noninteractive \
     KASM_RX_HOME=$STARTUPDIR/kasmrx \
     DONT_PROMPT_WSL_INSTALL="No_Prompt_please" \
     INST_DIR=$STARTUPDIR/install \
-    INST_SCRIPTS="/ubuntu/install/tools/install_tools_deluxe.sh \
-                  /ubuntu/install/misc/install_tools.sh \
-                  #There is an issue when installing "remnux-perl-packages" BUT the script works properly otherwise...might need to execute in a Kasm myself to get logs /ubuntu/install/remnux/install_remnux.sh \
-                  /ubuntu/install/cleanup/cleanup.sh"
+    INST_SCRIPTS="/ubuntu/install/tools/install_tools.sh \
+                  #There is an issue when installing "remnux-perl-packages" BUT the script works properly otherwise...might need to execute in a Kasm myself to get logs 
+                  /ubuntu/install/remnux/install_remnux.sh \
+                  /ubuntu/install/common/01_cleanup.sh"
 
 # Copy install scripts
 COPY ./src/ $INST_DIR
 
 # Run script installations
-RUN \
+RUN set -eux; \
   for SCRIPT in $INST_SCRIPTS; do \
-    bash ${INST_DIR}${SCRIPT} || exit 1; \
-  done && \
+    bash "${INST_DIR}${SCRIPT}"; \
+  done; \
   $STARTUPDIR/set_user_permission.sh $HOME && \
   rm -f /etc/X11/xinit/Xclients && \
   chown 1000:0 $HOME && \

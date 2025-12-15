@@ -1,44 +1,55 @@
-# Copied from official KasmTech repo at "https://github.com/kasmtech/workspaces-images/blob/develop/src/ubuntu/install/"
-# Modified to remove non-ubuntu references and apply updated logic
+# This script installs Signal. It is meant to be called from a Dockerfile
+# and installed on Ubuntu and/or a debian variant.
 #!/usr/bin/env bash
-set -ex
+set -euo pipefail
+source /dockerstartup/install/ubuntu/install/common/00_apt_helper.sh
 
 echo "======= Installing Signal ======="
-# Install Signal
-echo "Step 1: Check the CPU Architecture..."
-ARCH=$(arch | sed 's/aarch64/arm64/g' | sed 's/x86_64/amd64/g')
-if [ "${ARCH}" == "arm64" ] ; then
-    echo "Signal for arm64 currently not supported, skipping install"
-    exit 0
+
+ARCH="$(dpkg --print-architecture)"
+if [ "${ARCH}" != "amd64" ]; then
+  echo "Signal Desktop repo is amd64-only; skipping on ${ARCH}."
+  exit 0
 fi
 
-echo "Step 2: Download the GPG Key..."
-# Signal only releases its desktop app under the xenial release, however it is compatible with all versions of Debian and Ubuntu that we support.
-wget -qO /tmp/signal-desktop-keyring.gpg https://updates.signal.org/desktop/apt/keys.asc --no-check-certificate
-apt-key add /tmp/signal-desktop-keyring.gpg
+. /etc/os-release
+case "${ID}" in
+  ubuntu|debian|kali) ;;
+  *)
+    echo "Unsupported distro for Signal installer: ${ID}" >&2
+    exit 1
+    ;;
+esac
 
-echo "Step 3: Create the apt list and install..."
-echo "deb [arch=${ARCH}] https://updates.signal.org/desktop/apt xenial main" |  tee -a /etc/apt/sources.list.d/signal-xenial.list
-apt-get update
-apt-get install -y signal-desktop
+echo "Step 1: Install deps..."
+apt_update_if_needed
+apt_install wget ca-certificates gnupg
 
-# Desktop icon
-echo "Step 3: Modify the desktop icon..."
-# Modify the desktop file to include --no-sandbox
-sed -i 's|Exec=/opt/Signal/signal-desktop %U|Exec=/opt/Signal/signal-desktop --no-sandbox %U|' /usr/share/applications/signal-desktop.desktop
-cp /usr/share/applications/signal-desktop.desktop $HOME/Desktop/
-chmod +x $HOME/Desktop/signal-desktop.desktop
+echo "Step 2: Add Signal APT repo (xenial suite, supported by Signal)..."
+install -m 0755 -d /etc/apt/keyrings
+wget -qO /etc/apt/keyrings/signal.gpg https://updates.signal.org/desktop/apt/keys.asc
+chmod a+r /etc/apt/keyrings/signal.gpg
 
-# Cleanup for app layer
-echo "Step 4: Cleaning up..."
-chown -R 1000:0 $HOME
-find /usr/share/ -name "icon-theme.cache" -exec rm -f {} \;
-if [ -z ${SKIP_CLEAN+x} ]; then
-  apt-get autoclean
-  rm -rf \
-    /var/lib/apt/lists/* \
-    /var/tmp/* \
-    /tmp/*
+cat >/etc/apt/sources.list.d/signal-xenial.list <<EOF
+deb [arch=${ARCH} signed-by=/etc/apt/keyrings/signal.gpg] https://updates.signal.org/desktop/apt xenial main
+EOF
+
+apt_refresh_after_repo_change
+
+echo "Step 3: Install signal-desktop..."
+apt_install signal-desktop
+
+echo "Step 4: Desktop shortcut..."
+mkdir -p "$HOME/Desktop"
+
+DESKTOP_FILE="/usr/share/applications/signal-desktop.desktop"
+if [ -f "$DESKTOP_FILE" ]; then
+  # Add --no-sandbox (best-effort; don’t fail if upstream changes Exec line)
+  sed -i 's|^Exec=/opt/Signal/signal-desktop %U|Exec=/opt/Signal/signal-desktop --no-sandbox %U|' "$DESKTOP_FILE" || true
+
+  cp "$DESKTOP_FILE" "$HOME/Desktop/"
+  chmod +x "$HOME/Desktop/signal-desktop.desktop"
+  chown 1000:1000 "$HOME/Desktop/signal-desktop.desktop" 2>/dev/null || true
 fi
 
-echo "Signal is now Installed!"
+echo "Signal installed!"

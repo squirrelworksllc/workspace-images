@@ -3,43 +3,33 @@
 # Dockerfile and was not developed to work as standalone. 
 # For official documentation see "https://docs.remnux.org/install-distro/"
 #!/usr/bin/env bash
-set -ex
+set -euo pipefail
+source /dockerstartup/install/ubuntu/install/common/00_apt_helper.sh
 
-echo "======= Installing REMnux Malware Analysis Environment ======="
+echo "======= Installing REMnux Malware Analysis Environment (addon mode) ======="
 
-export DEBIAN_FRONTEND=noninteractive
-export HOME=/root   # ensure HOME is correct for REMnux
-
-# Step 1: Installing dependencies
-echo "Step 1: Installing dependencies..."
-apt-get update
-apt-get upgrade -y
-apt-get autoremove -y
-
-# Step 2: Downloading and running REMnux tools
-echo "Step 2: Downloading and running REMnux tools..."
-cd /tmp
-curl -sSLo remnux https://remnux.org/remnux-cli
-chmod +x remnux
-
-# Must run with the sudo command, with HOME=/root and /root must exist
-sudo ./remnux install --mode=addon --user=kasm-user
-
-# Step 3: Cleaning up
-echo "Step 3: Cleaning up..."
-
-# DO NOT remove /root before REMnux install
-rm -f /usr/share/xfce4/panel/plugins/power-manager-plugin.desktop
-rm -rf /tmp/*
-
-# Reset HOME **after** REMnux installation
-export HOME=/home/kasm-default-profile
-
-if [ -z "${SKIP_CLEAN+x}" ]; then
-  apt-get autoclean
-  rm -rf \
-    /var/lib/apt/lists/* \
-    /var/tmp/*
+# REMnux is amd64-only; Dockerfile should already enforce this,
+# but skipping silently is better than exploding a desktop build.
+ARCH="$(dpkg --print-architecture)"
+if [ "${ARCH}" != "amd64" ]; then
+  echo "REMnux addon is amd64-only; skipping on ${ARCH}."
+  exit 0
 fi
 
-echo "The REMnux Malware Analysis Environment is configured. Use responsibly!"
+echo "Step 1: Install minimal dependencies..."
+apt_update_if_needed
+apt_install curl ca-certificates gnupg sudo
+
+echo "Step 2: Download REMnux CLI..."
+INSTALL_DIR="/tmp/remnux-installer"
+mkdir -p "${INSTALL_DIR}"
+cd "${INSTALL_DIR}"
+
+curl -fsSLo remnux https://remnux.org/remnux-cli
+chmod +x remnux
+
+echo "Step 3: Run REMnux addon installer..."
+# REMnux requires HOME=/root, but we scope it to the command only
+HOME=/root ./remnux install --mode=addon --user=kasm-user
+
+echo "REMnux Malware Analysis Environment installed (addon mode)."
