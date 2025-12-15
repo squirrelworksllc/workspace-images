@@ -1,18 +1,26 @@
 # ----------------------------- DESCRIPTION -----------------------------
 # Slightly skinned down version of the official KASM Ubuntu Noble workspace dockerfile.
 # Installs Ubuntu, provides Docker-In-A-Docker and gives root access to OS.
+# - Optional lint target to enforce installer standards
 #
 # ----------------------------- INSTRUCTIONS -----------------------------
+# Sanity Checks and testing:
+# 1 - ALWAYS Run Lint to make sure you aren't shooting yourself in the foot!
+#     - docker build --target lint -f dockerfile-squirrelworksllc-ubuntu-noble-dind .
+# If Lint is fine then you can proceed to building the actual image (build without target)!
+#
 # In Dockerfile
 # 1 - Decide if you are using the "1.18.0" or "develop" branch.
 # 2 - When you build the dockerfile, be sure you specify the correct branch: squirrelworksllc/ubuntu-noble-dind:BRANCH-GOES-HERE
+#
 # In Workspace file following modification/update of THIS file:
 # 1 - recalculate the docker size via commandline with one of the following (depending on docker tag used)
 #     production: "docker inspect -f "{{ .Size }}" squirrelworksllc/ubuntu-noble-dind:1.18.0"
 #     development: "docker inspect -f "{{ .Size }}" squirrelworksllc/ubuntu-noble-dind:develop"
 # 2 - adjust the variable "uncompressed_size_mb"
+# ----------------------------------------------------------------------
 
-# DEV NOTE: The tag can change as Kasm changes
+# DEV NOTE: The tag can change as Kasm changes, use stable and not rolling.
 ARG BASE_TAG="1.18.0"
 # DEV NOTE: IF an Ubuntu version changes you should be making a new dockerfile!
 ARG BASE_IMAGE="core-ubuntu-noble"

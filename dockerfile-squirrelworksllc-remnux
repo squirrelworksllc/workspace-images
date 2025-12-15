@@ -1,56 +1,82 @@
 WIP - NOT WORKING
 # ----------------------------- DESCRIPTION -----------------------------
-# Custom script to create a REMnux Docker. Remnux only supports Ubuntu 20.04 (Focal) as of December 2025
-# so we have to use an older Kasm repo's image to build this. This docker WILL have root.
-#
+# Custom REMnux-based Kasm image.
+# NOTE: This Dockerfile intentionally uses a focal desktop base (per your Dockerfile policy),
+# and the /ubuntu/install/remnux/install_remnux.sh script handles the actual REMnux install.
 # ----------------------------- INSTRUCTIONS -----------------------------
+# Sanity Checks and testing:
+# 1 - ALWAYS Run Lint to make sure you aren't shooting yourself in the foot!
+#     - docker build --target lint -f dockerfile-squirrelworksllc-remnux .
+# If Lint is fine then you can proceed to building the actual image (build without target)!
+#
 # In Dockerfile
 # 1 - Decide if you are using the "1.18.0" or "develop" branch.
-# 2 - When you build the dockerfile, be sure you specify the correct branch: squirrelworksllc/ubuntu-noble-dind:BRANCH-GOES-HERE
+# 2 - When you build the dockerfile, be sure you specify the correct branch: squirrelworksllc/remnux:BRANCH-GOES-HERE
+#
 # In Workspace file following modification/update of THIS file:
 # 1 - recalculate the docker size via commandline with one of the following (depending on docker tag used):
 #     production: "docker inspect -f "{{ .Size }}" squirrelworksllc/remnux:1.18.0"
 #     development: "docker inspect -f "{{ .Size }}" squirrelworksllc/remnux:develop"
 # 2 - adjust the variable "uncompressed_size_mb"
+# ----------------------------------------------------------------------
 
 # DEV NOTE: If REMnux updated to use a newer LTS version we should fix this
-FROM kasmweb/ubuntu-focal-desktop:1.16.1-rolling-weekly
+# REMnux base (older Kasm focal desktop image)
+ARG BASE_IMAGE="ubuntu-focal-desktop"
+ARG BASE_TAG="1.16.1-rolling-weekly"
 
+# ----------------------------- LINT TARGET -----------------------------
+# Run only:
+#   docker build --target lint -f dockerfile-squirrelworksllc-remnux .
+FROM kasmweb/${BASE_IMAGE}:${BASE_TAG} AS lint
+USER root
+WORKDIR /lint
+
+COPY ./tools/lint_installers.sh /lint/tools/lint_installers.sh
+COPY ./src/ /lint/src/
+
+RUN chmod +x /lint/tools/lint_installers.sh && \
+    /lint/tools/lint_installers.sh
+
+
+# ----------------------------- RUNTIME IMAGE ---------------------------
+FROM kasmweb/${BASE_IMAGE}:${BASE_TAG}
 USER root
 
 ENV HOME=/home/kasm-default-profile
 ENV STARTUPDIR=/dockerstartup
-WORKDIR $HOME
+WORKDIR ${HOME}
 
-### Envrionment config 
+### Environment config
 ENV DEBIAN_FRONTEND=noninteractive \
     SKIP_CLEAN=true \
-    KASM_RX_HOME=$STARTUPDIR/kasmrx \
+    KASM_RX_HOME=${STARTUPDIR}/kasmrx \
     DONT_PROMPT_WSL_INSTALL="No_Prompt_please" \
-    INST_DIR=$STARTUPDIR/install \
+    INST_DIR=${STARTUPDIR}/install \
     INST_SCRIPTS="/ubuntu/install/tools/install_tools.sh \
-                  #There is an issue when installing "remnux-perl-packages" BUT the script works properly otherwise...might need to execute in a Kasm myself to get logs 
                   /ubuntu/install/remnux/install_remnux.sh \
                   /ubuntu/install/common/01_cleanup.sh"
 
-# Copy install scripts
-COPY ./src/ $INST_DIR
+# Copy install scripts payload
+COPY ./src/ ${INST_DIR}
 
-# Run script installations
+# Run installations
 RUN set -eux; \
-  for SCRIPT in $INST_SCRIPTS; do \
-    bash "${INST_DIR}${SCRIPT}"; \
-  done; \
-  $STARTUPDIR/set_user_permission.sh $HOME && \
-  rm -f /etc/X11/xinit/Xclients && \
-  chown 1000:0 $HOME && \
-  mkdir -p /home/kasm-user && \
-  chown -R 1000:0 /home/kasm-user && \
-  rm -Rf ${INST_DIR}
+    apt-get update; \
+    for SCRIPT in ${INST_SCRIPTS}; do \
+      echo ">>> Running ${SCRIPT}"; \
+      bash "${INST_DIR}${SCRIPT}"; \
+    done; \
+    "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \
+    rm -f /etc/X11/xinit/Xclients; \
+    chown 1000:0 "${HOME}"; \
+    mkdir -p /home/kasm-user; \
+    chown -R 1000:0 /home/kasm-user; \
+    rm -rf "${INST_DIR}"
 
 # Userspace Runtime
 ENV HOME=/home/kasm-user
-WORKDIR $HOME
+WORKDIR ${HOME}
 USER 1000
 
 CMD ["--tail-log"]
