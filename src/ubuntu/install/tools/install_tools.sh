@@ -18,6 +18,7 @@ apt_update_if_needed
 
 # Common CLI tools used across installers
 apt_install \
+  curl \
   git \
   nano \
   zip \

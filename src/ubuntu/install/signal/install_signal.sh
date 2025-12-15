@@ -1,14 +1,17 @@
 # This script installs Signal. It is meant to be called from a Dockerfile
 # and installed on Ubuntu and/or a debian variant.
+# This script installs Signal. It is meant to be called from a Dockerfile
+# and installed on Ubuntu and/or a debian variant.
 #!/usr/bin/env bash
 set -euo pipefail
 source /dockerstartup/install/ubuntu/install/common/00_apt_helper.sh
 
 echo "======= Installing Signal ======="
 
+echo "Step 1: Checking for supported Architecture and OS..."
 ARCH="$(dpkg --print-architecture)"
 if [ "${ARCH}" != "amd64" ]; then
-  echo "Signal Desktop repo is amd64-only; skipping on ${ARCH}."
+  echo "Signal Desktop APT repo is intended for amd64; skipping on ${ARCH}"
   exit 0
 fi
 
@@ -21,35 +24,43 @@ case "${ID}" in
     ;;
 esac
 
-echo "Step 1: Install deps..."
+echo "Step 2: Installing dependencies..."
 apt_update_if_needed
-apt_install wget ca-certificates gnupg
+apt_install ca-certificates curl gpg
 
-echo "Step 2: Add Signal APT repo (xenial suite, supported by Signal)..."
-install -m 0755 -d /etc/apt/keyrings
-wget -qO /etc/apt/keyrings/signal.gpg https://updates.signal.org/desktop/apt/keys.asc
-chmod a+r /etc/apt/keyrings/signal.gpg
+echo "Step 3: Installing signing key..."
+install -d -m 0755 /etc/apt/keyrings
+curl -fsSL https://updates.signal.org/desktop/apt/keys.asc \
+  | gpg --dearmor \
+  > /etc/apt/keyrings/signal-desktop.gpg
+chmod 0644 /etc/apt/keyrings/signal-desktop.gpg
 
-cat >/etc/apt/sources.list.d/signal-xenial.list <<EOF
-deb [arch=${ARCH} signed-by=/etc/apt/keyrings/signal.gpg] https://updates.signal.org/desktop/apt xenial main
-EOF
+echo "Step 4: Adding repo..."
+curl -fsSL -o /etc/apt/sources.list.d/signal-desktop.sources \
+  https://updates.signal.org/static/desktop/apt/signal-desktop.sources
 
+# If you ever had the old method, kill it so apt doesn't keep failing.
+rm -f /etc/apt/sources.list.d/signal-xenial.list || true
+
+# Ensure Signed-By points to our keyring (works whether or not it already exists)
+if grep -qi '^Signed-By:' /etc/apt/sources.list.d/signal-desktop.sources; then
+  sed -i 's|^Signed-By:.*|Signed-By: /etc/apt/keyrings/signal-desktop.gpg|I' \
+    /etc/apt/sources.list.d/signal-desktop.sources
+else
+  printf '\nSigned-By: /etc/apt/keyrings/signal-desktop.gpg\n' \
+    >> /etc/apt/sources.list.d/signal-desktop.sources
+fi
+
+echo "Step 5: Install the app..."
 apt_refresh_after_repo_change
-
-echo "Step 3: Install signal-desktop..."
 apt_install signal-desktop
 
-echo "Step 4: Desktop shortcut..."
+echo "Step 6: Fixing the desktop icon (best effort)..."
 mkdir -p "$HOME/Desktop"
-
-DESKTOP_FILE="/usr/share/applications/signal-desktop.desktop"
-if [ -f "$DESKTOP_FILE" ]; then
-  # Add --no-sandbox (best-effort; don’t fail if upstream changes Exec line)
-  sed -i 's|^Exec=/opt/Signal/signal-desktop %U|Exec=/opt/Signal/signal-desktop --no-sandbox %U|' "$DESKTOP_FILE" || true
-
-  cp "$DESKTOP_FILE" "$HOME/Desktop/"
+if [ -f /usr/share/applications/signal-desktop.desktop ]; then
+  cp /usr/share/applications/signal-desktop.desktop "$HOME/Desktop/"
   chmod +x "$HOME/Desktop/signal-desktop.desktop"
   chown 1000:1000 "$HOME/Desktop/signal-desktop.desktop" 2>/dev/null || true
 fi
 
-echo "Signal installed!"
+echo "Signal is now installed!"

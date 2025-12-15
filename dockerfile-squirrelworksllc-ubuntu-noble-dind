@@ -54,15 +54,17 @@ COPY ./src/ $INST_DIR
 
 # Run installations
 RUN set -eux; \
-  for SCRIPT in $INST_SCRIPTS; do \
-    bash "${INST_DIR}${SCRIPT}"; \
-  done; \
-  $STARTUPDIR/set_user_permission.sh $HOME && \
-  rm -f /etc/X11/xinit/Xclients && \
-  chown 1000:0 $HOME && \
-  mkdir -p /home/kasm-user && \
-  chown -R 1000:0 /home/kasm-user && \
-  rm -Rf ${INST_DIR}
+    apt-get update; \
+    for SCRIPT in ${INST_SCRIPTS}; do \
+      echo ">>> Running ${SCRIPT}"; \
+      bash "${INST_DIR}${SCRIPT}" || { echo "FAILED: ${SCRIPT}"; exit 1; }; \
+    done; \
+    "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \
+    rm -f /etc/X11/xinit/Xclients; \
+    chown 1000:0 "${HOME}"; \
+    mkdir -p /home/kasm-user; \
+    chown -R 1000:0 /home/kasm-user; \
+    rm -rf "${INST_DIR}"
 
 # Userspace Runtime
 ENV HOME=/home/kasm-user

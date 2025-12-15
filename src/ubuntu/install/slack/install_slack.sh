@@ -8,32 +8,54 @@ echo "======= Installing Slack ======="
 
 ARCH="$(dpkg --print-architecture)"
 if [ "${ARCH}" != "amd64" ]; then
-  echo "Slack .deb is amd64-only; skipping on ${ARCH}."
+  echo "Slack Desktop APT repo is amd64-only; skipping on ${ARCH}"
   exit 0
 fi
 
+. /etc/os-release
+case "${ID}" in
+  ubuntu|debian|kali) ;;
+  *)
+    echo "Unsupported distro for Slack installer: ${ID}" >&2
+    exit 1
+    ;;
+esac
+
+echo "Step 1: Installing dependencies..."
 apt_update_if_needed
-# wget/curl should already exist from install_tools, but this is safe if not:
-# apt_install wget ca-certificates
+apt_install ca-certificates curl gpg
 
-echo "Downloading Slack..."
-wget -qO /tmp/slack.deb https://downloads.slack-edge.com/linux_releases/slack-desktop-latest-amd64.deb
+echo "Step 2: Installing Slack signing key..."
+install -d -m 0755 /etc/apt/keyrings
+curl -fsSL https://packagecloud.io/slacktechnologies/slack/gpgkey \
+  | gpg --dearmor \
+  > /etc/apt/keyrings/slack.gpg
+chmod 0644 /etc/apt/keyrings/slack.gpg
 
-echo "Installing Slack..."
-apt-get install -y /tmp/slack.deb
-rm -f /tmp/slack.deb
+echo "Step 3: Adding Slack APT repo..."
+cat >/etc/apt/sources.list.d/slack.sources <<'EOF'
+Types: deb
+URIs: https://packagecloud.io/slacktechnologies/slack/debian/
+Suites: jessie
+Components: main
+Signed-By: /etc/apt/keyrings/slack.gpg
+Architectures: amd64
+EOF
 
-echo "Desktop shortcut..."
+echo "Step 4: Installing Slack..."
+apt_refresh_after_repo_change
+apt_install slack-desktop
+
+echo "Step 5: Desktop shortcut (best effort)..."
 mkdir -p "$HOME/Desktop"
+if [ -f /usr/share/applications/slack.desktop ]; then
+  # Add --no-sandbox safely
+  sed -i 's@^Exec=/usr/bin/slack@Exec=/usr/bin/slack --no-sandbox@' \
+    /usr/share/applications/slack.desktop || true
 
-DESKTOP_FILE="/usr/share/applications/slack.desktop"
-if [ -f "$DESKTOP_FILE" ]; then
-  # Add --no-sandbox (best-effort)
-  sed -i 's@^Exec=/usr/bin/slack@Exec=/usr/bin/slack --no-sandbox@' "$DESKTOP_FILE" || true
-
-  cp "$DESKTOP_FILE" "$HOME/Desktop/slack.desktop"
+  cp /usr/share/applications/slack.desktop "$HOME/Desktop/slack.desktop"
   chmod +x "$HOME/Desktop/slack.desktop"
   chown 1000:1000 "$HOME/Desktop/slack.desktop" 2>/dev/null || true
 fi
 
-echo "Slack installed!"
+echo "Slack is now installed!"

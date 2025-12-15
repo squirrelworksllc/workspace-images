@@ -65,7 +65,7 @@ RUN set -eux; \
     apt-get update; \
     for SCRIPT in ${INST_SCRIPTS}; do \
       echo ">>> Running ${SCRIPT}"; \
-      bash "${INST_DIR}${SCRIPT}"; \
+      bash "${INST_DIR}${SCRIPT}" || { echo "FAILED: ${SCRIPT}"; exit 1; }; \
     done; \
     "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \
     rm -f /etc/X11/xinit/Xclients; \

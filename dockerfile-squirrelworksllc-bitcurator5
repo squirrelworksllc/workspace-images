@@ -57,14 +57,14 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # Copy install scripts
 COPY ./src/ ${INST_DIR}
 
-# Run installations (one apt-get update here; scripts use apt_update_if_needed)
+# Run installations
 RUN set -eux; \
     apt-get update; \
     for SCRIPT in ${INST_SCRIPTS}; do \
       echo ">>> Running ${SCRIPT}"; \
-      bash "${INST_DIR}${SCRIPT}"; \
+      bash "${INST_DIR}${SCRIPT}" || { echo "FAILED: ${SCRIPT}"; exit 1; }; \
     done; \
-    ${STARTUPDIR}/set_user_permission.sh "${HOME}"; \
+    "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \
     rm -f /etc/X11/xinit/Xclients; \
     chown 1000:0 "${HOME}"; \
     mkdir -p /home/kasm-user; \
