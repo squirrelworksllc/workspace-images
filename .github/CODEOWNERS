@@ -1,0 +1,14 @@
+# Everything (default owners)
+* @eSupportSquirrel @jkonderla-PEP
+
+# Docker images
+/images/ @bmobleypep
+
+# Tools
+/tools/ @eSupportSquirrel @jkonderla-PEP
+
+# Common resources
+/common/ @bmobleypep
+
+# Install script files
+/src/ @bmobleypep
