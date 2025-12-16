@@ -1,3 +1,5 @@
+# This workflow acts as a "Lint Only" workflow. Not really used BUT if we ever implement 
+# "lint-only on Pull Request, full build on main" then this will be needed
 name: lint
 
 on:
