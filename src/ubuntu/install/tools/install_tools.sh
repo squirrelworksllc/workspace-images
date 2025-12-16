@@ -1,7 +1,7 @@
 # Installs common tools used by all squirrelworksllc base docker images.
 #!/usr/bin/env bash
 set -euo pipefail
-source /dockerstartup/install/ubuntu/install/common/00_apt_helper.sh
+source ${INST_DIR}/ubuntu/install/common/00_apt_helper.sh
 
 echo "======= Installing Common Tools ======="
 

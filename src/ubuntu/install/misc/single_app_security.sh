@@ -1,6 +1,6 @@
+#!/usr/bin/env bash
 # Copied from official KasmTech repo at "https://github.com/kasmtech/workspaces-images/blob/develop/src/ubuntu/install/"
 # Designed to lock down a workspace for a single application
-#!/usr/bin/env bash
 
 REMOVE_TERMINALS=false
 

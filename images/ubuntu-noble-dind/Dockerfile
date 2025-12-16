@@ -51,33 +51,27 @@ ENV DEBUG=false \
 # ############################################################################
 FROM base AS lint
 
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-ARG HADOLINT_VERSION="v2.12.0"
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl shellcheck \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install pinned hadolint (x86_64). If you build on ARM64, tell me and I’ll adapt it.
-RUN curl -fsSL -o /usr/local/bin/hadolint \
-      "https://github.com/hadolint/hadolint/releases/download/${HADOLINT_VERSION}/hadolint-Linux-x86_64" \
-    && chmod +x /usr/local/bin/hadolint \
-    && hadolint --version
-
+# install hadolint + shellcheck here...
 WORKDIR /src
 COPY . /src
 
-# Lint THIS Dockerfile (path inside repo)
-RUN hadolint --ignore DL3008 /src/images/ubuntu-noble-dind/Dockerfile
+# installs hadolint + shellcheck
+RUN bash /src/tools/ci/lint_installers.sh
 
-# Shellcheck scripts in the repo
-RUN find /src/src /src/tools /src/common -type f -name "*.sh" -print0 2>/dev/null | xargs -0 -r shellcheck
+# Dockerfile lint (centralized policy)
+RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/ubuntu-noble-dind/Dockerfile
+
+# Shell script lint (centralized policy)
+RUN bash /src/tools/ci/lint-shell.sh
+
 USER 1000
 
 # ############################################################################
 # -------------------------- COMMON BUILD TARGET --------------------------- #
 # ############################################################################
 FROM base AS build
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # Copy install payload (repo-root/src contains ubuntu/)
 COPY ./src/ ${INST_DIR}
@@ -92,16 +86,20 @@ RUN chmod 0755 ${STARTUPDIR}/custom_startup.sh
 # - scripts should use 00_apt_helper.sh and avoid per-script cleanup
 RUN set -eux; \
     apt-get update; \
-    SCRIPTS="/ubuntu/install/tools/install_tools.sh \
-             /ubuntu/install/dind/install_dind.sh"; \
+    SCRIPTS=( \
+      "/ubuntu/install/tools/install_tools.sh" \
+      "/ubuntu/install/dind/install_dind.sh" \
+    ); \
     if [ "${SKIP_CHROMIUM}" != "true" ]; then \
-      SCRIPTS="${SCRIPTS} /ubuntu/install/chrome/install_chromium.sh"; \
+      SCRIPTS+=( "/ubuntu/install/chrome/install_chromium.sh" ); \
     else \
       echo ">>> SKIP_CHROMIUM=true; skipping Chromium installer"; \
     fi; \
-    SCRIPTS="${SCRIPTS} /ubuntu/install/vs_code/install_vs_code.sh \
-                     /ubuntu/install/common/01_cleanup.sh"; \
-    for SCRIPT in ${SCRIPTS}; do \
+    SCRIPTS+=( \
+      "/ubuntu/install/vs_code/install_vs_code.sh" \
+      "/ubuntu/install/common/01_cleanup.sh" \
+    ); \
+    for SCRIPT in "${SCRIPTS[@]}"; do \
       echo ">>> Running ${SCRIPT}"; \
       bash "${INST_DIR}${SCRIPT}" || { echo "FAILED: ${SCRIPT}"; exit 1; }; \
     done; \

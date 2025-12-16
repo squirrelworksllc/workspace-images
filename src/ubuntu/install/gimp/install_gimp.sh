@@ -1,8 +1,7 @@
-# Copied from official KasmTech repo at "https://github.com/kasmtech/workspaces-images/blob/develop/src/ubuntu/install/"
-# Modified to remove non-ubuntu references and apply updated logic
 #!/usr/bin/env bash
+# This script file installs Gimp. It is meant to be called from a Dockerfile
 set -euo pipefail
-source /dockerstartup/install/ubuntu/install/common/00_apt_helper.sh
+source ${INST_DIR}/ubuntu/install/common/00_apt_helper.sh
 
 echo "======= Installing GIMP (AppImage) ======="
 
@@ -67,4 +66,4 @@ chown 1000:1000 "$HOME/Desktop/gimp.desktop" 2>/dev/null || true
 # Ownership on /opt is optional; only do it if runtime user needs write access there.
 chown -R 1000:1000 /opt/gimp-3 2>/dev/null || true
 
-echo "GIMP installed!"
+echo "Your GIMP installed! Remember to use a safe word."

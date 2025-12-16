@@ -1,6 +1,6 @@
+#!/usr/bin/env bash
 # This is the cleanup script that runs following app installs.
 # It should only be called at the END of the dockerfile after all apps are installed!
-#!/usr/bin/env bash
 set -euo pipefail
 
 echo "======= Running Final Cleanups ======="

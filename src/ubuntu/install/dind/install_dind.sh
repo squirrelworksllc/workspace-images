@@ -1,8 +1,8 @@
-# Copied from official KasmTech repo at "https://github.com/kasmtech/workspaces-images/blob/develop/src/ubuntu/install/"
-# Modified to remove non-ubuntu references and apply updated logic
 #!/usr/bin/env bash
+# Script to install "Docker In A Docker" (DIND).
+# Meant to be called from a Dockerfile, may not run on its own.
 set -euo pipefail
-source /dockerstartup/install/ubuntu/install/common/00_apt_helper.sh
+source ${INST_DIR}/ubuntu/install/common/00_apt_helper.sh
 
 ARCH="$(dpkg --print-architecture)"
 . /etc/os-release

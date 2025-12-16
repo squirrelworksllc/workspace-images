@@ -46,33 +46,27 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # ############################################################################
 FROM base AS lint
 
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-ARG HADOLINT_VERSION="v2.12.0"
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl shellcheck \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install pinned hadolint (x86_64).
-RUN curl -fsSL -o /usr/local/bin/hadolint \
-      "https://github.com/hadolint/hadolint/releases/download/${HADOLINT_VERSION}/hadolint-Linux-x86_64" \
-    && chmod +x /usr/local/bin/hadolint \
-    && hadolint --version
-
+# install hadolint + shellcheck here...
 WORKDIR /src
 COPY . /src
 
-# Lint THIS Dockerfile (path inside repo)
-RUN hadolint --ignore DL3008 /src/images/ubuntu-noble-dind/Dockerfile
+# installs hadolint + shellcheck
+RUN bash /src/tools/ci/lint_installers.sh
 
-# Shellcheck scripts
-RUN find /src/src /src/tools /src/common -type f -name "*.sh" -print0 2>/dev/null | xargs -0 -r shellcheck
+# Dockerfile lint (centralized policy)
+RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/ubuntu-noble-desktop/Dockerfile
+
+# Shell script lint (centralized policy)
+RUN bash /src/tools/ci/lint-shell.sh
+
 USER 1000
 
 # ############################################################################
 # ------------------------------ BUILD TARGET ------------------------------ #
 # ############################################################################
 FROM base AS build
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # Install script list (kept close to the build logic)
 # NOTE: This is a space-separated list; keep it quoted and split by shell.
@@ -100,7 +94,26 @@ COPY ./src/ ${INST_DIR}
 # Run installations (single apt-get update here)
 RUN set -eux; \
     apt-get update; \
-    for SCRIPT in ${INST_SCRIPTS}; do \
+    SCRIPTS=( \
+      "/ubuntu/install/tools/install_tools.sh" \
+      "/ubuntu/install/chrome/install_chrome.sh" \
+      "/ubuntu/install/firefox/install_firefox.sh" \
+      "/ubuntu/install/thunderbird/install_thunderbird.sh" \
+      "/ubuntu/install/vs_code/install_vs_code.sh" \
+      "/ubuntu/install/remmina/install_remmina.sh" \
+      "/ubuntu/install/libre_office/install_libre_office.sh" \
+      "/ubuntu/install/signal/install_signal.sh" \
+      "/ubuntu/install/gimp/install_gimp.sh" \
+      "/ubuntu/install/ansible/install_ansible.sh" \
+      "/ubuntu/install/slack/install_slack.sh" \
+      "/ubuntu/install/discord/install_discord.sh" \
+      "/ubuntu/install/teams/install_teams.sh" \
+      "/ubuntu/install/obsidian/install_obsidian.sh" \
+      "/ubuntu/install/infosec_yara/install_infosec_yara.sh" \
+      "/ubuntu/install/tesseract_ocr/install_tesseract_ocr.sh" \
+      "/ubuntu/install/common/01_cleanup.sh" \
+    ); \
+    for SCRIPT in "${SCRIPTS[@]}"; do \
       echo ">>> Running ${SCRIPT}"; \
       bash "${INST_DIR}${SCRIPT}" || { echo "FAILED: ${SCRIPT}"; exit 1; }; \
     done; \

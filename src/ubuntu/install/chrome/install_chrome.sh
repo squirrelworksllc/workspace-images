@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
+# Custom script to install Google Chrome
 set -euo pipefail
-source /dockerstartup/install/ubuntu/install/common/00_apt_helper.sh
+source ${INST_DIR}/ubuntu/install/common/00_apt_helper.sh
 
 echo "======= Installing Chrome ======="
 

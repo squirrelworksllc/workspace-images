@@ -1,10 +1,10 @@
+#!/usr/bin/env bash
 # This script installs Bitcurator onto the system under the kasm-user user. 
 # It is meant to be run/installed into a pre-configured Kasm workspace's
 # Dockerfile and was not developed to work as standalone. 
 # For official documentation see "https://github.com/BitCurator/bitcurator-distro/wiki/BitCurator-Quick-Start-Guide"
-#!/usr/bin/env bash
 set -euo pipefail
-source /dockerstartup/install/ubuntu/install/common/00_apt_helper.sh
+source ${INST_DIR}/ubuntu/install/common/00_apt_helper.sh
 
 echo "======= Installing Bitcurator 5 Environment ======="
 

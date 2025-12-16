@@ -1,9 +1,9 @@
+#!/usr/bin/env bash
 # This script is designed to install the complete environment needed to run Tesseract Optical Character Recognition (OCR).
 # Although this script may work alone it was not designed to do so and was designed to be invoked via Dockerfile.
 # This script assumes Ubuntu and/or pure debian.
-#!/usr/bin/env bash
 set -euo pipefail
-source /dockerstartup/install/ubuntu/install/common/00_apt_helper.sh
+source ${INST_DIR}/ubuntu/install/common/00_apt_helper.sh
 
 echo "======= Installing Tesseract OCR Environment ======="
 

@@ -1,8 +1,8 @@
+#!/usr/bin/env bash
 # Customized script to install Chromium. Depends on an environmental of "Install_Chrome" being either true/false
 # in the dockerfile this script is invoked from.
-#!/usr/bin/env bash
 set -euo pipefail
-source /dockerstartup/install/ubuntu/install/common/00_apt_helper.sh
+source ${INST_DIR}/ubuntu/install/common/00_apt_helper.sh
 
 echo "======= Installing Chromium ======="
 

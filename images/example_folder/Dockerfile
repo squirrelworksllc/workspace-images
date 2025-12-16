@@ -36,28 +36,15 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 # ----------------------------- LINT TARGET -----------------------------
 FROM base AS lint
-
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-ARG HADOLINT_VERSION="v2.12.0"
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl shellcheck \
-    && rm -rf /var/lib/apt/lists/*
-
-# Pinned hadolint (x86_64). If you build on ARM64, switch to hadolint-Linux-aarch64.
-RUN curl -fsSL -o /usr/local/bin/hadolint \
-      "https://github.com/hadolint/hadolint/releases/download/${HADOLINT_VERSION}/hadolint-Linux-x86_64" \
-    && chmod +x /usr/local/bin/hadolint \
-    && hadolint --version
+# ... install shellcheck + hadolint ...
 
 WORKDIR /src
 COPY . /src
 
-# Lint this Dockerfile (update the path to match your image folder)
-RUN hadolint --ignore DL3008 /src/images/ubuntu-noble-dind/Dockerfile
+RUN bash /src/tools/ci/lint_installers.sh
+RUN hadolint /src/images/ubuntu-noble-dind/Dockerfile
+RUN bash /src/tools/ci/lint-shell.sh
 
-# Shellcheck scripts in repo (tighten if desired)
-RUN find /src/src /src/tools /src/common -type f -name "*.sh" -print0 2>/dev/null | xargs -0 -r shellcheck
 USER 1000
 
 # ----------------------------- BUILD TARGET -----------------------------

@@ -1,6 +1,6 @@
+#!/usr/bin/env bash
 # This is a helper file designed to modify the dockerfile and called scripts so that they only
 # invoke "apt update" if new sources/keys/packages are added, cutting down redundancy.
-#!/usr/bin/env bash
 set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive

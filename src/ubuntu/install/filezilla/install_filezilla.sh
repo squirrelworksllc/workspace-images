@@ -1,7 +1,7 @@
-# This script installs Filezilla. It is meant to be called from a Dockerfile.
 #!/usr/bin/env bash
+# This script installs Filezilla. It is meant to be called from a Dockerfile.
 set -euo pipefail
-source /dockerstartup/install/ubuntu/install/common/00_apt_helper.sh
+source ${INST_DIR}/ubuntu/install/common/00_apt_helper.sh
 
 echo "======= Installing FileZilla ======="
 
@@ -12,8 +12,8 @@ apt_install filezilla
 mkdir -p "$HOME/.config/filezilla" "$HOME/Desktop"
 
 # Copy default config if it exists in the image
-if [ -f /dockerstartup/install/filezilla/filezilla.xml ]; then
-  cp /dockerstartup/install/filezilla/filezilla.xml "$HOME/.config/filezilla/filezilla.xml"
+if [ -f ${INST_DIR}/filezilla/filezilla.xml ]; then
+  cp ${INST_DIR}/filezilla/filezilla.xml "$HOME/.config/filezilla/filezilla.xml"
   chown 1000:1000 "$HOME/.config/filezilla/filezilla.xml" 2>/dev/null || true
 fi
 

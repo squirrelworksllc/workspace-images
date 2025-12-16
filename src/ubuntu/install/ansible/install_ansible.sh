@@ -1,8 +1,7 @@
-# This script install Ansible. It is meant to be called from inside of a Dockerfile.
-# Modified to remove non-ubuntu references and apply updated logic
 #!/usr/bin/env bash
+# This script install Ansible. It is meant to be called from inside of a Dockerfile.
 set -euo pipefail
-source /dockerstartup/install/ubuntu/install/common/00_apt_helper.sh
+source ${INST_DIR}/ubuntu/install/common/00_apt_helper.sh
 
 echo "======= Installing Ansible ======="
 

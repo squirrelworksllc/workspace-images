@@ -2,7 +2,7 @@
 # Then adjust the text up here to describe what the file does.
 #!/usr/bin/env bash
 set -euo pipefail
-source /dockerstartup/install/ubuntu/install/common/00_apt_helper.sh
+source ${INST_DIR}/ubuntu/install/common/00_apt_helper.sh
 
 # ----------------------------- CONFIG -----------------------------
 APP_NAME="REPLACE_ME"                  # e.g., "VLC"

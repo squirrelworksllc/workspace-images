@@ -1,6 +1,8 @@
-# This script prompts the user to select one of the pre-defined images/builds
 #!/usr/bin/env bash
+# This script prompts the user to select one of the pre-defined images/builds
 set -euo pipefail
+
+export DOCKER_BUILDKIT=1
 
 MODE="${1:-prod}"   # prod | dev | lint
 CONFIG=".vscode/images.json"
@@ -35,13 +37,18 @@ dockerfile="$(jq -r '.dockerfile' <<<"$img")"
 context="$(jq -r '.context' <<<"$img")"
 repo="$(jq -r '.repo' <<<"$img")"
 
+echo ""
+echo "Key:        $KEY"
+echo "Dockerfile: $dockerfile"
+echo "Context:    $context"
+
 case "$MODE" in
   dev)
     tag="$(jq -r '.devTag' <<<"$img")"
     target="$(jq -r '.devTarget' <<<"$img")"
     echo ""
     echo "Building DEV: ${repo}:${tag} (target=${target})"
-    docker build --target "$target" -f "$dockerfile" -t "${repo}:${tag}" "$context"
+    docker build --progress=plain --target "$target" -f "$dockerfile" -t "${repo}:${tag}" "$context"
     ;;
   lint)
     target="$(jq -r '.lintTarget // "lint"' <<<"$img")"
@@ -55,7 +62,7 @@ case "$MODE" in
     tag="$(jq -r '.prodTag' <<<"$img")"
     echo ""
     echo "Building PROD: ${repo}:${tag}"
-    docker build -f "$dockerfile" -t "${repo}:${tag}" "$context"
+    docker build --progress=plain -f "$dockerfile" -t "${repo}:${tag}" "$context"
     ;;
   *)
     echo "Unknown mode: $MODE (use prod|dev|lint)"

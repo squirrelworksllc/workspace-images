@@ -34,10 +34,10 @@
       "lintContext": "."
     },
     {
-      "key": "bitcurator",
-      "dockerfile": "images/bitcurator/Dockerfile",
+      "key": "bitcurator5",
+      "dockerfile": "images/bitcurator5/Dockerfile",
       "context": ".",
-      "repo": "squirrelworksllc/bitcurator",
+      "repo": "squirrelworksllc/bitcurator5",
       "prodTag": "latest",
       "devTag": "develop",
       "devTarget": "develop",

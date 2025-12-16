@@ -1,4 +1,4 @@
-WIP - NOT WORKING
+#WIP - NOT WORKING
 
 # syntax=docker/dockerfile:1.7
 # ----------------------------- DESCRIPTION -----------------------------
@@ -46,27 +46,19 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # ############################################################################
 FROM base AS lint
 
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-ARG HADOLINT_VERSION="v2.12.0"
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl shellcheck \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install pinned hadolint (x86_64).
-RUN curl -fsSL -o /usr/local/bin/hadolint \
-      "https://github.com/hadolint/hadolint/releases/download/${HADOLINT_VERSION}/hadolint-Linux-x86_64" \
-    && chmod +x /usr/local/bin/hadolint \
-    && hadolint --version
-
+# install hadolint + shellcheck here...
 WORKDIR /src
 COPY . /src
 
-# Lint THIS Dockerfile (path inside repo)
-RUN hadolint --ignore DL3008 /src/images/ubuntu-noble-dind/Dockerfile
+# installs hadolint + shellcheck
+RUN bash /src/tools/ci/lint_installers.sh
 
-# Shellcheck scripts
-RUN find /src/src /src/tools /src/common -type f -name "*.sh" -print0 2>/dev/null | xargs -0 -r shellcheck
+# Dockerfile lint (centralized policy)
+RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/remnux/Dockerfile
+
+# Shell script lint (centralized policy)
+RUN bash /src/tools/ci/lint-shell.sh
+
 USER 1000
 
 # ############################################################################
