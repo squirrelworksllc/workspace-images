@@ -68,26 +68,6 @@ FROM base AS build
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Install script list (kept close to the build logic)
-# NOTE: This is a space-separated list; keep it quoted and split by shell.
-ENV INST_SCRIPTS="/ubuntu/install/tools/install_tools.sh \
-/ubuntu/install/chrome/install_chrome.sh \
-/ubuntu/install/firefox/install_firefox.sh \
-/ubuntu/install/thunderbird/install_thunderbird.sh \
-/ubuntu/install/vs_code/install_vs_code.sh \
-/ubuntu/install/remmina/install_remmina.sh \
-/ubuntu/install/libre_office/install_libre_office.sh \
-/ubuntu/install/signal/install_signal.sh \
-/ubuntu/install/gimp/install_gimp.sh \
-/ubuntu/install/ansible/install_ansible.sh \
-/ubuntu/install/slack/install_slack.sh \
-/ubuntu/install/discord/install_discord.sh \
-/ubuntu/install/teams/install_teams.sh \
-/ubuntu/install/obsidian/install_obsidian.sh \
-/ubuntu/install/infosec_yara/install_infosec_yara.sh \
-/ubuntu/install/tesseract_ocr/install_tesseract_ocr.sh \
-/ubuntu/install/common/01_cleanup.sh"
-
 # Copy install payload from repo-root/src (contains ubuntu/)
 COPY ./src/ ${INST_DIR}
 
