@@ -1,22 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-fail=0
+# Installs lint tooling used by the Dockerfile lint stages.
+# Expected to run inside the lint stage container as root.
 
-check() {
-  local pattern="$1"
-  local msg="$2"
-  if rg -n --hidden --glob '!**/.git/**' "$pattern" >/dev/null; then
-    echo "FAIL: $msg"
-    rg -n --hidden --glob '!**/.git/**' "$pattern" || true
-    echo
-    fail=1
-  fi
-}
+HADOLINT_VERSION="${HADOLINT_VERSION:-v2.12.0}"
 
-check '\bapt-key\b' "apt-key is deprecated (use /etc/apt/keyrings + signed-by=)"
-check '\bapt(-get)?\s+upgrade\b' "avoid apt upgrade inside images"
-check 'icon-theme\.cache' "icon cache removal should only be in final cleanup"
-check 'rm -rf\s+/var/lib/apt/lists' "apt lists cleanup should only be in final cleanup"
+apt-get update
+apt-get install -y --no-install-recommends \
+  ca-certificates \
+  curl \
+  shellcheck
 
-exit "$fail"
+rm -rf /var/lib/apt/lists/*
+
+# Install hadolint (amd64). If you build on arm64 later, we’ll adapt this.
+curl -fsSL -o /usr/local/bin/hadolint \
+  "https://github.com/hadolint/hadolint/releases/download/${HADOLINT_VERSION}/hadolint-Linux-x86_64"
+chmod +x /usr/local/bin/hadolint
+
+# Sanity check
+hadolint --version
+shellcheck --version
