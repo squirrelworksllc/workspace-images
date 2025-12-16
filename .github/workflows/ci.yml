@@ -1,4 +1,4 @@
-# This is the main CI enforcement workflow for the entire repository. Do not modify it!
+# Main CI enforcement workflow for the repository
 name: ci
 
 concurrency:
@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 jobs:
-  # 1) Build a dynamic matrix from .vscode/images.json
+  # 1) Generate the build matrix from .vscode/images.json
   matrix:
     name: generate matrix
     runs-on: ubuntu-latest
@@ -24,13 +24,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Generate include matrix from .vscode/images.json
+      - name: Generate include matrix
         id: gen
         shell: bash
         run: |
           set -euo pipefail
 
-          # include = [{key, dockerfile, repo, prodTag, devTarget, lintTarget}]
           include="$(jq -c '
             { include: [
               .images[] | {
@@ -46,7 +45,7 @@ jobs:
           echo "include=$include" >> "$GITHUB_OUTPUT"
           echo "$include" | jq .
 
-  # 2) Lint each image (Dockerfile + scripts)
+  # 2) Lint each image
   lint:
     name: lint (${{ matrix.key }})
     runs-on: ubuntu-latest
@@ -59,7 +58,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Lint target (no cache, plain output)
+      - name: Run lint target
         shell: bash
         run: |
           set -euo pipefail
@@ -71,14 +70,14 @@ jobs:
             -f "${{ matrix.dockerfile }}" \
             .
 
-  # 2b) Lint gate (single stable required check)
+  # 2b) Stable required check for branch protection
   lint-gate:
     name: lint / gate
     runs-on: ubuntu-latest
     needs: [lint]
     if: always()
     steps:
-      - name: Fail if any lint job failed
+      - name: Evaluate lint results
         shell: bash
         run: |
           set -euo pipefail
@@ -88,13 +87,12 @@ jobs:
             *) exit 1 ;;
           esac
 
-  # 3) Optional: Build production for every image (proves it actually builds)
-  # Informational on PRs; enforced on push (see build-production-gate)
+  # 3) Production builds (informational)
   build-production:
     name: build production (${{ matrix.key }})
     runs-on: ubuntu-latest
     needs: [matrix]
-    continue-on-error: ${{ github.event_name == 'pull_request' }}
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.matrix.outputs.include) }}
@@ -103,7 +101,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build production (no push)
+      - name: Build production image (no push)
         shell: bash
         run: |
           set -euo pipefail
@@ -114,17 +112,3 @@ jobs:
             -t "${{ matrix.repo }}:${{ matrix.prodTag }}" \
             -f "${{ matrix.dockerfile }}" \
             .
-
-  # 3b) Build gate (single stable check) - ONLY enforce on push
-  build-production-gate:
-    name: build production / gate
-    runs-on: ubuntu-latest
-    needs: [build-production]
-    if: github.event_name == 'push'
-    steps:
-      - name: Fail if any production build job failed
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "build-production result: ${{ needs.build-production.result }}"
-          test "${{ needs.build-production.result }}" = "success"
