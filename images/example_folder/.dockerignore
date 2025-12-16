@@ -1,0 +1,2 @@
+# Usually minimal, since context is repo root and root .dockerignore does the heavy lifting.
+# This file is optional if you already have a good repo-root .dockerignore.

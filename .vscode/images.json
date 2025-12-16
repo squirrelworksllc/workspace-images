@@ -1,0 +1,48 @@
+{
+  "images": [
+    {
+      "key": "ubuntu-noble-dind",
+      "dockerfile": "images/ubuntu-noble-dind/Dockerfile",
+      "context": ".",
+      "repo": "squirrelworksllc/ubuntu-noble-dind",
+      "prodTag": "1.18.0",
+      "devTag": "develop",
+      "devTarget": "develop",
+      "lintTarget": "lint",
+      "lintContext": "."
+    },
+    {
+      "key": "ubuntu-noble-desktop",
+      "dockerfile": "images/ubuntu-noble-desktop/Dockerfile",
+      "context": ".",
+      "repo": "squirrelworksllc/ubuntu-noble-desktop",
+      "prodTag": "1.18.0",
+      "devTag": "develop",
+      "devTarget": "develop",
+      "lintTarget": "lint",
+      "lintContext": "."
+    },
+    {
+      "key": "remnux",
+      "dockerfile": "images/remnux/Dockerfile",
+      "context": ".",
+      "repo": "squirrelworksllc/remnux",
+      "prodTag": "latest",
+      "devTag": "develop",
+      "devTarget": "develop",
+      "lintTarget": "lint",
+      "lintContext": "."
+    },
+    {
+      "key": "bitcurator",
+      "dockerfile": "images/bitcurator/Dockerfile",
+      "context": ".",
+      "repo": "squirrelworksllc/bitcurator",
+      "prodTag": "latest",
+      "devTag": "develop",
+      "devTarget": "develop",
+      "lintTarget": "lint",
+      "lintContext": "."
+    }
+  ]
+}

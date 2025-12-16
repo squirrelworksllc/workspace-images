@@ -1,0 +1,26 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "docker: build (prod)",
+      "type": "shell",
+      "command": ".vscode/docker-build.sh prod",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "docker: build (develop)",
+      "type": "shell",
+      "command": ".vscode/docker-build.sh dev",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "docker: lint",
+      "type": "shell",
+      "command": ".vscode/docker-build.sh lint",
+      "group": "test",
+      "problemMatcher": []
+    }
+  ]
+}

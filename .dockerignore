@@ -1,0 +1,10 @@
+.git
+.vscode
+**/.DS_Store
+**/*.log
+**/__pycache__/
+**/*.pyc
+**/node_modules/
+**/.venv/
+**/dist/
+**/build/
