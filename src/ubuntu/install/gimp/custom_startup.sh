@@ -1,5 +1,6 @@
-# Copied from official KasmTech repo at "https://github.com/kasmtech/workspaces-images/blob/develop/src/ubuntu/install/"
 #!/usr/bin/env bash
+# Copied from official KasmTech repo at "https://github.com/kasmtech/workspaces-images/blob/develop/src/ubuntu/install/"
+
 set -ex
 START_COMMAND="/opt/gimp-3/squashfs-root/launcher"
 PGREP="gimp"

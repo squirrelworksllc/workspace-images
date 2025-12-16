@@ -1,5 +1,6 @@
-# Copied from official KasmTech repo at "https://github.com/kasmtech/workspaces-images/blob/develop/src/ubuntu/install/"
 #!/usr/bin/env bash
+# Copied from official KasmTech repo at "https://github.com/kasmtech/workspaces-images/blob/develop/src/ubuntu/install/"
+
 set -ex
 if [ "$(arch)" == "aarch64" ]; then
   START_COMMAND="/usr/bin/telegram-desktop"
