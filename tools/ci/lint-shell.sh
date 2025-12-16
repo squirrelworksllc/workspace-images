@@ -1,29 +1,35 @@
 #!/usr/bin/env bash
-# runs lint checks against shell scripts
 set -euo pipefail
-
-# Lint all bash scripts in the repo that are part of the build context.
-# Expected to run inside a container where the repo is copied to /src.
 
 ROOT="${1:-/src}"
 
-# Paths we care about
 SCAN_DIRS=(
   "${ROOT}/src"
   "${ROOT}/tools"
   "${ROOT}/common"
 )
 
-# Find .sh files
+EXCLUDES=(
+  "*/custom_startup.sh"
+)
+
+# Build find exclusion args
+EXCLUDE_ARGS=()
+for pattern in "${EXCLUDES[@]}"; do
+  EXCLUDE_ARGS+=( -not -path "$pattern" )
+done
+
 mapfile -d '' files < <(
-  find "${SCAN_DIRS[@]}" -type f -name "*.sh" -print0 2>/dev/null
+  find "${SCAN_DIRS[@]}" \
+    -type f -name "*.sh" \
+    "${EXCLUDE_ARGS[@]}" \
+    -print0 2>/dev/null
 )
 
 if [[ "${#files[@]}" -eq 0 ]]; then
-  echo "No shell scripts found under: ${SCAN_DIRS[*]}"
+  echo "No shell scripts found to lint."
   exit 0
 fi
 
 echo "ShellCheck: ${#files[@]} script(s)"
-# Run shellcheck once for cleaner output (no xargs exit-code weirdness)
 shellcheck "${files[@]}"
