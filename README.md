@@ -2,279 +2,258 @@
   <img src="common/resources/images/Logo.png" alt="Project Logo" width="300">
 </p>
 
-# 🐳 SquirrelWorksLLC Workspace Images – Repository Guide
+# 🐳 SquirrelWorksLLC Workspace Images
 
-This directory contains **all Docker images built and maintained by this repository**.  
-Each image lives in its own folder and follows the same structure, targets, and build rules.
+This repository contains **all Docker workspace images built and maintained by SquirrelWorksLLC**.
 
-If you follow this guide, you will:
-- avoid Docker build-context problems
-- get consistent linting for free
-- never touch VS Code tasks again
-- keep builds predictable and boring (the good kind)
+Each image follows a **strict, repeatable, and scalable structure** designed to grow cleanly as new images are added — without constantly modifying CI workflows, VS Code tasks, or build scripts.
 
 ---
 
-## 📁 Directory Structure
+## 📑 Table of Contents
+
+1. [Repository Overview](#repository-overview)
+2. [Repository Structure](#repository-structure)
+3. [Core Rules](#core-rules)
+4. [Build Context](#build-context)
+5. [Dockerfile Structure](#dockerfile-structure)
+6. [Image Targets](#image-targets)
+7. [CI & Branch Protection](#ci--branch-protection)
+8. [Contribution & Required Workflow](#contribution--required-workflow)
+9. [Adding a New Image](#adding-a-new-image)
+10. [Manual Builds](#manual-builds)
+11. [Philosophy](#philosophy)
+
+---
+
+## Repository Overview
+
+Current images include:
+
+- **ubuntu-noble-dind**
+- **ubuntu-noble-desktop**
+- **remnux**
+- **bitcurator5**
+
+All images are built using:
+- A shared repo-root build context
+- Centralized linting policy
+- Dynamically generated CI matrix
+
+---
+
+## Repository Structure
 
 ```text
-repo-root/
-├─ images/
-│  ├─ ubuntu-noble-dind/
-│  │  ├─ Dockerfile
-│  │  └─ README.md
-│  ├─ ubuntu-noble-desktop/
-│  │  ├─ Dockerfile
-│  │  └─ README.md
-│  ├─ remnux/
-│  │  ├─ Dockerfile
-│  │  └─ README.md
-│  ├─ bitcurator/
-│  │  ├─ Dockerfile
-│  │  └─ README.md
-│  └─ README.md   ← (this file)
-│
-├─ src/
-├─ tools/
-├─ common/
-└─ .vscode/
-   ├─ images.json
-   ├─ docker-build.sh
-   └─ tasks.json
+.
+├── images/
+│   ├── ubuntu-noble-dind/
+│   ├── ubuntu-noble-desktop/
+│   ├── remnux/
+│   └── bitcurator5/
+├── src/
+│   └── ubuntu/
+├── tools/
+│   └── ci/
+├── common/
+│   └── resources/
+│       └── images/
+├── .vscode/
+│   └── images.json
+└── README.md
 ```
 
 ---
 
-## 🧠 Core Rules (Read Once)
+## Core Rules
 
-1. **All Docker builds use the repo root (`.`) as the build context**
-2. **Each image lives in its own folder under `images/`**
-3. **Every Dockerfile supports the same targets**:
-   - `lint`
-   - `develop`
-   - `production` (default / final stage)
-4. **You never edit `tasks.json` when adding new images**
-5. **Image names and tags are defined once in `.vscode/images.json`**
+- **Repo root is always the Docker build context**
+- Each image owns its own Dockerfile under `images/<image-name>/`
+- Images are registered **once** in `.vscode/images.json`
+- CI automatically discovers all images
+- **Lint is the enforcement gate**
 
 ---
 
-## 📦 Build Context (Critical)
+## Build Context
 
-All images assume the **build context is the repo root**:
+All Dockerfiles assume:
 
 ```bash
-docker build -f images/<image-name>/Dockerfile .
+docker build -f images/<image>/Dockerfile .
 ```
 
-This is required because Dockerfiles copy files from:
-- `src/`
-- `tools/`
-- `common/`
-
-### ❌ Wrong (will break COPY)
-```bash
-docker build images/<image-name>
-```
-
-### ✅ Correct
-```bash
-docker build -f images/<image-name>/Dockerfile .
-```
+Never change the build context per-image.
 
 ---
 
-## 🧩 Required Dockerfile Layout
+## Dockerfile Structure
 
-Every Dockerfile under `images/` must follow this structure:
+Every Dockerfile must provide:
 
-```dockerfile
-FROM <base> AS base
+- `base` stage
+- `lint` stage
+- `build` stage
+- `develop` target
+- `production` target (default)
 
-FROM base AS lint
-# hadolint + shellcheck
+Linting is centralized via:
 
-FROM base AS build
-# installation logic
-
-FROM build AS develop
-# dev tweaks
-
-FROM build AS production
-# prod image (final stage)
-```
-
-### Why this matters
-- Lint behaves consistently
-- VS Code build picker works for every image
-- CI/CD remains predictable
-- Base images can be swapped cleanly
+- `tools/ci/lint_installers.sh`
+- `tools/ci/lint-dockerfile.sh`
+- `tools/ci/lint-shell.sh`
 
 ---
 
-## 🧪 Target Definitions
+## Image Targets
 
-### `lint`
-- Runs **Hadolint** on the Dockerfile
-- Runs **ShellCheck** on scripts in:
-  - `src/`
-  - `tools/`
-  - `common/`
-- Fails fast before wasting build time
-
-### `develop`
-- Same as production, but with:
-  - `DEBUG=true`
-  - optional dev-only tooling
-- Tagged as `:develop`
-
-### `production`
-- Final stage
-- Built when no `--target` is specified
-- Tagged with a version or `latest`
+| Target | Purpose |
+|------|--------|
+| `lint` | Static validation only |
+| `build` | Shared install logic |
+| `develop` | Debug-friendly image |
+| `production` | Final runtime image |
 
 ---
 
-## ➕ Adding a New Image (Step-by-Step)
+## CI & Branch Protection
 
-### 1️⃣ Create the image folder
+CI dynamically generates a matrix from `.vscode/images.json`.
 
-```text
-images/my-new-image/
-├─ Dockerfile
-└─ README.md
-```
+### Enforcement Behavior
 
-Use the provided **template Dockerfile** as your starting point.
+- **Lint gate is required**
+- Production builds are informational only
+- A PR **cannot merge** if lint fails
+- Production build failures do **not** block merges
 
----
-
-### 2️⃣ Write the Dockerfile
-
-Required rules:
-- Build context must be repo root (`.`)
-- Lint target must reference the correct path:
-
-```dockerfile
-RUN hadolint /src/images/my-new-image/Dockerfile
-```
-
-Installer scripts should live under:
-
-```text
-src/ubuntu/install/<feature>/
-```
+This allows active upstream projects (REMnux, BitCurator) to be worked on without blocking all changes.
 
 ---
 
-### 3️⃣ Register the image in `.vscode/images.json`
+## Contribution & Required Workflow
 
-Add **one object** to the `images` array:
+> **Direct pushes to `main` are intentionally blocked.**  
+> This repository enforces pull-request-only changes with mandatory CI checks.
 
-```json
-{
-  "key": "my-new-image",
-  "dockerfile": "images/my-new-image/Dockerfile",
-  "context": ".",
-  "repo": "squirrelworksllc/my-new-image",
-  "prodTag": "1.0.0",
-  "devTag": "develop",
-  "devTarget": "develop",
-  "lintTarget": "lint",
-  "lintContext": "."
-}
-```
+### 🚫 What Is Not Allowed
 
-✅ That’s it.  
-🚫 Do **not** modify:
-- `.vscode/tasks.json`
-- `.vscode/docker-build.sh`
+- Pushing directly to `main`
+- Bypassing required CI checks
+- Merging code that fails the lint gate
+
+Attempts to push directly to `main` will be rejected by GitHub.
 
 ---
 
-## ▶️ Building Images
+### ✅ Required Workflow
 
-### From VS Code
-1. **Terminal → Run Task**
-2. Choose:
-   - `docker: build (prod)`
-   - `docker: build (develop)`
-   - `docker: lint`
-3. Select the image from the picker
-
-### From CLI (repo root)
+#### 1. Create a working branch
 
 ```bash
-# lint
-docker build --target lint -f images/my-new-image/Dockerfile .
-
-# develop
-docker build --target develop -t squirrelworksllc/my-new-image:develop   -f images/my-new-image/Dockerfile .
-
-# production
-docker build -t squirrelworksllc/my-new-image:1.0.0   -f images/my-new-image/Dockerfile .
+git checkout -b develop
 ```
+
+Use a descriptive name for feature work when appropriate (e.g. `lint-fix`, `dockerfile-update`).
 
 ---
 
-## ⚠️ Common Mistakes
+#### 2. Commit changes locally
 
-### ❌ Using the image folder as context
 ```bash
-docker build images/my-new-image
+git add .
+git commit -m "Describe your changes"
 ```
-Breaks `COPY ./src`.
 
-### ✅ Always do this
+---
+
+#### 3. Push the branch
+
 ```bash
-docker build -f images/my-new-image/Dockerfile .
+git push -u origin develop
 ```
 
 ---
 
-### ❌ Editing VS Code tasks per image
-This repo intentionally avoids that.
+#### 4. Open a Pull Request
 
-If you feel the need to edit `tasks.json`, something has gone wrong.
+Create a Pull Request targeting:
 
----
-
-### ❌ Skipping lint
-Lint exists to save time.
-
-If lint fails:
-1. Fix lint
-2. Rebuild
-3. Then move on
+- **Base:** `main`
+- **Compare:** your working branch
 
 ---
 
-## 🧹 Repo-wide Requirement: `.dockerignore`
+#### 5. Required status checks
 
-The repo root **must** contain a `.dockerignore`.
+The following check **must pass** before merging:
 
-Example:
+- `lint / gate`
 
-```dockerignore
-.git
-.vscode
-**/node_modules
-**/.venv
-**/__pycache__
-**/*.log
-**/dist
-**/build
+If lint fails, update your branch and push again until the check passes.
+
+---
+
+#### 6. Merge
+
+Once all required checks pass and repository rules are satisfied, the Pull Request may be merged into `main`.
+
+---
+
+### ℹ️ Notes
+
+- These rules are enforced server-side by GitHub
+- VS Code and Git cannot override them
+- This protects the stability and consistency of `main`
+
+If you encounter push rejections, confirm you are not pushing directly to `main`.
+
+---
+
+## Adding a New Image
+
+1. Create a folder:
+   ```bash
+   images/<new-image>/
+   ```
+
+2. Copy the Dockerfile template
+
+3. Register the image in `.vscode/images.json`
+
+4. Commit and open a PR
+
+CI will automatically:
+- Add lint checks
+- Enforce policy
+- Include the image in gating
+
+No CI changes required.
+
+---
+
+## Manual Builds
+
+Lint:
+```bash
+docker build --target lint -f images/<image>/Dockerfile .
 ```
 
-Without this, builds will be slow and noisy.
+Production:
+```bash
+docker build -t squirrelworksllc/<image>:<tag> -f images/<image>/Dockerfile .
+```
 
 ---
 
-## 🧠 Philosophy
+## Philosophy
 
-- Dockerfiles should be boring
-- Image metadata lives in one place
-- Adding images is mechanical, not creative
-- Lint fails early and loudly
-- Tooling stays out of your way
+> Calm infrastructure is good infrastructure.
 
-If you follow this pattern, everything stays calm—and that’s the goal.
+This repository favors:
+- Predictability over cleverness
+- Linting over tribal knowledge
+- Gates over trust
+
+Everything here is designed so **future-you** does not have to rediscover rules the hard way.
+
