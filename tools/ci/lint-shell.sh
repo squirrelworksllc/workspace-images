@@ -32,4 +32,4 @@ if [[ "${#files[@]}" -eq 0 ]]; then
 fi
 
 echo "ShellCheck: ${#files[@]} script(s)"
-shellcheck "${files[@]}"
+shellcheck -S error "${files[@]}"

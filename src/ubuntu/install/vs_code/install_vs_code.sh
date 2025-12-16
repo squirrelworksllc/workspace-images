@@ -2,7 +2,7 @@
 # Copied from official KasmTech repo at "https://github.com/kasmtech/workspaces-images/blob/develop/src/ubuntu/install/"
 # Modified to remove non-ubuntu references and apply updated logic
 set -euo pipefail
-source ${INST_DIR}/ubuntu/install/common/00_apt_helper.sh
+source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
 echo "======= Installing VS Code ======="
 echo "Step 1: Download and install..."

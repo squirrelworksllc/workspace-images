@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # This script install vlc. It is meant to be called from inside a Dockerfile.
 set -euo pipefail
-source ${INST_DIR}/ubuntu/install/common/00_apt_helper.sh
+source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
 echo "======= Installing VLC ======="
 

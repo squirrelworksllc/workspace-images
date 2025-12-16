@@ -2,7 +2,7 @@
 # This script installs Telegram. It is meant to be called from a Dockerfile
 # and installed on Ubuntu and/or a debian variant.
 set -euo pipefail
-source ${INST_DIR}/ubuntu/install/common/00_apt_helper.sh
+source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
 echo "======= Installing Telegram ======="
 

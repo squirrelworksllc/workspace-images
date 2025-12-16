@@ -2,7 +2,7 @@
 # Script to install "Docker In A Docker" (DIND).
 # Meant to be called from a Dockerfile, may not run on its own.
 set -euo pipefail
-source ${INST_DIR}/ubuntu/install/common/00_apt_helper.sh
+source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
 ARCH="$(dpkg --print-architecture)"
 . /etc/os-release

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Customized script to install Thunderbird email client using the DEB package instead of snap
 set -euo pipefail
-source ${INST_DIR}/ubuntu/install/common/00_apt_helper.sh
+source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
 echo "======= Installing Thunderbird (DEB, no snap) ======="
 

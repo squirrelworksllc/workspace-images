@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # This script is meant to install Firefox browser and to be called from a Dockerfile.
 set -euo pipefail
-source ${INST_DIR}/ubuntu/install/common/00_apt_helper.sh
+source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
 echo "======= Install Firefox ======="
 

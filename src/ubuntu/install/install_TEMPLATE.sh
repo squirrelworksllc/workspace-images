@@ -1,8 +1,8 @@
+#!/usr/bin/env bash
 # This file acts as a template for new app installers. You should create a new folder, then add an install_APPNAME.sh file into it.
 # Then adjust the text up here to describe what the file does.
-#!/usr/bin/env bash
 set -euo pipefail
-source ${INST_DIR}/ubuntu/install/common/00_apt_helper.sh
+source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
 # ----------------------------- CONFIG -----------------------------
 APP_NAME="REPLACE_ME"                  # e.g., "VLC"

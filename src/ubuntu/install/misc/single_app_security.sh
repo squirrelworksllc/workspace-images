@@ -23,8 +23,8 @@ if [ "$REMOVE_TERMINALS" = true ] ; then
         echo "apt package manager detected"
         terminals=("koi8rxterm" "lxterm" "xterm" "x-terminal-emulator" "xfce4-terminal" "xfce4-terminal.wrapper")
 
-        for termapp in ${terminals[@]}; do
-            if [[ $(apt -qq list "$termapp") ]] ; then
+        for termapp in "${terminals[@]}"; do
+            if [[ $(apt -qq list "${termapp}") ]] ; then
                 echo "Removing termina all $termapp."
                 apt remove -y ${termapp}
             fi

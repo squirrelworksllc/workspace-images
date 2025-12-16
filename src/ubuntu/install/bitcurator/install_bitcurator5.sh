@@ -4,7 +4,7 @@
 # Dockerfile and was not developed to work as standalone. 
 # For official documentation see "https://github.com/BitCurator/bitcurator-distro/wiki/BitCurator-Quick-Start-Guide"
 set -euo pipefail
-source ${INST_DIR}/ubuntu/install/common/00_apt_helper.sh
+source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
 echo "======= Installing Bitcurator 5 Environment ======="
 

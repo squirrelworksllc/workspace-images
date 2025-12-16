@@ -5,7 +5,7 @@
 # Although this script may work alone it was not designed to do so and was designed to be invoked via Dockerfile.
 # This script assumes Ubuntu and/or pure debian.
 set -euo pipefail
-source ${INST_DIR}/ubuntu/install/common/00_apt_helper.sh
+source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
 echo "======= Installing InfoSec Yara Environment (distro packages) ======="
 

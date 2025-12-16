@@ -2,7 +2,7 @@
 # Script to install Microsoft Edge. This script is meant to be called from a Dockerfile
 # and may not work on it's own.
 set -euo pipefail
-source ${INST_DIR}/ubuntu/install/common/00_apt_helper.sh
+source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
 echo "======= Installing Microsoft Edge ======="
 
