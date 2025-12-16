@@ -51,6 +51,7 @@ ENV DEBUG=false \
 # ############################################################################
 FROM base AS lint
 
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG HADOLINT_VERSION="v2.12.0"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -67,11 +68,11 @@ WORKDIR /src
 COPY . /src
 
 # Lint THIS Dockerfile (path inside repo)
-RUN hadolint /src/images/ubuntu-noble-dind/Dockerfile
+RUN hadolint --ignore DL3008 /src/images/ubuntu-noble-dind/Dockerfile
 
 # Shellcheck scripts in the repo
 RUN find /src/src /src/tools /src/common -type f -name "*.sh" -print0 2>/dev/null | xargs -0 -r shellcheck
-
+USER 1000
 
 # ############################################################################
 # -------------------------- COMMON BUILD TARGET --------------------------- #

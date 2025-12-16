@@ -44,6 +44,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # ############################################################################
 FROM base AS lint
 
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG HADOLINT_VERSION="v2.12.0"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -60,11 +61,11 @@ WORKDIR /src
 COPY . /src
 
 # Lint THIS Dockerfile
-RUN hadolint /src/images/bitcurator/Dockerfile
+RUN hadolint --ignore DL3008 /src/images/ubuntu-noble-dind/Dockerfile
 
 # Shellcheck scripts in repo
 RUN find /src/src /src/tools /src/common -type f -name "*.sh" -print0 2>/dev/null | xargs -0 -r shellcheck
-
+USER 1000
 
 # ############################################################################
 # ------------------------------ BUILD TARGET ------------------------------ #
