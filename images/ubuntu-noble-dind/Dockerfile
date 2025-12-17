@@ -91,7 +91,7 @@ RUN set -eux; \
       "/ubuntu/install/dind/install_dind.sh" \
     ); \
     if [ "${SKIP_CHROMIUM}" != "true" ]; then \
-      SCRIPTS+=( "/ubuntu/install/chrome/install_chromium.sh" ); \
+      SCRIPTS+=( "/ubuntu/install/chromium/install_chromium.sh" ); \
     else \
       echo ">>> SKIP_CHROMIUM=true; skipping Chromium installer"; \
     fi; \
