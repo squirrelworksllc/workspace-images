@@ -82,9 +82,9 @@ jobs:
           # - its Dockerfile changed, OR
           # - any file under the Dockerfile directory changed
           include="$(jq -c --arg files "$files" --arg rebuild_all "$rebuild_all" '
-            def tokens($s): ($s | split(" ") | map(select(length>0)));
+            def tokens(s): (s | split(" ") | map(select(length>0)));
 
-            ($files | tokens) as $changed
+            tokens($files) as $changed
             |
             def touched($dockerfile):
               ($dockerfile | split("/")[:-1] | join("/")) as $dir
@@ -142,7 +142,12 @@ jobs:
           echo "Dockerfile: ${{ matrix.dockerfile }}"
           echo "Pushing:   ${{ matrix.repo }}:${{ matrix.prodTag }}"
 
-          DOCKER_BUILDKIT=1 docker buildx build             --progress=plain             --push             -t "${{ matrix.repo }}:${{ matrix.prodTag }}"             -f "${{ matrix.dockerfile }}"             .
+          DOCKER_BUILDKIT=1 docker buildx build \
+            --progress=plain \
+            --push \
+            -t "${{ matrix.repo }}:${{ matrix.prodTag }}" \
+            -f "${{ matrix.dockerfile }}" \
+            .
 
   nothing-to-publish:
     name: nothing to publish
@@ -153,4 +158,3 @@ jobs:
       - name: No changed images detected
         run: |
           echo "No image Dockerfiles (or their directories) changed in this push. Skipping Docker Hub publish."
-  
