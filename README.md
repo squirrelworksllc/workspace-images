@@ -4,6 +4,73 @@
 
 # 🐳 SquirrelWorksLLC Workspace Images
 
+
+## Branching & Workflow
+
+This section reflects the **current, enforced workflow**. If anything elsewhere conflicts, **this section wins**.
+
+### Branch Roles
+
+- **`develop`**
+  - Integration branch
+  - Direct pushes are allowed
+  - CI runs for signal only
+  - May contain frequent commits and WIP
+
+- **`main`**
+  - Protected release branch
+  - Pull requests required
+  - `lint / gate` must pass
+  - Squash merges only
+
+### Daily Development (`develop`)
+
+```bash
+git switch develop
+git pull origin develop
+# work, commit freely
+git push origin develop
+```
+
+No pull request is required for `develop`.
+
+### Merging into `main`
+
+When changes are ready for release:
+
+1. Open a Pull Request  
+   - **Base:** `main`  
+   - **Compare:** `develop`
+
+2. Ensure required checks pass  
+   - `lint / gate`
+
+3. Squash merge the PR
+
+4. Sync `develop` back to `main`:
+
+```bash
+git switch develop
+git fetch origin
+git merge origin/main
+git push origin develop
+```
+
+### Ahead / Behind Notes
+
+GitHub’s “ahead / behind” counts are based on **commit history**, not file diffs.
+
+- Merge commits increase the “ahead” count
+- Repeated merges from `main` into `develop` can add noise
+- Inspect real differences with:
+
+```bash
+git log --oneline origin/main..develop
+```
+
+Integration branches should be easy. Release branches should be boring.
+
+
 This repository contains **all Docker workspace images built and maintained by SquirrelWorksLLC**.
 
 Each image follows a **strict, repeatable, and scalable structure** designed to grow cleanly as new images are added — without constantly modifying CI workflows, VS Code tasks, or build scripts.
@@ -256,4 +323,3 @@ This repository favors:
 - Gates over trust
 
 Everything here is designed so **future-you** does not have to rediscover rules the hard way.
-

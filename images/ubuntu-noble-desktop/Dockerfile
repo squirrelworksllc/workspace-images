@@ -13,6 +13,7 @@
 #   Lint: docker build --target lint -f images/ubuntu-noble-desktop/Dockerfile .
 #   Prod: docker build -t squirrelworksllc/ubuntu-noble-desktop:1.18.0 -f images/ubuntu-noble-desktop/Dockerfile .
 #   Dev : docker build --target develop -t squirrelworksllc/ubuntu-noble-desktop:develop -f images/ubuntu-noble-desktop/Dockerfile .
+#
 # ----------------------------------------------------------------------
 
 # DEV NOTE: The tag can change as Kasm changes, use stable and not rolling.
