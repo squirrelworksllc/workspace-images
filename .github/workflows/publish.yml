@@ -3,6 +3,7 @@ name: publish (dockerhub)
 on:
   push:
     branches: ["main"]
+  workflow_dispatch:
 
 concurrency:
   group: publish-${{ github.ref }}
@@ -152,3 +153,4 @@ jobs:
       - name: No changed images detected
         run: |
           echo "No image Dockerfiles (or their directories) changed in this push. Skipping Docker Hub publish."
+  
