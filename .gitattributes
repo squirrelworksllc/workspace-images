@@ -1,0 +1,23 @@
+# Default: let Git handle text files sanely
+* text=auto
+
+# Force LF for scripts
+*.sh      text eol=lf
+*.bash    text eol=lf
+
+# Docker / CI / config files
+Dockerfile        text eol=lf
+*.dockerfile     text eol=lf
+*.yml            text eol=lf
+*.yaml           text eol=lf
+*.json           text eol=lf
+*.env            text eol=lf
+
+# Markdown & docs
+*.md      text eol=lf
+*.rst     text eol=lf
+
+# Shell & config fragments
+*.conf    text eol=lf
+*.ini     text eol=lf
+*.service text eol=lf
