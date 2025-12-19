@@ -21,6 +21,13 @@ log() { echo "[tor-browser] $*"; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Global temp dir so EXIT trap can always see it (avoid "tmp: unbound variable" with set -u)
+tmp=""
+cleanup() {
+  [[ -n "${tmp:-}" ]] && rm -rf "${tmp}"
+}
+trap cleanup EXIT
+
 require_root() {
   if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
     echo "[tor-browser] ERROR: must run as root" >&2
@@ -115,9 +122,7 @@ main() {
   tarball="tor-browser-linux-${arch}-${version}.tar.xz"
   sig="${tarball}.asc"
 
-  local tmp
   tmp="$(mktemp -d)"
-  trap 'rm -rf "$tmp"' EXIT
 
   echo "Step 2: Installing prerequisites..."
   apt_update_if_needed
