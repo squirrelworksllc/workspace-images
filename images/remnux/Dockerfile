@@ -72,7 +72,7 @@ ENV INST_SCRIPTS="/ubuntu/install/tools/install_tools.sh \
 /ubuntu/install/common/01_cleanup.sh"
 
 # Copy install payload from repo-root/src (contains ubuntu/)
-COPY ./src/ ${INST_DIR}
+COPY ./src/ubuntu/ ${INST_DIR}/ubuntu/
 
 # Run installations
 RUN set -eux; \

@@ -45,7 +45,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 FROM base AS lint
 
 WORKDIR /src
-COPY . /src
+COPY ./src/ ${INST_DIR}
 
 # installs hadolint + shellcheck
 RUN bash /src/tools/ci/lint_installers.sh

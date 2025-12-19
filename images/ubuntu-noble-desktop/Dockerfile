@@ -1,78 +1,39 @@
 # syntax=docker/dockerfile:1.7
-# ----------------------------- DESCRIPTION -----------------------------
-# Installs Ubuntu and gives root access to OS.
-# Does NOT provide DIND (Docker-in-Docker).
-# Provides:
-#   - lint target (hadolint + shellcheck)
-#   - develop target
-#   - production target (default)
-#
-# IMPORTANT:
-# This Dockerfile assumes the BUILD CONTEXT is the REPO ROOT.
-# Examples:
-#   Lint: docker build --target lint -f images/ubuntu-noble-desktop/Dockerfile .
-#   Prod: docker build -t squirrelworksllc/ubuntu-noble-desktop:1.18.0 -f images/ubuntu-noble-desktop/Dockerfile .
-#   Dev : docker build --target develop -t squirrelworksllc/ubuntu-noble-desktop:develop -f images/ubuntu-noble-desktop/Dockerfile .
-#
-# ----------------------------------------------------------------------
 
-# DEV NOTE: The tag can change as Kasm changes, use stable and not rolling.
 ARG BASE_TAG="1.18.0-rolling-weekly"
 ARG BASE_IMAGE="core-ubuntu-noble"
 
-# ############################################################################
-# -------------------------------- BASE ----------------------------------- #
-# ############################################################################
 FROM kasmweb/${BASE_IMAGE}:${BASE_TAG} AS base
-
 USER root
 
-ENV HOME=/home/kasm-default-profile
-ENV STARTUPDIR=/dockerstartup
+ENV HOME=/home/kasm-default-profile \
+    STARTUPDIR=/dockerstartup \
+    DEBIAN_FRONTEND=noninteractive \
+    SKIP_CLEAN=true \
+    KASM_RX_HOME=/dockerstartup/kasmrx \
+    DONT_PROMPT_WSL_INSTALL="No_Prompt_please" \
+    INST_DIR=/dockerstartup/install \
+    INSTALL_CHROME=true
+
 WORKDIR ${HOME}
 
-# If Chrome is being installed in the image:
-#   INSTALL_CHROME=true and SKIP_CHROMIUM=false (or remove skip logic entirely)
-ENV INSTALL_CHROME=true
-
-ENV DEBIAN_FRONTEND=noninteractive \
-    SKIP_CLEAN=true \
-    KASM_RX_HOME=${STARTUPDIR}/kasmrx \
-    DONT_PROMPT_WSL_INSTALL="No_Prompt_please" \
-    INST_DIR=${STARTUPDIR}/install
-
-
-# ############################################################################
-# ------------------------------ LINT TARGET ------------------------------- #
-# ############################################################################
+# ------------------------------ LINT TARGET ------------------------------
 FROM base AS lint
-
-# install hadolint + shellcheck here...
 WORKDIR /src
 COPY . /src
-
-# installs hadolint + shellcheck
 RUN bash /src/tools/ci/lint_installers.sh
-
-# Dockerfile lint (centralized policy)
 RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/ubuntu-noble-desktop/Dockerfile
-
-# Shell script lint (centralized policy)
 RUN bash /src/tools/ci/lint-shell.sh
-
 USER 1000
 
-# ############################################################################
-# ------------------------------ BUILD TARGET ------------------------------ #
-# ############################################################################
+# ------------------------------ BUILD TARGET -----------------------------
 FROM base AS build
-
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Copy install payload from repo-root/src (contains ubuntu/)
-COPY ./src/ ${INST_DIR}
+# NEW STRUCTURE: installers live at repo-root ./ubuntu/install/**
+# Copy just ubuntu/ into /dockerstartup/install/ubuntu/
+COPY ./src/ubuntu/ ${INST_DIR}/ubuntu/
 
-# Run installations (single apt-get update here)
 RUN set -eux; \
     apt-get update; \
     SCRIPTS=( \
@@ -92,6 +53,8 @@ RUN set -eux; \
       "/ubuntu/install/obsidian/install_obsidian.sh" \
       "/ubuntu/install/infosec_yara/install_infosec_yara.sh" \
       "/ubuntu/install/tesseract_ocr/install_tesseract_ocr.sh" \
+      "/ubuntu/install/tor_browser/install_tor_browser.sh" \
+      "/ubuntu/install/torboost/install_torboost.sh" \
       "/ubuntu/install/common/01_cleanup.sh" \
     ); \
     for SCRIPT in "${SCRIPTS[@]}"; do \
@@ -105,23 +68,13 @@ RUN set -eux; \
     chown -R 1000:0 /home/kasm-user; \
     rm -rf "${INST_DIR}"
 
-# Userspace Runtime
 ENV HOME=/home/kasm-user
 WORKDIR ${HOME}
 USER 1000
-
 CMD ["--tail-log"]
 
-
-# ############################################################################
-# ------------------------------- DEVELOP IMAGE ---------------------------- #
-# ############################################################################
 FROM build AS develop
 ENV DEBUG=true
 
-
-# ############################################################################
-# ----------------------------- PRODUCTION IMAGE --------------------------- #
-# ############################################################################
 FROM build AS production
 ENV DEBUG=false
