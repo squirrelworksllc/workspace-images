@@ -6,21 +6,33 @@
       "type": "shell",
       "command": ".vscode/docker-build.sh prod",
       "group": "build",
-      "problemMatcher": []
+      "problemMatcher": [],
+      "options": { "cwd": "${workspaceFolder}" }
     },
     {
       "label": "docker: build (develop)",
       "type": "shell",
       "command": ".vscode/docker-build.sh dev",
       "group": "build",
-      "problemMatcher": []
+      "problemMatcher": [],
+      "options": { "cwd": "${workspaceFolder}" }
     },
     {
       "label": "docker: lint",
       "type": "shell",
       "command": ".vscode/docker-build.sh lint",
       "group": "test",
-      "problemMatcher": []
+      "problemMatcher": [],
+      "options": { "cwd": "${workspaceFolder}" }
+    },
+    {
+      "label": "docker: build (current Dockerfile, repo root)",
+      "type": "shell",
+      "command": "docker build",
+      "args": ["-f", "${file}", "."],
+      "group": "build",
+      "problemMatcher": [],
+      "options": { "cwd": "${workspaceFolder}" }
     }
   ]
 }
