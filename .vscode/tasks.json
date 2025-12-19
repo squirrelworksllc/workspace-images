@@ -2,24 +2,25 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "docker: build (prod)",
+      "label": "Docker: Build (menu)",
       "type": "shell",
-      "command": ".vscode/docker-build.sh prod",
-      "group": "build",
-      "problemMatcher": []
-    },
-    {
-      "label": "docker: build (develop)",
-      "type": "shell",
-      "command": ".vscode/docker-build.sh dev",
-      "group": "build",
-      "problemMatcher": []
-    },
-    {
-      "label": "docker: lint",
-      "type": "shell",
-      "command": ".vscode/docker-build.sh lint",
-      "group": "test",
+      "command": "bash",
+      "args": ["-lc", ".vscode/docker-build.sh"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "focus": true,
+        "panel": "dedicated",
+        "showReuseMessage": false,
+        "clear": false,
+        "close": false
+      },
       "problemMatcher": []
     }
   ]

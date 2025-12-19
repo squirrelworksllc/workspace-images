@@ -1,0 +1,6 @@
+{
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
+  "docker.explorer.contextMenu": false,
+  "terminal.integrated.defaultProfile.windows": "Git Bash"
+}

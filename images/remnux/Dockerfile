@@ -71,8 +71,12 @@ ENV INST_SCRIPTS="/ubuntu/install/tools/install_tools.sh \
 /ubuntu/install/remnux/install_remnux.sh \
 /ubuntu/install/common/01_cleanup.sh"
 
-# Copy install payload from repo-root/src (contains ubuntu/)
-COPY ./src/ ${INST_DIR}
+# Guard: fail fast if build context isn't repo root (COPY fails if missing)
+COPY ./src/ubuntu/install/ ./__context_check__/ubuntu_install/
+RUN rm -rf ./__context_check__
+
+# Copy just ubuntu/ into /dockerstartup/install/ubuntu/
+COPY ./src/ubuntu/ ${INST_DIR}/ubuntu/
 
 # Run installations
 RUN set -eux; \

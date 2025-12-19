@@ -47,15 +47,9 @@ FROM base AS lint
 WORKDIR /src
 COPY . /src
 
-# installs hadolint + shellcheck
 RUN bash /src/tools/ci/lint_installers.sh
-
-# Dockerfile lint (centralized policy)
-RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/bitcurator5/Dockerfile
-
-# Shell script lint (centralized policy)
+RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/ubuntu-noble-desktop/Dockerfile
 RUN bash /src/tools/ci/lint-shell.sh
-
 USER 1000
 
 # ############################################################################
@@ -67,8 +61,12 @@ ENV INST_SCRIPTS="/ubuntu/install/tools/install_tools.sh \
 /ubuntu/install/bitcurator/install_bitcurator5.sh \
 /ubuntu/install/common/01_cleanup.sh"
 
-# Copy install payload from repo-root/src (contains ubuntu/)
-COPY ./src/ ${INST_DIR}
+# Guard: fail fast if build context isn't repo root (COPY fails if missing)
+COPY ./src/ubuntu/install/ ./__context_check__/ubuntu_install/
+RUN rm -rf ./__context_check__
+
+# Copy just ubuntu/ into /dockerstartup/install/ubuntu/
+COPY ./src/ubuntu/ ${INST_DIR}/ubuntu/
 
 RUN set -eux; \
     apt-get update; \

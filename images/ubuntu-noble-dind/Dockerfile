@@ -73,8 +73,12 @@ FROM base AS build
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Copy install payload (repo-root/src contains ubuntu/)
-COPY ./src/ ${INST_DIR}
+# Guard: fail fast if build context isn't repo root (COPY fails if missing)
+COPY ./src/ubuntu/install/ ./__context_check__/ubuntu_install/
+RUN rm -rf ./__context_check__
+
+# Copy just ubuntu/ into /dockerstartup/install/ubuntu/
+COPY ./src/ubuntu/ ${INST_DIR}/ubuntu/
 
 # Startup scripts specific to DIND
 COPY ./src/ubuntu/install/dind/custom_startup.sh ${STARTUPDIR}/custom_startup.sh
