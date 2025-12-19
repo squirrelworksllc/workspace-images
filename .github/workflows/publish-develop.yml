@@ -1,0 +1,89 @@
+name: Publish (develop)
+
+on:
+  workflow_run:
+    workflows: ["CI (build/test)"]
+    types: [completed]
+
+concurrency:
+  group: publish-develop
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  IMAGES_JSON: .vscode/images.json
+
+jobs:
+  matrix:
+    name: Matrix (develop)
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'develop'
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set.outputs.matrix }}
+
+    steps:
+      - name: Checkout tested commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Generate matrix from images.json
+        id: set
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ ! -f "$IMAGES_JSON" ]; then
+            echo "Missing $IMAGES_JSON"
+            exit 1
+          fi
+
+          MATRIX="$(jq -c '{include: [.images[] | {
+            key: .key,
+            dockerfile: .dockerfile,
+            repo: .repo,
+            devTag: .devTag,
+            devTarget: .devTarget
+          }]}' "$IMAGES_JSON")"
+
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+
+  publish:
+    name: Publish develop tags
+    needs: matrix
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
+
+    steps:
+      - name: Checkout tested commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & push develop image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          target: ${{ matrix.devTarget }}
+          push: true
+          tags: |
+            ${{ matrix.repo }}:${{ matrix.devTag }}
+          cache-from: type=gha,scope=ci-${{ matrix.key }}
+          cache-to: type=gha,mode=max,scope=ci-${{ matrix.key }}
