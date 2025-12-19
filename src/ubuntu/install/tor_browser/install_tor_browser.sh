@@ -28,6 +28,27 @@ require_root() {
   fi
 }
 
+# Source shared apt helper functions used across this repo.
+# In Docker builds, installers live under: /dockerstartup/install/ubuntu/install/**.
+source_apt_helpers() {
+  local candidates=(
+    "/dockerstartup/install/ubuntu/install/common/00_apt_helper.sh"
+    "${SCRIPT_DIR}/../common/00_apt_helper.sh"
+    "${SCRIPT_DIR}/../common/00_apt_helpers.sh"
+  )
+
+  for f in "${candidates[@]}"; do
+    if [[ -r "$f" ]]; then
+      # shellcheck disable=SC1090
+      . "$f"
+      return 0
+    fi
+  done
+
+  echo "[tor-browser] ERROR: could not locate apt helper script (00_apt_helper.sh)" >&2
+  return 1
+}
+
 require_helpers() {
   local missing=0
   for fn in apt_update_if_needed apt_install; do
@@ -69,6 +90,7 @@ detect_latest_version() {
 
 main() {
   require_root
+  source_apt_helpers
   require_helpers
 
   # Standard Kasm user
@@ -99,7 +121,8 @@ main() {
 
   echo "Step 2: Installing prerequisites..."
   apt_update_if_needed
-  apt_install ca-certificates curl gnupg xz-utils tar
+  # gpgv is sometimes separate; include explicitly for predictable builds
+  apt_install ca-certificates curl gnupg gpgv xz-utils tar
 
   echo "Step 3: Downloading Tor Browser tarball and signature..."
   curl -fL --retry 3 --retry-delay 2 -o "${tmp}/${tarball}" "${base_url}/${tarball}"

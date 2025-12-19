@@ -1,26 +1,56 @@
 #!/usr/bin/env bash
-# Build images defined in .vscode/images.json
-# Always uses REPO ROOT as the Docker build context.
-
+# Interactive builder for repo images (always repo-root context)
 set -euo pipefail
 
 export DOCKER_BUILDKIT=1
 
-MODE="${1:-prod}"   # prod | dev | lint
 CONFIG=".vscode/images.json"
 
 command -v jq >/dev/null 2>&1 || { echo "jq is required. Install jq and retry."; exit 1; }
 
-# Force repo root, regardless of where called from (VS Code, terminal, subfolder, etc.)
+# Ensure we're at repo root (works even if launched from elsewhere)
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
-if [[ -z "${REPO_ROOT}" ]]; then
-  echo "ERROR: must be run from inside a git repo (could not determine repo root)."
-  exit 10
-fi
+[[ -n "${REPO_ROOT}" ]] || { echo "ERROR: must be run inside a git repo"; exit 10; }
 cd "${REPO_ROOT}"
 
-# Repo-root context is non-negotiable going forward
-ROOT_CONTEXT="."
+# Extract BASE_TAG from a Dockerfile (for prod tagging)
+get_base_tag() {
+  local df="$1"
+  local tag=""
+
+  # Match lines like: ARG BASE_TAG="1.18.0-rolling-weekly"
+  tag="$(
+    awk '
+      /^[[:space:]]*ARG[[:space:]]+BASE_TAG=/ {
+        sub(/^[[:space:]]*ARG[[:space:]]+BASE_TAG=/, "", $0)
+        gsub(/"/, "", $0)
+        gsub(/\047/, "", $0) # strip single quotes
+        print $0
+        exit
+      }
+    ' "$df"
+  )"
+
+  if [[ -z "${tag}" ]]; then
+    echo "ERROR: Could not determine BASE_TAG from ${df} (expected: ARG BASE_TAG=...)" >&2
+    exit 20
+  fi
+
+  printf '%s' "${tag}"
+}
+
+# Mode picker (default: lint)
+echo ""
+read -r -p "Select mode [lint/prod/dev] (default: lint): " MODE_IN
+MODE="${MODE_IN:-lint}"
+
+case "$MODE" in
+  lint|prod|production|dev|develop) ;;
+  *)
+    echo "Unknown mode: $MODE (use lint|prod|dev)"
+    exit 4
+    ;;
+esac
 
 # Build list of keys
 mapfile -t KEYS < <(jq -r '.images[].key' "$CONFIG")
@@ -49,55 +79,34 @@ fi
 dockerfile="$(jq -r '.dockerfile' <<<"$img")"
 repo="$(jq -r '.repo' <<<"$img")"
 
-# Friendly warning if images.json still defines context fields (ignored)
-json_context="$(jq -r '.context // empty' <<<"$img" || true)"
-json_lint_context="$(jq -r '.lintContext // empty' <<<"$img" || true)"
-
 echo ""
 echo "Key:        $KEY"
 echo "Dockerfile: $dockerfile"
-echo "Context:    ${ROOT_CONTEXT} (repo root enforced)"
-if [[ -n "${json_context}" || -n "${json_lint_context}" ]]; then
-  echo "Note: images.json context/lintContext values are ignored (repo root is required)."
-fi
+echo "Context:    . (repo root enforced)"
+
+# Enforce repo-root context no matter what images.json says
+ROOT_CONTEXT="."
 
 case "$MODE" in
-  dev)
-    tag="$(jq -r '.devTag' <<<"$img")"
+  dev|develop)
+    # Always tag dev builds as :develop
+    tag="develop"
     target="$(jq -r '.devTarget' <<<"$img")"
     echo ""
     echo "Building DEV: ${repo}:${tag} (target=${target})"
-    docker build \
-      --progress=plain \
-      --target "$target" \
-      -f "$dockerfile" \
-      -t "${repo}:${tag}" \
-      "${ROOT_CONTEXT}"
+    docker build --progress=plain --target "$target" -f "$dockerfile" -t "${repo}:${tag}" "$ROOT_CONTEXT"
     ;;
   lint)
     target="$(jq -r '.lintTarget // "lint"' <<<"$img")"
     echo ""
     echo "Running LINT build: (target=${target})"
-    # no tag on purpose (lint is a check, not an artifact)
-    docker build \
-      --progress=plain \
-      --no-cache \
-      --target "$target" \
-      -f "$dockerfile" \
-      "${ROOT_CONTEXT}"
+    docker build --progress=plain --no-cache --target "$target" -f "$dockerfile" "$ROOT_CONTEXT"
     ;;
   prod|production)
-    tag="$(jq -r '.prodTag' <<<"$img")"
+    # Prod tag derived from Dockerfile ARG BASE_TAG
+    tag="$(get_base_tag "$dockerfile")"
     echo ""
     echo "Building PROD: ${repo}:${tag}"
-    docker build \
-      --progress=plain \
-      -f "$dockerfile" \
-      -t "${repo}:${tag}" \
-      "${ROOT_CONTEXT}"
-    ;;
-  *)
-    echo "Unknown mode: $MODE (use prod|dev|lint)"
-    exit 4
+    docker build --progress=plain -f "$dockerfile" -t "${repo}:${tag}" "$ROOT_CONTEXT"
     ;;
 esac

@@ -30,7 +30,10 @@ USER 1000
 FROM base AS build
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# NEW STRUCTURE: installers live at repo-root ./ubuntu/install/**
+# Guard: fail fast if build context isn't repo root (COPY fails if missing)
+COPY ./src/ubuntu/install/ ./__context_check__/ubuntu_install/
+RUN rm -rf ./__context_check__
+
 # Copy just ubuntu/ into /dockerstartup/install/ubuntu/
 COPY ./src/ubuntu/ ${INST_DIR}/ubuntu/
 
