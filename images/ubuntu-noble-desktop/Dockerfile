@@ -36,6 +36,14 @@ RUN rm -rf ./__context_check__
 
 # Copy just ubuntu/ into /dockerstartup/install/ubuntu/
 COPY ./src/ubuntu/ ${INST_DIR}/ubuntu/
+# ---- Tor Browser desktop integration needs +x (it is executed directly) ----
+# Many installers are invoked with `bash ...` and don't require exec bits,
+# but integrate_tor_browser_desktop.sh is called as a program from install_tor_browser.sh.
+RUN set -eux; \
+    chmod +x "${INST_DIR}/ubuntu/install/tor_browser/integrate_tor_browser_desktop.sh"; \
+    chmod +x "${INST_DIR}/ubuntu/install/tor_browser/install_tor_browser.sh"; \
+    # Optional hardening: make all installer scripts executable (safe + avoids future surprises)
+    find "${INST_DIR}/ubuntu/install" -maxdepth 4 -type f -name '*.sh' -exec chmod +x {} \;
 
 RUN set -eux; \
     apt-get update; \

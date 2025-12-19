@@ -45,17 +45,11 @@ ENV DEBIAN_FRONTEND=noninteractive \
 FROM base AS lint
 
 WORKDIR /src
-COPY ./src/ ${INST_DIR}
+COPY . /src
 
-# installs hadolint + shellcheck
 RUN bash /src/tools/ci/lint_installers.sh
-
-# Dockerfile lint (centralized policy)
-RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/bitcurator5/Dockerfile
-
-# Shell script lint (centralized policy)
+RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/ubuntu-noble-desktop/Dockerfile
 RUN bash /src/tools/ci/lint-shell.sh
-
 USER 1000
 
 # ############################################################################
