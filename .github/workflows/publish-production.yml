@@ -47,7 +47,7 @@ jobs:
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
 
   publish:
-    name: Publish production tags (partial)
+    name: Publish prod – ${{ matrix.key }}
     runs-on: ubuntu-latest
     needs: matrix
 
@@ -68,7 +68,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Lint (no push)
+      - name: Lint – ${{ matrix.key }}
         id: lint
         continue-on-error: true
         uses: docker/build-push-action@v6
@@ -81,7 +81,7 @@ jobs:
           cache-from: type=gha,scope=pubprod-${{ matrix.key }}
           cache-to: type=gha,mode=max,scope=pubprod-${{ matrix.key }}
 
-      - name: Build & push production image (only if lint passed)
+      - name: Build & push – ${{ matrix.key }}
         id: push
         if: steps.lint.outcome == 'success'
         continue-on-error: true
@@ -101,7 +101,7 @@ jobs:
         run: |
           echo "Image: ${{ matrix.repo }}"
           echo "Lint outcome: ${{ steps.lint.outcome }}"
-          echo "Push outcome: ${{ steps.push.outcome }}"
+          echo "Push outcome: ${{ steps.push.outcome || 'skipped' }}"
 
       - name: Mark this image failed (but don't block others)
         if: always()
