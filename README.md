@@ -4,322 +4,149 @@
 
 # 🐳 SquirrelWorksLLC Workspace Images
 
-
-## Branching & Workflow
-
-This section reflects the **current, enforced workflow**. If anything elsewhere conflicts, **this section wins**.
-
-### Branch Roles
-
-- **`develop`**
-  - Integration branch
-  - Direct pushes are allowed
-  - CI runs for signal only
-  - May contain frequent commits and WIP
-
-- **`main`**
-  - Protected release branch
-  - Pull requests required
-  - `lint / gate` must pass
-  - Squash merges only
-
-### Daily Development (`develop`)
-
-```bash
-git switch develop
-git pull origin develop
-# work, commit freely
-git push origin develop
-```
-
-No pull request is required for `develop`.
-
-### Merging into `main`
-
-When changes are ready for release:
-
-1. Open a Pull Request  
-   - **Base:** `main`  
-   - **Compare:** `develop`
-
-2. Ensure required checks pass  
-   - `lint / gate`
-
-3. Squash merge the PR
-
-4. Sync `develop` back to `main`:
-
-```bash
-git switch develop
-git fetch origin
-git merge origin/main
-git push origin develop
-```
-
-### Ahead / Behind Notes
-
-GitHub’s “ahead / behind” counts are based on **commit history**, not file diffs.
-
-- Merge commits increase the “ahead” count
-- Repeated merges from `main` into `develop` can add noise
-- Inspect real differences with:
-
-```bash
-git log --oneline origin/main..develop
-```
-
-Integration branches should be easy. Release branches should be boring.
-
-
-This repository contains **all Docker workspace images built and maintained by SquirrelWorksLLC**.
-
-Each image follows a **strict, repeatable, and scalable structure** designed to grow cleanly as new images are added — without constantly modifying CI workflows, VS Code tasks, or build scripts.
+> **Calm infrastructure is good infrastructure.**
+>
+> This repository is intentionally opinionated: predictable builds, strict linting, and boring releases.
+> If something here feels rigid, it is by design.
 
 ---
 
 ## 📑 Table of Contents
 
-1. [Repository Overview](#repository-overview)
-2. [Repository Structure](#repository-structure)
-3. [Core Rules](#core-rules)
-4. [Build Context](#build-context)
-5. [Dockerfile Structure](#dockerfile-structure)
-6. [Image Targets](#image-targets)
-7. [CI & Branch Protection](#ci--branch-protection)
-8. [Contribution & Required Workflow](#contribution--required-workflow)
-9. [Adding a New Image](#adding-a-new-image)
-10. [Manual Builds](#manual-builds)
-11. [Philosophy](#philosophy)
+1. [Philosophy](#philosophy)
+2. [Repository Overview](#repository-overview)
+3. [Repository Structure](#repository-structure)
+4. [Branching Model (High-Level)](#branching-model-high-level)
+5. [CI & Publishing Model](#ci--publishing-model)
+6. [Core Rules](#core-rules)
+7. [Contributing](#contributing)
 
 ---
 
-## Repository Overview
+## 🧠 Philosophy
+
+This repository exists to make **multi-image Docker maintenance boring and reliable**.
+
+We explicitly optimize for:
+
+- 🧩 **Consistency over cleverness**
+- 🔒 **Gates over trust**
+- 🔍 **Linting over tribal knowledge**
+- 📦 **Independent images over monolithic releases**
+
+CI is treated as a *signal*, not a punishment. Publishing is designed to be **partial and resilient** so one broken upstream project does not block all others.
+
+If you are looking for a fast-and-loose Docker playground, this is not it.
+
+---
+
+## 📦 Repository Overview
+
+This repository contains **all Docker workspace images built and maintained by SquirrelWorksLLC**.
 
 Current images include:
 
-- **ubuntu-noble-dind**
-- **ubuntu-noble-desktop**
-- **remnux**
-- **bitcurator5**
+- 🖥️ **ubuntu-noble-desktop**
+- 🔧 **ubuntu-noble-dind**
+- 🧪 **remnux**
+- 🗄️ **bitcurator5**
 
-All images are built using:
-- A shared repo-root build context
-- Centralized linting policy
-- Dynamically generated CI matrix
+All images share:
+
+- A **single repo-root build context**
+- Centralized linting and policy enforcement
+- A dynamically generated CI matrix (no per-image CI edits)
 
 ---
 
-## Repository Structure
+## 🗂️ Repository Structure
 
 ```text
 .
-├── images/
+├── images/                 # One folder per image
 │   ├── ubuntu-noble-dind/
 │   ├── ubuntu-noble-desktop/
 │   ├── remnux/
 │   └── bitcurator5/
 ├── src/
-│   └── ubuntu/
+│   └── ubuntu/             # Shared install logic
 ├── tools/
-│   └── ci/
+│   └── ci/                 # Lint + CI helpers
 ├── common/
 │   └── resources/
-│       └── images/
+│       └── images/         # Branding assets
 ├── .vscode/
-│   └── images.json
+│   └── images.json         # Single source of truth for images
+├── CONTRIBUTING.md
 └── README.md
 ```
 
 ---
 
-## Core Rules
+## 🌳 Branching Model (High-Level)
 
-- **Repo root is always the Docker build context**
-- Each image owns its own Dockerfile under `images/<image-name>/`
+- **`develop`**
+  - Integration and active work branch
+  - CI runs for signal
+  - Partial dev publishing
+
+- **`main`**
+  - Protected release branch
+  - Pull requests required
+  - Lint gate enforced
+  - Production publishing
+
+Detailed contributor workflow lives in **[CONTRIBUTING.md](CONTRIBUTING.md)**.
+
+---
+
+## 🤖 CI & Publishing Model
+
+### CI (Build / Test)
+
+- Matrix generated dynamically from `.vscode/images.json`
+- **Lint always runs first** and is the enforcement gate
+- Dev and prod builds are informational
+
+### Publishing
+
+Publishing is intentionally **per-image and resilient**:
+
+- 🧪 **Develop publishes** on push to `develop`
+  - Only images that successfully build are pushed
+  - Failures do not block other images
+  - Workflow may go red for visibility
+
+- 🚀 **Production publishes** on push to `main`
+  - Same partial-publish behavior
+  - No `:latest` tags
+  - Tags defined per-image
+
+Red workflows provide **signal**, not enforcement.
+
+---
+
+## 📏 Core Rules
+
+- Repo root is **always** the Docker build context
+- Each image owns its Dockerfile under `images/<image>/`
 - Images are registered **once** in `.vscode/images.json`
-- CI automatically discovers all images
+- CI auto-discovers all images
 - **Lint is the enforcement gate**
 
 ---
 
-## Build Context
+## 🤝 Contributing
 
-All Dockerfiles assume:
+If you plan to contribute, please read **[CONTRIBUTING.md](CONTRIBUTING.md)**.
 
-```bash
-docker build -f images/<image>/Dockerfile .
-```
-
-Never change the build context per-image.
-
----
-
-## Dockerfile Structure
-
-Every Dockerfile must provide:
-
-- `base` stage
-- `lint` stage
-- `build` stage
-- `develop` target
-- `production` target (default)
-
-Linting is centralized via:
-
-- `tools/ci/lint_installers.sh`
-- `tools/ci/lint-dockerfile.sh`
-- `tools/ci/lint-shell.sh`
+That document contains:
+- Required workflows
+- Branch protections
+- Lint expectations
+- How to add or modify images
 
 ---
 
-## Image Targets
-
-| Target | Purpose |
-|------|--------|
-| `lint` | Static validation only |
-| `build` | Shared install logic |
-| `develop` | Debug-friendly image |
-| `production` | Final runtime image |
-
----
-
-## CI & Branch Protection
-
-CI dynamically generates a matrix from `.vscode/images.json`.
-
-### Enforcement Behavior
-
-- **Lint gate is required**
-- Production builds are informational only
-- A PR **cannot merge** if lint fails
-- Production build failures do **not** block merges
-
-This allows active upstream projects (REMnux, BitCurator) to be worked on without blocking all changes.
-
----
-
-## Contribution & Required Workflow
-
-> **Direct pushes to `main` are intentionally blocked.**  
-> This repository enforces pull-request-only changes with mandatory CI checks.
-
-### 🚫 What Is Not Allowed
-
-- Pushing directly to `main`
-- Bypassing required CI checks
-- Merging code that fails the lint gate
-
-Attempts to push directly to `main` will be rejected by GitHub.
-
----
-
-### ✅ Required Workflow
-
-#### 1. Create a working branch
-
-```bash
-git checkout -b develop
-```
-
-Use a descriptive name for feature work when appropriate (e.g. `lint-fix`, `dockerfile-update`).
-
----
-
-#### 2. Commit changes locally
-
-```bash
-git add .
-git commit -m "Describe your changes"
-```
-
----
-
-#### 3. Push the branch
-
-```bash
-git push -u origin develop
-```
-
----
-
-#### 4. Open a Pull Request
-
-Create a Pull Request targeting:
-
-- **Base:** `main`
-- **Compare:** your working branch
-
----
-
-#### 5. Required status checks
-
-The following check **must pass** before merging:
-
-- `lint / gate`
-
-If lint fails, update your branch and push again until the check passes.
-
----
-
-#### 6. Merge
-
-Once all required checks pass and repository rules are satisfied, the Pull Request may be merged into `main`.
-
----
-
-### ℹ️ Notes
-
-- These rules are enforced server-side by GitHub
-- VS Code and Git cannot override them
-- This protects the stability and consistency of `main`
-
-If you encounter push rejections, confirm you are not pushing directly to `main`.
-
----
-
-## Adding a New Image
-
-1. Create a folder:
-   ```bash
-   images/<new-image>/
-   ```
-
-2. Copy the Dockerfile template
-
-3. Register the image in `.vscode/images.json`
-
-4. Commit and open a PR
-
-CI will automatically:
-- Add lint checks
-- Enforce policy
-- Include the image in gating
-
-No CI changes required.
-
----
-
-## Manual Builds
-
-Lint:
-```bash
-docker build --target lint -f images/<image>/Dockerfile .
-```
-
-Production:
-```bash
-docker build -t squirrelworksllc/<image>:<tag> -f images/<image>/Dockerfile .
-```
-
----
-
-## Philosophy
-
-> Calm infrastructure is good infrastructure.
-
-This repository favors:
-- Predictability over cleverness
-- Linting over tribal knowledge
-- Gates over trust
-
-Everything here is designed so **future-you** does not have to rediscover rules the hard way.
+> **If this repository feels strict, that is intentional.**
+> The goal is to make mistakes loud, recovery easy, and releases boring.

@@ -3,6 +3,9 @@
 ARG BASE_TAG="1.18.0-rolling-weekly"
 ARG BASE_IMAGE="core-ubuntu-noble"
 
+# ############################################################################
+# ------------------------------ BASE STAGE -------------------------------- #
+# ############################################################################
 FROM kasmweb/${BASE_IMAGE}:${BASE_TAG} AS base
 USER root
 
@@ -17,16 +20,25 @@ ENV HOME=/home/kasm-default-profile \
 
 WORKDIR ${HOME}
 
-# ------------------------------ LINT TARGET ------------------------------
+# ############################################################################
+# ------------------------------ LINT TARGET ------------------------------- #
+# ############################################################################
 FROM base AS lint
+
 WORKDIR /src
 COPY . /src
+
+# installs hadolint + shellcheck
 RUN bash /src/tools/ci/lint_installers.sh
-RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/ubuntu-noble-desktop/Dockerfile
+RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/ubuntu-noble-dind/Dockerfile
 RUN bash /src/tools/ci/lint-shell.sh
+
 USER 1000
 
-# ------------------------------ BUILD TARGET -----------------------------
+# ############################################################################
+# -------------------------- COMMON BUILD TARGET --------------------------- #
+# ############################################################################
+
 FROM base AS build
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -36,9 +48,6 @@ RUN rm -rf ./__context_check__
 
 # Copy just ubuntu/ into /dockerstartup/install/ubuntu/
 COPY ./src/ubuntu/ ${INST_DIR}/ubuntu/
-# ---- Tor Browser desktop integration needs +x (it is executed directly) ----
-# Many installers are invoked with `bash ...` and don't require exec bits,
-# but integrate_tor_browser_desktop.sh is called as a program from install_tor_browser.sh.
 RUN set -eux; \
     chmod +x "${INST_DIR}/ubuntu/install/tor_browser/integrate_tor_browser_desktop.sh"; \
     chmod +x "${INST_DIR}/ubuntu/install/tor_browser/install_tor_browser.sh"; \
@@ -84,8 +93,16 @@ WORKDIR ${HOME}
 USER 1000
 CMD ["--tail-log"]
 
+# ############################################################################
+# ------------------------------- DEVELOP IMAGE ---------------------------- #
+# ############################################################################
+
 FROM build AS develop
 ENV DEBUG=true
+
+# ############################################################################
+# ----------------------------- PRODUCTION IMAGE --------------------------- #
+# ############################################################################
 
 FROM build AS production
 ENV DEBUG=false
