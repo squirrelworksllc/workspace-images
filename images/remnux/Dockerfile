@@ -46,17 +46,12 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # ############################################################################
 FROM base AS lint
 
-# install hadolint + shellcheck here...
 WORKDIR /src
 COPY . /src
 
 # installs hadolint + shellcheck
 RUN bash /src/tools/ci/lint_installers.sh
-
-# Dockerfile lint (centralized policy)
-RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/remnux/Dockerfile
-
-# Shell script lint (centralized policy)
+RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/ubuntu-noble-dind/Dockerfile
 RUN bash /src/tools/ci/lint-shell.sh
 
 USER 1000
