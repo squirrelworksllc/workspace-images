@@ -101,7 +101,7 @@ fi
 apt_install_pkgs recoll recollgui recollcmd
 
 ###############################################################################
-# STEP 2: Desktop integration (if applicable)
+# STEP 2: Desktop integration (Kasm Desktop shortcut)
 ###############################################################################
 echo "============================================================"
 echo "[recoll] STEP 2: Desktop integration"
@@ -110,10 +110,53 @@ echo "============================================================"
 REC_DESKTOP_1="/usr/share/applications/recollgui.desktop"
 REC_DESKTOP_2="/usr/share/applications/recoll.desktop"
 
+REC_DESKTOP_SRC=""
 if [ -f "$REC_DESKTOP_1" ]; then
-  log "Desktop entry present: $REC_DESKTOP_1"
+  REC_DESKTOP_SRC="$REC_DESKTOP_1"
 elif [ -f "$REC_DESKTOP_2" ]; then
-  log "Desktop entry present: $REC_DESKTOP_2"
+  REC_DESKTOP_SRC="$REC_DESKTOP_2"
+fi
+
+if [ -n "$REC_DESKTOP_SRC" ]; then
+  log "Desktop entry present: $REC_DESKTOP_SRC"
+
+  # Try to determine the Kasm user's home directory.
+  KASM_HOME=""
+  KASM_USER=""
+
+  if id -u kasm-user >/dev/null 2>&1; then
+    KASM_USER="kasm-user"
+    KASM_HOME="$(getent passwd kasm-user | cut -d: -f6)"
+  elif id -u kasm-default-profile >/dev/null 2>&1; then
+    KASM_USER="kasm-default-profile"
+    KASM_HOME="$(getent passwd kasm-default-profile | cut -d: -f6)"
+  elif getent passwd 1000 >/dev/null 2>&1; then
+    KASM_USER="$(getent passwd 1000 | cut -d: -f1)"
+    KASM_HOME="$(getent passwd 1000 | cut -d: -f6)"
+  fi
+
+  if [ -n "$KASM_HOME" ] && [ -d "$KASM_HOME" ]; then
+    DESKTOP_DIR="$KASM_HOME/Desktop"
+    mkdir -p "$DESKTOP_DIR"
+
+    DEST_LAUNCHER="$DESKTOP_DIR/recollgui.desktop"
+    cp -f "$REC_DESKTOP_SRC" "$DEST_LAUNCHER"
+
+    # Make it behave like a proper clickable launcher in many desktop environments.
+    chmod 0755 "$DEST_LAUNCHER"
+
+    # Ensure ownership so the user can edit/remove it.
+    if [ -n "$KASM_USER" ]; then
+      chown "$KASM_USER:$KASM_USER" "$DEST_LAUNCHER" || true
+    else
+      # Fallback: match the home directory owner
+      chown --reference="$KASM_HOME" "$DEST_LAUNCHER" || true
+    fi
+
+    log "Copied launcher to Desktop: $DEST_LAUNCHER"
+  else
+    log "WARNING: Could not determine Kasm user's home directory; skipping Desktop shortcut"
+  fi
 else
   log "No Recoll desktop entry found (non-fatal)"
 fi
@@ -147,5 +190,5 @@ else
   log "recollindex not found (non-fatal)"
 fi
 
-log "Installation complete"
+log "Recoll Installation complete"
 echo "Recoll is now Installed!"
