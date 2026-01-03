@@ -16,6 +16,7 @@
 #   TORBROWSER_INSTALL_DIR (default: /opt/tor-browser)
 
 set -euo pipefail
+IFS=$'\n\t'
 
 log() { echo "[tor-browser] $*"; }
 
@@ -170,12 +171,19 @@ main() {
   # Allow standard Kasm user to update Tor Browser at runtime
   chown -R "${owner_uid}:${owner_gid}" "${install_dir}"
 
+  # Real launcher
+  local start_bin="${install_dir}/Browser/start-tor-browser"
+  if [[ ! -x "$start_bin" ]]; then
+    echo "[tor-browser] ERROR: expected launcher not found or not executable: ${start_bin}" >&2
+    exit 1
+  fi
+
   echo "Step 8: Creating CLI launcher..."
   install -m 0755 -d /usr/local/bin
   cat >/usr/local/bin/tor-browser <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
-exec "${install_dir}/start-tor-browser.desktop" "\$@"
+exec "${start_bin}" "\$@"
 EOF
   chmod 0755 /usr/local/bin/tor-browser
 
@@ -189,6 +197,8 @@ EOF
   fi
 
   TORBROWSER_INSTALL_DIR="${install_dir}" \
+  TORBROWSER_DESKTOP_UID="${owner_uid}" \
+  TORBROWSER_DESKTOP_GID="${owner_gid}" \
     "$desktop_script"
 
   echo "Step 10: Tor Browser installation and integration complete."
