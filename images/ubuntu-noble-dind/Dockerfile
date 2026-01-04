@@ -58,7 +58,7 @@ COPY . /src
 ARG LINT_DOCKERFILE="/src/Dockerfile"
 
 RUN bash /src/tools/ci/lint_installers.sh
-RUN bash /src/tools/ci/lint-dockerfile.sh "${LINT_DOCKERFILE}"
+RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/ubuntu-noble-dind/Dockerfile
 RUN bash /src/tools/ci/lint-shell.sh
 
 USER 1000
