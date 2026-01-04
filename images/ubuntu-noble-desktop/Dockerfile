@@ -1,12 +1,35 @@
 # syntax=docker/dockerfile:1.7
 
-ARG BASE_TAG="1.18.0-rolling-weekly"
-ARG BASE_IMAGE="core-ubuntu-noble"
+# ----------------------------- DESCRIPTION -----------------------------
+# Ubuntu Noble Desktop (Kasm-compatible).
+#
+# Built on the SquirrelWorks Ubuntu Noble core image and extended with a
+# full desktop environment and common desktop applications.
+#
+# Provides:
+#   - lint target (hadolint + shellcheck)
+#   - develop target
+#   - production target (default)
+#
+# IMPORTANT:
+# This Dockerfile assumes the BUILD CONTEXT is the REPO ROOT.
+# Example builds:
+#   Lint: docker build --target lint -f images/ubuntu-noble-desktop/Dockerfile .
+#   Prod: docker build -t squirrelworksllc/ubuntu-noble-desktop:1.18.0 -f images/ubuntu-noble-desktop/Dockerfile .
+#   Dev : docker build --target develop -t squirrelworksllc/ubuntu-noble-desktop:develop -f images/ubuntu-noble-desktop/Dockerfile .
+# ----------------------------------------------------------------------
+
+# ----------------------------- BASE IMAGE -----------------------------
+# Base image for all SquirrelWorks Kasm images.
+# Keep BASE_TAG aligned with the Kasm release you target (e.g., 1.18.0).
+ARG BASE_IMAGE="squirrelworksllc/ubuntu-noble-core"
+ARG BASE_TAG="1.18.0"
 
 # ############################################################################
 # ------------------------------ BASE STAGE -------------------------------- #
 # ############################################################################
-FROM kasmweb/${BASE_IMAGE}:${BASE_TAG} AS base
+FROM ${BASE_IMAGE}:${BASE_TAG} AS base
+
 USER root
 
 ENV HOME=/home/kasm-default-profile \
@@ -30,7 +53,7 @@ COPY . /src
 
 # installs hadolint + shellcheck
 RUN bash /src/tools/ci/lint_installers.sh
-RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/ubuntu-noble-dind/Dockerfile
+RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/ubuntu-noble-desktop/Dockerfile
 RUN bash /src/tools/ci/lint-shell.sh
 
 USER 1000

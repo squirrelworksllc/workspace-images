@@ -1,9 +1,9 @@
-#WIP - NOT WORKING
 # syntax=docker/dockerfile:1.7
+
 # ----------------------------- DESCRIPTION -----------------------------
 # BitCurator5 Kasm image.
-# This image is built *on top of your* squirrelworksllc's ubuntu-noble-dind image,
-# then runs BitCurator installer scripts.
+# Built on top of squirrelworksllc/ubuntu-noble-core, then runs BitCurator5
+# installer scripts.
 #
 # Provides:
 #   - lint target (hadolint + shellcheck)
@@ -12,44 +12,39 @@
 #
 # IMPORTANT:
 # Build context is repo root.
-#   Lint: docker build --target lint -f images/bitcurator/Dockerfile .
-#   Prod: docker build -t squirrelworksllc/bitcurator:latest -f images/bitcurator/Dockerfile .
-#   Dev : docker build --target develop -t squirrelworksllc/bitcurator:develop -f images/bitcurator/Dockerfile .
+#   Lint: docker build --target lint -f images/bitcurator5/Dockerfile .
+#   Prod: docker build -t squirrelworksllc/bitcurator5:1.18.0 -f images/bitcurator5/Dockerfile .
+#   Dev : docker build --target develop -t squirrelworksllc/bitcurator5:develop -f images/bitcurator5/Dockerfile .
 # ----------------------------------------------------------------------
 
-ARG DIND_REPO="squirrelworksllc/ubuntu-noble-dind"
-ARG DIND_TAG="1.18.0"
+ARG BASE_IMAGE="squirrelworksllc/ubuntu-noble-core"
+ARG BASE_TAG="1.18.0"
 
 # ############################################################################
 # -------------------------------- BASE ----------------------------------- #
 # ############################################################################
-FROM ${DIND_REPO}:${DIND_TAG} AS base
-
+FROM ${BASE_IMAGE}:${BASE_TAG} AS base
 USER root
 
-# These should already exist in dind image, but keeping them consistent just in case.
-ENV HOME=/home/kasm-default-profile
-ENV STARTUPDIR=/dockerstartup
-WORKDIR ${HOME}
-
-ENV DEBIAN_FRONTEND=noninteractive \
+ENV HOME=/home/kasm-default-profile \
+    STARTUPDIR=/dockerstartup \
+    DEBIAN_FRONTEND=noninteractive \
     SKIP_CLEAN=true \
-    KASM_RX_HOME=${STARTUPDIR}/kasmrx \
+    KASM_RX_HOME=/dockerstartup/kasmrx \
     DONT_PROMPT_WSL_INSTALL="No_Prompt_please" \
-    INST_DIR=${STARTUPDIR}/install
+    INST_DIR=/dockerstartup/install
 
+WORKDIR ${HOME}
 
 # ############################################################################
 # ------------------------------ LINT TARGET ------------------------------- #
 # ############################################################################
 FROM base AS lint
-
 WORKDIR /src
 COPY . /src
 
-# installs hadolint + shellcheck
 RUN bash /src/tools/ci/lint_installers.sh
-RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/ubuntu-noble-dind/Dockerfile
+RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/bitcurator5/Dockerfile
 RUN bash /src/tools/ci/lint-shell.sh
 
 USER 1000
@@ -58,16 +53,15 @@ USER 1000
 # ------------------------------ BUILD TARGET ------------------------------ #
 # ############################################################################
 FROM base AS build
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 ENV INST_SCRIPTS="/ubuntu/install/tools/install_tools.sh \
 /ubuntu/install/bitcurator/install_bitcurator5.sh \
 /ubuntu/install/common/01_cleanup.sh"
 
-# Guard: fail fast if build context isn't repo root (COPY fails if missing)
 COPY ./src/ubuntu/install/ ./__context_check__/ubuntu_install/
 RUN rm -rf ./__context_check__
 
-# Copy just ubuntu/ into /dockerstartup/install/ubuntu/
 COPY ./src/ubuntu/ ${INST_DIR}/ubuntu/
 
 RUN set -eux; \
@@ -77,29 +71,24 @@ RUN set -eux; \
       bash "${INST_DIR}${SCRIPT}" || { echo "FAILED: ${SCRIPT}"; exit 1; }; \
     done; \
     "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \
-    rm -f /etc/X11/xinit/Xclients; \
     chown 1000:0 "${HOME}"; \
     mkdir -p /home/kasm-user; \
     chown -R 1000:0 /home/kasm-user; \
     rm -rf "${INST_DIR}"
 
-# Userspace Runtime
 ENV HOME=/home/kasm-user
 WORKDIR ${HOME}
 USER 1000
-
 CMD ["--tail-log"]
 
-
 # ############################################################################
-# ------------------------------- DEVELOP IMAGE ---------------------------- #
+# ------------------------------- DEVELOP --------------------------------- #
 # ############################################################################
 FROM build AS develop
 ENV DEBUG=true
 
-
 # ############################################################################
-# ----------------------------- PRODUCTION IMAGE --------------------------- #
+# ----------------------------- PRODUCTION -------------------------------- #
 # ############################################################################
 FROM build AS production
 ENV DEBUG=false

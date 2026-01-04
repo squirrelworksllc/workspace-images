@@ -15,15 +15,16 @@
 #   Dev : docker build --target develop -t squirrelworksllc/ubuntu-noble-dind:develop -f images/ubuntu-noble-dind/Dockerfile .
 # ----------------------------------------------------------------------
 
-# DEV NOTE: The tag can change as Kasm changes, use stable and not rolling.
+# ----------------------------- BASE IMAGE -----------------------------
+# Base image for all SquirrelWorks Kasm images.
+# Keep BASE_TAG aligned with the Kasm release you target (e.g., 1.18.0).
+ARG BASE_IMAGE="squirrelworksllc/ubuntu-noble-core"
 ARG BASE_TAG="1.18.0"
-# DEV NOTE: If Ubuntu version changes, make a new Dockerfile.
-ARG BASE_IMAGE="core-ubuntu-noble"
 
 # ############################################################################
 # ------------------------------ BASE STAGE -------------------------------- #
 # ############################################################################
-FROM kasmweb/${BASE_IMAGE}:${BASE_TAG} AS base
+FROM ${BASE_IMAGE}:${BASE_TAG} AS base
 
 USER root
 
@@ -54,9 +55,10 @@ FROM base AS lint
 WORKDIR /src
 COPY . /src
 
-# installs hadolint + shellcheck
+ARG LINT_DOCKERFILE="/src/Dockerfile"
+
 RUN bash /src/tools/ci/lint_installers.sh
-RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/ubuntu-noble-dind/Dockerfile
+RUN bash /src/tools/ci/lint-dockerfile.sh "${LINT_DOCKERFILE}"
 RUN bash /src/tools/ci/lint-shell.sh
 
 USER 1000

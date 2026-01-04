@@ -1,31 +1,12 @@
 # syntax=docker/dockerfile:1.7
 
-# ----------------------------- DESCRIPTION -----------------------------
-# REMnux (Kasm-compatible) for Ubuntu Noble.
-#
-# Built on the SquirrelWorks Ubuntu Noble core image and extended with the
-# REMnux CLI installer (addon style) via /ubuntu/install/remnux/install_remnux.sh.
-#
-# Provides:
-#   - lint target (hadolint + shellcheck)
-#   - develop target
-#   - production target (default)
-#
-# IMPORTANT:
-# This Dockerfile assumes the BUILD CONTEXT is the REPO ROOT.
-# Example builds:
-#   Lint: docker build --target lint -f images/remnux/Dockerfile .
-#   Prod: docker build -t squirrelworksllc/remnux:1.18.0 -f images/remnux/Dockerfile .
-#   Dev : docker build --target develop -t squirrelworksllc/remnux:develop -f images/remnux/Dockerfile .
-# ----------------------------------------------------------------------
-
-ARG BASE_IMAGE="squirrelworksllc/ubuntu-noble-core"
-ARG BASE_TAG="1.18.0"
+ARG BASE_TAG="1.18.0-rolling-weekly"
+ARG BASE_IMAGE="core-ubuntu-noble"
 
 # ############################################################################
 # -------------------------------- BASE ----------------------------------- #
 # ############################################################################
-FROM ${BASE_IMAGE}:${BASE_TAG} AS base
+FROM kasmweb/${BASE_IMAGE}:${BASE_TAG} AS base
 USER root
 
 ENV HOME=/home/kasm-default-profile \
@@ -39,20 +20,20 @@ ENV HOME=/home/kasm-default-profile \
 WORKDIR ${HOME}
 
 # ############################################################################
-# ------------------------------ LINT TARGET ------------------------------- #
+# -------------------------------- LINT ----------------------------------- #
 # ############################################################################
 FROM base AS lint
 WORKDIR /src
 COPY . /src
 
 RUN bash /src/tools/ci/lint_installers.sh
-RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/remnux/Dockerfile
+RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/ubuntu-noble-core/Dockerfile
 RUN bash /src/tools/ci/lint-shell.sh
 
 USER 1000
 
 # ############################################################################
-# ------------------------------ BUILD TARGET ------------------------------ #
+# -------------------------------- BUILD ---------------------------------- #
 # ############################################################################
 FROM base AS build
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -61,17 +42,21 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 COPY ./src/ubuntu/install/ ./__context_check__/ubuntu_install/
 RUN rm -rf ./__context_check__
 
-# Copy just ubuntu/ into /dockerstartup/install/ubuntu/
+# Copy installer framework
 COPY ./src/ubuntu/ ${INST_DIR}/ubuntu/
 
-# Install script list (keep intentionally small)
-ENV INST_SCRIPTS="/ubuntu/install/tools/install_tools.sh \
-/ubuntu/install/remnux/install_remnux.sh \
-/ubuntu/install/common/01_cleanup.sh"
+# Make scripts executable (avoid surprises)
+RUN set -eux; \
+    find "${INST_DIR}/ubuntu/install" -maxdepth 5 -type f -name '*.sh' -exec chmod +x {} \;
 
+# Minimal baseline only (keep this list intentionally tiny)
 RUN set -eux; \
     apt-get update; \
-    for SCRIPT in ${INST_SCRIPTS}; do \
+    SCRIPTS=( \
+      "/ubuntu/install/tools/install_tools.sh" \
+      "/ubuntu/install/common/01_cleanup.sh" \
+    ); \
+    for SCRIPT in "${SCRIPTS[@]}"; do \
       echo ">>> Running ${SCRIPT}"; \
       bash "${INST_DIR}${SCRIPT}" || { echo "FAILED: ${SCRIPT}"; exit 1; }; \
     done; \
@@ -81,7 +66,6 @@ RUN set -eux; \
     chown -R 1000:0 /home/kasm-user; \
     rm -rf "${INST_DIR}"
 
-# Userspace Runtime
 ENV HOME=/home/kasm-user
 WORKDIR ${HOME}
 USER 1000

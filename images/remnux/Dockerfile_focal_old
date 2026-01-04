@@ -1,10 +1,10 @@
-# syntax=docker/dockerfile:1.7
+#WIP - NOT WORKING
 
+# syntax=docker/dockerfile:1.7
 # ----------------------------- DESCRIPTION -----------------------------
-# REMnux (Kasm-compatible) for Ubuntu Noble.
-#
-# Built on the SquirrelWorks Ubuntu Noble core image and extended with the
-# REMnux CLI installer (addon style) via /ubuntu/install/remnux/install_remnux.sh.
+# Custom REMnux-based Kasm image.
+# NOTE: This Dockerfile intentionally uses a focal desktop base (per your policy),
+# and the /ubuntu/install/remnux/install_remnux.sh script handles the actual REMnux install.
 #
 # Provides:
 #   - lint target (hadolint + shellcheck)
@@ -13,40 +13,45 @@
 #
 # IMPORTANT:
 # This Dockerfile assumes the BUILD CONTEXT is the REPO ROOT.
-# Example builds:
+# Examples:
 #   Lint: docker build --target lint -f images/remnux/Dockerfile .
-#   Prod: docker build -t squirrelworksllc/remnux:1.18.0 -f images/remnux/Dockerfile .
+#   Prod: docker build -t squirrelworksllc/remnux:latest -f images/remnux/Dockerfile .
 #   Dev : docker build --target develop -t squirrelworksllc/remnux:develop -f images/remnux/Dockerfile .
 # ----------------------------------------------------------------------
 
-ARG BASE_IMAGE="squirrelworksllc/ubuntu-noble-core"
-ARG BASE_TAG="1.18.0"
+# REMnux base (older Kasm focal desktop image)
+ARG BASE_IMAGE="ubuntu-focal-desktop"
+ARG BASE_TAG="1.16.1-rolling-weekly"
 
 # ############################################################################
 # -------------------------------- BASE ----------------------------------- #
 # ############################################################################
-FROM ${BASE_IMAGE}:${BASE_TAG} AS base
+FROM kasmweb/${BASE_IMAGE}:${BASE_TAG} AS base
+
 USER root
 
-ENV HOME=/home/kasm-default-profile \
-    STARTUPDIR=/dockerstartup \
-    DEBIAN_FRONTEND=noninteractive \
-    SKIP_CLEAN=true \
-    KASM_RX_HOME=/dockerstartup/kasmrx \
-    DONT_PROMPT_WSL_INSTALL="No_Prompt_please" \
-    INST_DIR=/dockerstartup/install
-
+ENV HOME=/home/kasm-default-profile
+ENV STARTUPDIR=/dockerstartup
 WORKDIR ${HOME}
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    SKIP_CLEAN=true \
+    KASM_RX_HOME=${STARTUPDIR}/kasmrx \
+    DONT_PROMPT_WSL_INSTALL="No_Prompt_please" \
+    INST_DIR=${STARTUPDIR}/install
+
 
 # ############################################################################
 # ------------------------------ LINT TARGET ------------------------------- #
 # ############################################################################
 FROM base AS lint
+
 WORKDIR /src
 COPY . /src
 
+# installs hadolint + shellcheck
 RUN bash /src/tools/ci/lint_installers.sh
-RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/remnux/Dockerfile
+RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/ubuntu-noble-dind/Dockerfile
 RUN bash /src/tools/ci/lint-shell.sh
 
 USER 1000
@@ -55,7 +60,11 @@ USER 1000
 # ------------------------------ BUILD TARGET ------------------------------ #
 # ############################################################################
 FROM base AS build
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+# Install script list
+ENV INST_SCRIPTS="/ubuntu/install/tools/install_tools.sh \
+/ubuntu/install/remnux/install_remnux.sh \
+/ubuntu/install/common/01_cleanup.sh"
 
 # Guard: fail fast if build context isn't repo root (COPY fails if missing)
 COPY ./src/ubuntu/install/ ./__context_check__/ubuntu_install/
@@ -64,11 +73,7 @@ RUN rm -rf ./__context_check__
 # Copy just ubuntu/ into /dockerstartup/install/ubuntu/
 COPY ./src/ubuntu/ ${INST_DIR}/ubuntu/
 
-# Install script list (keep intentionally small)
-ENV INST_SCRIPTS="/ubuntu/install/tools/install_tools.sh \
-/ubuntu/install/remnux/install_remnux.sh \
-/ubuntu/install/common/01_cleanup.sh"
-
+# Run installations
 RUN set -eux; \
     apt-get update; \
     for SCRIPT in ${INST_SCRIPTS}; do \
@@ -76,6 +81,7 @@ RUN set -eux; \
       bash "${INST_DIR}${SCRIPT}" || { echo "FAILED: ${SCRIPT}"; exit 1; }; \
     done; \
     "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \
+    rm -f /etc/X11/xinit/Xclients; \
     chown 1000:0 "${HOME}"; \
     mkdir -p /home/kasm-user; \
     chown -R 1000:0 /home/kasm-user; \
@@ -85,16 +91,19 @@ RUN set -eux; \
 ENV HOME=/home/kasm-user
 WORKDIR ${HOME}
 USER 1000
+
 CMD ["--tail-log"]
 
+
 # ############################################################################
-# ------------------------------- DEVELOP --------------------------------- #
+# ------------------------------- DEVELOP IMAGE ---------------------------- #
 # ############################################################################
 FROM build AS develop
 ENV DEBUG=true
 
+
 # ############################################################################
-# ----------------------------- PRODUCTION -------------------------------- #
+# ----------------------------- PRODUCTION IMAGE --------------------------- #
 # ############################################################################
 FROM build AS production
 ENV DEBUG=false
