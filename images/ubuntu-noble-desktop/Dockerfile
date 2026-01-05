@@ -105,7 +105,7 @@ RUN set -eux; \
       "/ubuntu/install/infosec_yara/install_infosec_yara.sh" \
       "/ubuntu/install/tesseract_ocr/install_tesseract_ocr.sh" \
       "/ubuntu/install/tor_browser/install_tor_browser.sh" \
-      "/ubuntu/install/torboost/install_torboost.sh" \
+      "/ubuntu/install/torsocks/install_torsocks.sh" \
       "/ubuntu/install/recoll/install_recoll.sh" \
       "/ubuntu/install/desktop/set_wallpaper.sh" \
       "/ubuntu/install/common/01_cleanup.sh" \
