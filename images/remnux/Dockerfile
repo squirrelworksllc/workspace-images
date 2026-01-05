@@ -64,6 +64,11 @@ RUN rm -rf ./__context_check__
 # Copy just ubuntu/ into /dockerstartup/install/ubuntu/
 COPY ./src/ubuntu/ ${INST_DIR}/ubuntu/
 
+# Move validation script to base tools folder.
+RUN mkdir -p /dockerstartup/tools
+COPY ./src/tools/runtime/runtime_validation.sh /dockerstartup/tools/runtime_validation.sh
+RUN chmod 0755 /dockerstartup/tools/runtime_validation.sh
+
 # Install script list (keep intentionally small)
 ENV INST_SCRIPTS="/ubuntu/install/tools/install_tools.sh \
 /ubuntu/install/remnux/install_remnux.sh \

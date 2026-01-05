@@ -41,6 +41,11 @@ get_base_tag() {
   printf '%s' "${tag}"
 }
 
+dockerfile_supports_apt_debug() {
+  local df="$1"
+  grep -Eq '^[[:space:]]*ARG[[:space:]]+APT_DEBUG' "$df"
+}
+
 # Mode picker (default: lint)
 echo ""
 read -r -p "Select mode [lint/prod/dev] (default: lint): " MODE_IN
@@ -121,9 +126,31 @@ case "$MODE" in
     target="$(img_field "devTarget")"
     [[ -n "$target" && "$target" != "null" ]] || { echo "ERROR: devTarget missing for $KEY"; exit 22; }
 
+    APT_DEBUG_FLAG=""
+    if dockerfile_supports_apt_debug "$dockerfile"; then
+      echo ""
+      read -r -p "Enable APT debug output for this DEV build? [y/N]: " ans
+      case "${ans,,}" in
+        y|yes) APT_DEBUG_FLAG="--build-arg APT_DEBUG=true" ;;
+      esac
+    else
+      echo ""
+      echo "NOTE: Dockerfile does not define ARG APT_DEBUG; debug option unavailable."
+    fi
+
     echo ""
     echo "Building DEV: ${repo}:${tag} (target=${target})"
-    docker build --progress=plain --target "$target" -f "$dockerfile" -t "${repo}:${tag}" "$ROOT_CONTEXT"
+    if [[ -n "$APT_DEBUG_FLAG" ]]; then
+      echo "  APT_DEBUG: enabled"
+    else
+      echo "  APT_DEBUG: disabled"
+    fi
+
+    docker build --progress=plain $APT_DEBUG_FLAG \
+      --target "$target" \
+      -f "$dockerfile" \
+      -t "${repo}:${tag}" \
+      "$ROOT_CONTEXT"
     ;;
   lint)
     target="$(img_field "lintTarget")"

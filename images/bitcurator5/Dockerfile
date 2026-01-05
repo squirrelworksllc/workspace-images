@@ -55,6 +55,12 @@ USER 1000
 FROM base AS build
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
+# Move validation script to base tools folder.
+RUN mkdir -p /dockerstartup/tools
+COPY ./src/tools/runtime/runtime_validation.sh /dockerstartup/tools/runtime_validation.sh
+RUN chmod 0755 /dockerstartup/tools/runtime_validation.sh
+
+# Run Installs
 ENV INST_SCRIPTS="/ubuntu/install/tools/install_tools.sh \
 /ubuntu/install/bitcurator/install_bitcurator5.sh \
 /ubuntu/install/common/01_cleanup.sh"

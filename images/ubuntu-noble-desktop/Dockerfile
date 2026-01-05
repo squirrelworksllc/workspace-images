@@ -20,8 +20,6 @@
 # ----------------------------------------------------------------------
 
 # ----------------------------- BASE IMAGE -----------------------------
-# Base image for all SquirrelWorks Kasm images.
-# Keep BASE_TAG aligned with the Kasm release you target (e.g., 1.18.0).
 ARG BASE_IMAGE="squirrelworksllc/ubuntu-noble-core"
 ARG BASE_TAG="1.18.0"
 
@@ -61,7 +59,6 @@ USER 1000
 # ############################################################################
 # -------------------------- COMMON BUILD TARGET --------------------------- #
 # ############################################################################
-
 FROM base AS build
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -69,16 +66,27 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 COPY ./src/ubuntu/install/ ./__context_check__/ubuntu_install/
 RUN rm -rf ./__context_check__
 
-# Copy just ubuntu/ into /dockerstartup/install/ubuntu/
+# Copy ubuntu/ into /dockerstartup/install/ubuntu/
 COPY ./src/ubuntu/ ${INST_DIR}/ubuntu/
+
+# Make installer scripts executable (avoid surprises)
 RUN set -eux; \
-    chmod +x "${INST_DIR}/ubuntu/install/tor_browser/integrate_tor_browser_desktop.sh"; \
-    chmod +x "${INST_DIR}/ubuntu/install/tor_browser/install_tor_browser.sh"; \
-    # Optional hardening: make all installer scripts executable (safe + avoids future surprises)
     find "${INST_DIR}/ubuntu/install" -maxdepth 4 -type f -name '*.sh' -exec chmod +x {} \;
+
+# Move validation script to base tools folder.
+RUN mkdir -p /dockerstartup/tools
+COPY ./src/tools/runtime/runtime_validation.sh /dockerstartup/tools/runtime_validation.sh
+RUN chmod 0755 /dockerstartup/tools/runtime_validation.sh
+
+# Run Installs
+#
+# Debug toggle:
+#   docker build --progress=plain --no-cache --build-arg APT_DEBUG=true ...
+ARG APT_DEBUG=false
 
 RUN set -eux; \
     apt-get update; \
+    \
     SCRIPTS=( \
       "/ubuntu/install/tools/install_tools.sh" \
       "/ubuntu/install/chrome/install_chrome.sh" \
@@ -102,10 +110,29 @@ RUN set -eux; \
       "/ubuntu/install/desktop/set_wallpaper.sh" \
       "/ubuntu/install/common/01_cleanup.sh" \
     ); \
+    \
     for SCRIPT in "${SCRIPTS[@]}"; do \
       echo ">>> Running ${SCRIPT}"; \
-      bash "${INST_DIR}${SCRIPT}" || { echo "FAILED: ${SCRIPT}"; exit 1; }; \
+      bash "${INST_DIR}${SCRIPT}" || { \
+        rc=$?; \
+        echo "FAILED: ${SCRIPT} (rc=$rc)"; \
+        if [ "${APT_DEBUG}" = "true" ]; then \
+          echo "----- apt logs (tail) -----"; \
+          tail -n 200 /var/log/apt/term.log 2>/dev/null || true; \
+          tail -n 200 /var/log/apt/history.log 2>/dev/null || true; \
+          echo "----- dpkg log (tail) -----"; \
+          tail -n 200 /var/log/dpkg.log 2>/dev/null || true; \
+          echo "----- free -h -----"; \
+          free -h || true; \
+          echo "----- df -h -----"; \
+          df -h || true; \
+          echo "----- ps (top RSS) -----"; \
+          ps aux --sort=-rss | head -n 15 || true; \
+        fi; \
+        exit "$rc"; \
+      }; \
     done; \
+    \
     "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \
     rm -f /etc/X11/xinit/Xclients; \
     chown 1000:0 "${HOME}"; \
@@ -121,13 +148,11 @@ CMD ["--tail-log"]
 # ############################################################################
 # ------------------------------- DEVELOP IMAGE ---------------------------- #
 # ############################################################################
-
 FROM build AS develop
 ENV DEBUG=true
 
 # ############################################################################
 # ----------------------------- PRODUCTION IMAGE --------------------------- #
 # ############################################################################
-
 FROM build AS production
 ENV DEBUG=false
