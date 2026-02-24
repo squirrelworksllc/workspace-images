@@ -97,6 +97,8 @@ CMD ["--tail-log"]
 # ############################################################################
 FROM --platform=$BUILDPLATFORM build AS develop
 ENV DEBUG=true
+# Allow the REMnux installer script to run on ARM64 for local dev builds.
+ENV FORCE_REMNUX_INSTALL_ON_ARM=true
 
 # ############################################################################
 # ----------------------------- PRODUCTION -------------------------------- #

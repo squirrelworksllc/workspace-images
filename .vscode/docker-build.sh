@@ -60,14 +60,15 @@ check_dependencies() {
 # Prompts the user to select a build mode (lint, prod, or dev).
 prompt_for_mode() {
   echo ""
-  read -r -p "Select mode [lint/prod/dev] (default: lint): " mode_in
+  read -r -p "Select mode [lint/prod/dev/clean] (default: lint): " mode_in
   BUILD_MODE="${mode_in:-lint}"
 
   case "$BUILD_MODE" in
-    lint|prod|production|dev|develop) ;;
+    lint|prod|production|dev|develop|clean) ;;
     *) fail "Unknown mode: '$BUILD_MODE'. Use lint, prod, or dev." ;;
   esac
 }
+
 
 # Prompts the user to select which image to build from images.json.
 prompt_for_image() {
@@ -113,6 +114,26 @@ run_lint_build() {
     --target "$LINT_TARGET" \
     -f "$DOCKERFILE" \
     "$REPO_ROOT"
+}
+
+# --- CLEAN DEV IMAGES ---
+run_clean() {
+  log_info "Cleaning up local 'develop' images defined in ${CONFIG_FILE}..."
+  local images_to_clean
+  mapfile -t images_to_clean < <(jq -r '.images[] | "docker.io/\(.repo):\(.devTag // "develop")"' "$CONFIG_FILE")
+
+  if [[ "${#images_to_clean[@]}" -eq 0 ]]; then
+    log_info "No images to clean."
+    return
+  fi
+
+  echo "The following images will be removed if they exist locally:"
+  printf " - %s\n" "${images_to_clean[@]}"
+  echo ""
+  read -r -p "Continue? [Y/n] " ans
+  [[ "${ans,,}" == "n" ]] && fail "Clean operation cancelled."
+
+  docker image rm -f "${images_to_clean[@]}"
 }
 
 # --- PRODUCTION BUILD ---
@@ -230,6 +251,13 @@ main() {
   check_dependencies
 
   prompt_for_mode
+
+  if [[ "$BUILD_MODE" == "clean" ]]; then
+    run_clean
+    log_info "Build script finished."
+    exit 0
+  fi
+
   prompt_for_image
   parse_image_config
 

@@ -19,11 +19,16 @@ log() { echo "[remnux] $*"; }
 
 log "======= Installing REMnux Malware Analysis Environment (CLI) ======="
 
-# REMnux tooling is effectively amd64-focused; skip gracefully on other arches.
-ARCH="$(dpkg --print-architecture)"
-if [ "${ARCH}" != "amd64" ]; then
-  log "REMnux install is amd64-only in this image; skipping on ${ARCH}."
-  exit 0
+# Allow bypassing the arch check for dev builds on ARM.
+# The Dockerfile's 'develop' target sets FORCE_REMNUX_INSTALL_ON_ARM=true.
+if [ "${FORCE_REMNUX_INSTALL_ON_ARM:-false}" != "true" ]; then
+  # REMnux tooling is effectively amd64-focused; skip gracefully on other arches.
+  ARCH="$(dpkg --print-architecture)"
+  if [ "${ARCH}" != "amd64" ]; then
+    log "REMnux install is amd64-only in this image; skipping on ${ARCH}."
+    log "To override for development, set FORCE_REMNUX_INSTALL_ON_ARM=true"
+    exit 0
+  fi
 fi
 
 # Ensure the target user exists (Kasm images usually have kasm-user, but be defensive)
