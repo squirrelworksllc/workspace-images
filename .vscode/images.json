@@ -35,6 +35,15 @@
       "devTag": "develop",
       "devTarget": "develop",
       "lintTarget": "lint"
+    },
+    {
+      "key": "ubuntu-noble-core",
+      "dockerfile": "images/ubuntu-noble-core/Dockerfile",
+      "repo": "squirrelworksllc/ubuntu-noble-core",
+      "prodTag": "1.18.0",
+      "devTag": "develop",
+      "devTarget": "develop",
+      "lintTarget": "lint"
     }
   ]
 }

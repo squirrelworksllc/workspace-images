@@ -3,6 +3,7 @@
 # - Installs a system .desktop file so Kasm/Desktop sees it immediately
 # - Extracts icons into /usr/share/icons/hicolor for consistent launcher icons
 # - Places a Desktop shortcut for the standard Kasm user
+# - Marks .desktop launchers executable to avoid "Run/Display" prompts in XFCE
 #
 # Env overrides:
 #   TORBROWSER_INSTALL_DIR      (default: /opt/tor-browser)
@@ -57,10 +58,6 @@ main() {
   fi
 
   echo "Step 2: Extracting icons into /usr/share/icons/hicolor..."
-  # Tor Browser typically stores icons here:
-  #   /opt/tor-browser/Browser/browser/chrome/icons/default/
-  # Files are usually named like:
-  #   default16.png default32.png default48.png default64.png default128.png default256.png
   local icon_src_dir="${install_dir}/Browser/browser/chrome/icons/default"
   local icon_png_abs="${icon_src_dir}/default128.png"
 
@@ -79,7 +76,6 @@ main() {
     done
   fi
 
-  # Refresh icon cache if available (not always installed in minimal images)
   if command -v gtk-update-icon-cache >/dev/null 2>&1; then
     echo "Step 3: Updating icon cache..."
     gtk-update-icon-cache -f /usr/share/icons/hicolor >/dev/null 2>&1 || true
@@ -91,7 +87,6 @@ main() {
   local desktop_path="/usr/share/applications/${desktop_id}.desktop"
 
   # Prefer the absolute PNG to guarantee correctness even if icon theme/caches are odd.
-  # If it's missing, fall back to the theme icon name we installed into hicolor.
   local icon_field="$icon_name"
   if [[ -f "$icon_png_abs" ]]; then
     icon_field="$icon_png_abs"
@@ -111,9 +106,9 @@ StartupNotify=true
 # WM_CLASS varies; leaving it out avoids "click does nothing" when mismatched.
 EOF
 
-  chmod 0644 "$desktop_path"
+  # IMPORTANT: must be executable or XFCE will prompt "Run / Display?"
+  chmod 0755 "$desktop_path"
 
-  # Optional: place a Desktop shortcut for the standard Kasm user
   echo "Step 5: Installing Desktop shortcut..."
   local d_uid="${TORBROWSER_DESKTOP_UID:-1000}"
   local d_gid="${TORBROWSER_DESKTOP_GID:-1000}"
@@ -129,6 +124,10 @@ EOF
 
   install -m 0755 -d "$desktop_dir"
   install -m 0644 "$desktop_path" "$desktop_shortcut"
+
+  # IMPORTANT: Desktop shortcut copy must also be executable to avoid prompt
+  chmod 0755 "$desktop_shortcut"
+
   chown "$d_uid:$d_gid" "$desktop_dir" "$desktop_shortcut"
 
   echo "Step 6: Desktop integration complete."

@@ -1,12 +1,33 @@
 # syntax=docker/dockerfile:1.7
 
-ARG BASE_TAG="1.18.0-rolling-weekly"
-ARG BASE_IMAGE="core-ubuntu-noble"
+# ----------------------------- DESCRIPTION -----------------------------
+# Ubuntu Noble Desktop (Kasm-compatible).
+#
+# Built on the SquirrelWorks Ubuntu Noble core image and extended with a
+# full desktop environment and common desktop applications.
+#
+# Provides:
+#   - lint target (hadolint + shellcheck)
+#   - develop target
+#   - production target (default)
+#
+# IMPORTANT:
+# This Dockerfile assumes the BUILD CONTEXT is the REPO ROOT.
+# Example builds:
+#   Lint: docker build --target lint -f images/ubuntu-noble-desktop/Dockerfile .
+#   Prod: docker build -t squirrelworksllc/ubuntu-noble-desktop:1.18.0 -f images/ubuntu-noble-desktop/Dockerfile .
+#   Dev : docker build --target develop -t squirrelworksllc/ubuntu-noble-desktop:develop -f images/ubuntu-noble-desktop/Dockerfile .
+# ----------------------------------------------------------------------
+
+# ----------------------------- BASE IMAGE -----------------------------
+ARG BASE_IMAGE="squirrelworksllc/ubuntu-noble-core"
+ARG BASE_TAG="1.18.0"
 
 # ############################################################################
 # ------------------------------ BASE STAGE -------------------------------- #
 # ############################################################################
-FROM kasmweb/${BASE_IMAGE}:${BASE_TAG} AS base
+FROM --platform=$BUILDPLATFORM ${BASE_IMAGE}:${BASE_TAG} AS base
+
 USER root
 
 ENV HOME=/home/kasm-default-profile \
@@ -23,14 +44,14 @@ WORKDIR ${HOME}
 # ############################################################################
 # ------------------------------ LINT TARGET ------------------------------- #
 # ############################################################################
-FROM base AS lint
+FROM --platform=$BUILDPLATFORM base AS lint
 
 WORKDIR /src
 COPY . /src
 
 # installs hadolint + shellcheck
 RUN bash /src/tools/ci/lint_installers.sh
-RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/ubuntu-noble-dind/Dockerfile
+RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/ubuntu-noble-desktop/Dockerfile
 RUN bash /src/tools/ci/lint-shell.sh
 
 USER 1000
@@ -38,24 +59,34 @@ USER 1000
 # ############################################################################
 # -------------------------- COMMON BUILD TARGET --------------------------- #
 # ############################################################################
-
-FROM base AS build
+FROM --platform=$BUILDPLATFORM base AS build
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # Guard: fail fast if build context isn't repo root (COPY fails if missing)
 COPY ./src/ubuntu/install/ ./__context_check__/ubuntu_install/
 RUN rm -rf ./__context_check__
 
-# Copy just ubuntu/ into /dockerstartup/install/ubuntu/
+# Copy ubuntu/ into /dockerstartup/install/ubuntu/
 COPY ./src/ubuntu/ ${INST_DIR}/ubuntu/
+
+# Make installer scripts executable (avoid surprises)
 RUN set -eux; \
-    chmod +x "${INST_DIR}/ubuntu/install/tor_browser/integrate_tor_browser_desktop.sh"; \
-    chmod +x "${INST_DIR}/ubuntu/install/tor_browser/install_tor_browser.sh"; \
-    # Optional hardening: make all installer scripts executable (safe + avoids future surprises)
     find "${INST_DIR}/ubuntu/install" -maxdepth 4 -type f -name '*.sh' -exec chmod +x {} \;
+
+# Move validation script to base tools folder.
+RUN mkdir -p /dockerstartup/tools
+COPY ./src/tools/runtime/runtime_validation.sh /dockerstartup/tools/runtime_validation.sh
+RUN chmod 0755 /dockerstartup/tools/runtime_validation.sh
+
+# Run Installs
+#
+# Debug toggle:
+#   docker build --progress=plain --no-cache --build-arg APT_DEBUG=true ...
+ARG APT_DEBUG=false
 
 RUN set -eux; \
     apt-get update; \
+    \
     SCRIPTS=( \
       "/ubuntu/install/tools/install_tools.sh" \
       "/ubuntu/install/chrome/install_chrome.sh" \
@@ -74,15 +105,34 @@ RUN set -eux; \
       "/ubuntu/install/infosec_yara/install_infosec_yara.sh" \
       "/ubuntu/install/tesseract_ocr/install_tesseract_ocr.sh" \
       "/ubuntu/install/tor_browser/install_tor_browser.sh" \
-      "/ubuntu/install/torboost/install_torboost.sh" \
+      "/ubuntu/install/torsocks/install_torsocks.sh" \
       "/ubuntu/install/recoll/install_recoll.sh" \
       "/ubuntu/install/desktop/set_wallpaper.sh" \
       "/ubuntu/install/common/01_cleanup.sh" \
     ); \
+    \
     for SCRIPT in "${SCRIPTS[@]}"; do \
       echo ">>> Running ${SCRIPT}"; \
-      bash "${INST_DIR}${SCRIPT}" || { echo "FAILED: ${SCRIPT}"; exit 1; }; \
+      bash "${INST_DIR}${SCRIPT}" || { \
+        rc=$?; \
+        echo "FAILED: ${SCRIPT} (rc=$rc)"; \
+        if [ "${APT_DEBUG}" = "true" ]; then \
+          echo "----- apt logs (tail) -----"; \
+          tail -n 200 /var/log/apt/term.log 2>/dev/null || true; \
+          tail -n 200 /var/log/apt/history.log 2>/dev/null || true; \
+          echo "----- dpkg log (tail) -----"; \
+          tail -n 200 /var/log/dpkg.log 2>/dev/null || true; \
+          echo "----- free -h -----"; \
+          free -h || true; \
+          echo "----- df -h -----"; \
+          df -h || true; \
+          echo "----- ps (top RSS) -----"; \
+          ps aux --sort=-rss | head -n 15 || true; \
+        fi; \
+        exit "$rc"; \
+      }; \
     done; \
+    \
     "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \
     rm -f /etc/X11/xinit/Xclients; \
     chown 1000:0 "${HOME}"; \
@@ -98,13 +148,11 @@ CMD ["--tail-log"]
 # ############################################################################
 # ------------------------------- DEVELOP IMAGE ---------------------------- #
 # ############################################################################
-
-FROM build AS develop
+FROM --platform=$BUILDPLATFORM build AS develop
 ENV DEBUG=true
 
 # ############################################################################
 # ----------------------------- PRODUCTION IMAGE --------------------------- #
 # ############################################################################
-
-FROM build AS production
+FROM --platform=$BUILDPLATFORM build AS production
 ENV DEBUG=false

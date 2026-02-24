@@ -1,29 +1,12 @@
 # syntax=docker/dockerfile:1.7
 
-# ----------------------------- DESCRIPTION -----------------------------
-# BitCurator5 Kasm image.
-# Built on top of squirrelworksllc/ubuntu-noble-core, then runs BitCurator5
-# installer scripts.
-#
-# Provides:
-#   - lint target (hadolint + shellcheck)
-#   - develop target
-#   - production target (default)
-#
-# IMPORTANT:
-# Build context is repo root.
-#   Lint: docker build --target lint -f images/bitcurator5/Dockerfile .
-#   Prod: docker build -t squirrelworksllc/bitcurator5:1.18.0 -f images/bitcurator5/Dockerfile .
-#   Dev : docker build --target develop -t squirrelworksllc/bitcurator5:develop -f images/bitcurator5/Dockerfile .
-# ----------------------------------------------------------------------
-
-ARG BASE_IMAGE="squirrelworksllc/ubuntu-noble-core"
-ARG BASE_TAG="1.18.0"
+ARG BASE_TAG="1.18.0-rolling-weekly"
+ARG BASE_IMAGE="core-ubuntu-noble"
 
 # ############################################################################
 # -------------------------------- BASE ----------------------------------- #
 # ############################################################################
-FROM ${BASE_IMAGE}:${BASE_TAG} AS base
+FROM --platform=$BUILDPLATFORM kasmweb/${BASE_IMAGE}:${BASE_TAG} AS base
 USER root
 
 ENV HOME=/home/kasm-default-profile \
@@ -37,42 +20,43 @@ ENV HOME=/home/kasm-default-profile \
 WORKDIR ${HOME}
 
 # ############################################################################
-# ------------------------------ LINT TARGET ------------------------------- #
+# -------------------------------- LINT ----------------------------------- #
 # ############################################################################
-FROM base AS lint
+FROM --platform=$BUILDPLATFORM base AS lint
 WORKDIR /src
 COPY . /src
 
 RUN bash /src/tools/ci/lint_installers.sh
-RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/bitcurator5/Dockerfile
+RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/ubuntu-noble-core/Dockerfile
 RUN bash /src/tools/ci/lint-shell.sh
 
 USER 1000
 
 # ############################################################################
-# ------------------------------ BUILD TARGET ------------------------------ #
+# -------------------------------- BUILD ---------------------------------- #
 # ############################################################################
-FROM base AS build
+FROM --platform=$BUILDPLATFORM base AS build
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Move validation script to base tools folder.
-RUN mkdir -p /dockerstartup/tools
-COPY ./src/tools/runtime/runtime_validation.sh /dockerstartup/tools/runtime_validation.sh
-RUN chmod 0755 /dockerstartup/tools/runtime_validation.sh
-
-# Run Installs
-ENV INST_SCRIPTS="/ubuntu/install/tools/install_tools.sh \
-/ubuntu/install/bitcurator/install_bitcurator5.sh \
-/ubuntu/install/common/01_cleanup.sh"
-
+# Guard: fail fast if build context isn't repo root (COPY fails if missing)
 COPY ./src/ubuntu/install/ ./__context_check__/ubuntu_install/
 RUN rm -rf ./__context_check__
 
+# Copy installer framework
 COPY ./src/ubuntu/ ${INST_DIR}/ubuntu/
 
+# Make scripts executable (avoid surprises)
+RUN set -eux; \
+    find "${INST_DIR}/ubuntu/install" -maxdepth 5 -type f -name '*.sh' -exec chmod +x {} \;
+
+# Minimal baseline only (keep this list intentionally tiny)
 RUN set -eux; \
     apt-get update; \
-    for SCRIPT in ${INST_SCRIPTS}; do \
+    SCRIPTS=( \
+      "/ubuntu/install/tools/install_tools.sh" \
+      "/ubuntu/install/common/01_cleanup.sh" \
+    ); \
+    for SCRIPT in "${SCRIPTS[@]}"; do \
       echo ">>> Running ${SCRIPT}"; \
       bash "${INST_DIR}${SCRIPT}" || { echo "FAILED: ${SCRIPT}"; exit 1; }; \
     done; \
@@ -90,11 +74,11 @@ CMD ["--tail-log"]
 # ############################################################################
 # ------------------------------- DEVELOP --------------------------------- #
 # ############################################################################
-FROM build AS develop
+FROM --platform=$BUILDPLATFORM build AS develop
 ENV DEBUG=true
 
 # ############################################################################
 # ----------------------------- PRODUCTION -------------------------------- #
 # ############################################################################
-FROM build AS production
+FROM --platform=$BUILDPLATFORM build AS production
 ENV DEBUG=false
