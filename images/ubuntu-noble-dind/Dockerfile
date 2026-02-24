@@ -27,8 +27,7 @@ FROM --platform=$BUILDPLATFORM ${BASE_IMAGE}:${BASE_TAG} AS base
 USER root
 
 ENV HOME=/home/kasm-default-profile \
-    STARTUPDIR=/dockerstartup \
-    WORKDIR=${HOME}
+    STARTUPDIR=/dockerstartup 
 
 WORKDIR ${HOME}
 
