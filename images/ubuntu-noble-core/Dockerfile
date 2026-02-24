@@ -6,7 +6,7 @@ ARG BASE_IMAGE="core-ubuntu-noble"
 # ############################################################################
 # -------------------------------- BASE ----------------------------------- #
 # ############################################################################
-FROM kasmweb/${BASE_IMAGE}:${BASE_TAG} AS base
+FROM --platform=$BUILDPLATFORM kasmweb/${BASE_IMAGE}:${BASE_TAG} AS base
 USER root
 
 ENV HOME=/home/kasm-default-profile \
@@ -22,7 +22,7 @@ WORKDIR ${HOME}
 # ############################################################################
 # -------------------------------- LINT ----------------------------------- #
 # ############################################################################
-FROM base AS lint
+FROM --platform=$BUILDPLATFORM base AS lint
 WORKDIR /src
 COPY . /src
 
@@ -35,7 +35,7 @@ USER 1000
 # ############################################################################
 # -------------------------------- BUILD ---------------------------------- #
 # ############################################################################
-FROM base AS build
+FROM --platform=$BUILDPLATFORM base AS build
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # Guard: fail fast if build context isn't repo root (COPY fails if missing)
@@ -74,11 +74,11 @@ CMD ["--tail-log"]
 # ############################################################################
 # ------------------------------- DEVELOP --------------------------------- #
 # ############################################################################
-FROM build AS develop
+FROM --platform=$BUILDPLATFORM build AS develop
 ENV DEBUG=true
 
 # ############################################################################
 # ----------------------------- PRODUCTION -------------------------------- #
 # ############################################################################
-FROM build AS production
+FROM --platform=$BUILDPLATFORM build AS production
 ENV DEBUG=false
