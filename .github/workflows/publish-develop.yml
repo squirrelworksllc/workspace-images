@@ -60,7 +60,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up jq
-        uses: jdx/setup-jq@v1
+        uses: crazy-max/ghaction-setup-jq@v3
 
       - name: Generate matrix from images.json
         id: set
@@ -141,7 +141,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up jq
-        uses: jdx/setup-jq@v1
+        uses: crazy-max/ghaction-setup-jq@v3
 
       - name: Get core image config
         id: core-config
