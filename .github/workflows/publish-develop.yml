@@ -75,7 +75,7 @@ jobs:
             dockerfile: .dockerfile,
             devTarget: .devTarget,
             lintTarget: .lintTarget,
-            tags: .repo as $repo | (if .devTags then .devTags else [] end) | map($repo + ":" + .) | join("\n"),
+            tags: [range(0; ((if .devTags then .devTags else [] end) | length)) | .repo + ":" + (if .devTags then .devTags else [] end)[.]] | join("\n"),
             architectures: (if .architectures then .architectures else ["linux/amd64", "linux/arm64"] end) | join(",")
           }]}' "$IMAGES_JSON")"
 
@@ -147,7 +147,7 @@ jobs:
           echo "architectures=$(echo "$CORE_CONFIG" | jq -r '.architectures | join(",")')" >> "$GITHUB_OUTPUT"
           {
             echo 'tags<<EOF'
-            echo "$CORE_CONFIG" | jq -r '.repo as $repo | (if .devTags then .devTags else [] end) | .[] | $repo + ":" + .'
+            echo "$CORE_CONFIG" | jq -r '[range(0; ((if .devTags then .devTags else [] end) | length)) | .repo + ":" + (if .devTags then .devTags else [] end)[.]] | .[]'
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
 
