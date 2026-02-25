@@ -95,8 +95,8 @@ parse_image_config() {
   REPO="$(jq -r '.repo' <<<"$IMAGE_CONFIG_JSON")"
   PROD_TAG="$(jq -r '((if .prodTags then .prodTags else [] end)[0]) | (if . == null then empty else . end)' <<<"$IMAGE_CONFIG_JSON")"
   DEV_TAG="$(jq -r '(if .devTags then .devTags else ["develop"] end)[0]' <<<"$IMAGE_CONFIG_JSON")"
-  DEV_TARGET="$(jq -r '.devTarget // empty' <<<"$IMAGE_CONFIG_JSON")"
-  LINT_TARGET="$(jq -r '.lintTarget // "lint"' <<<"$IMAGE_CONFIG_JSON")"
+  DEV_TARGET="$(jq -r '.devTarget | if . == null then empty else . end' <<<"$IMAGE_CONFIG_JSON")"
+  LINT_TARGET="$(jq -r 'if .lintTarget then .lintTarget else "lint" end' <<<"$IMAGE_CONFIG_JSON")"
 
   [[ -f "$DOCKERFILE" ]] || fail "Dockerfile not found: $DOCKERFILE"
 }
