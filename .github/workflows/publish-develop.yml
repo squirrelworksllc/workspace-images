@@ -179,14 +179,17 @@ jobs:
           if [[ "$tags_array" != "null" ]]; then
             mapfile -t tags < <(jq -r '.[]' <<< "$tags_array")
             for tag in "${tags[@]}"; do
-              tag_string+=$(printf '%s:%s\n' "$repo" "$tag")
+              if [[ -z "$tag_string" ]]; then
+                tag_string="${repo}:${tag}"
+              else
+                tag_string+=$(printf '\n%s:%s' "$repo" "$tag")
+              fi
             done
           fi
 
           {
             echo 'tags<<EOF'
-            # Trim trailing newline
-            printf "%s" "$tag_string"
+            echo "$tag_string"
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
 
