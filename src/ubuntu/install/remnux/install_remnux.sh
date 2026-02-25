@@ -19,16 +19,16 @@ log() { echo "[remnux] $*"; }
 
 log "======= Installing REMnux Malware Analysis Environment (CLI) ======="
 
-# Allow bypassing the arch check for dev builds on ARM.
-# The Dockerfile's 'develop' target sets FORCE_REMNUX_INSTALL_ON_ARM=true.
-if [ "${FORCE_REMNUX_INSTALL_ON_ARM:-false}" != "true" ]; then
-  # REMnux tooling is effectively amd64-focused; skip gracefully on other arches.
-  ARCH="$(dpkg --print-architecture)"
-  if [ "${ARCH}" != "amd64" ]; then
-    log "REMnux install is amd64-only in this image; skipping on ${ARCH}."
-    log "To override for development, set FORCE_REMNUX_INSTALL_ON_ARM=true"
-    exit 0
-  fi
+# REMnux tooling is amd64-only. This check enforces that the image is not
+# built on other architectures like arm64. This is an intentional build failure.
+ARCH="$(dpkg --print-architecture)"
+if [ "${ARCH}" != "amd64" ]; then
+  log "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+  log "ERROR: REMnux is configured as amd64-only in images.json."
+  log "       Attempting to build on an unsupported architecture: '${ARCH}'."
+  log "       This build will now fail intentionally. BAD DOG!"
+  log "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+  exit 1
 fi
 
 # Ensure the target user exists (Kasm images usually have kasm-user, but be defensive)
@@ -72,8 +72,11 @@ trap 'rm -rf "${tmpdir}"' EXIT
 cd "${tmpdir}"
 
 # Use the exact URL you used successfully (case-insensitive on host, but keep canonical)
-wget -qO remnux https://REMnux.org/remnux-cli
+log "temp - wget"
+curl -O https://REMnux.org/remnux
+log "temp - chmod"
 chmod +x remnux
+log "temp - mv"
 mv remnux /usr/local/bin/remnux
 
 log "Step 3: Run REMnux installer for user ${TARGET_USER} ..."

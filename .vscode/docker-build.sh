@@ -48,6 +48,12 @@ log_info() {
 # Checks for required command-line tools.
 check_dependencies() {
   command -v jq >/dev/null || fail "jq is required but not found in PATH."
+  # Check for jq >= 1.5 which supports the '//' and 'as' operators
+  local jq_version
+  jq_version="$(jq --version | sed 's/jq-//')"
+  if ! printf '%s\n%s\n' "1.5" "$jq_version" | sort -V -C 2>/dev/null; then
+    fail "jq version 1.5 or newer is required for this script. You have ${jq_version}. Please upgrade jq."
+  fi
   command -v git >/dev/null || fail "git is required but not found in PATH."
   [[ -n "${REPO_ROOT}" ]] || fail "Could not determine repository root. Must be run inside a git repo."
   [[ -f "${CONFIG_FILE}" ]] || fail "Config file not found: ${CONFIG_FILE}"
@@ -93,8 +99,8 @@ parse_image_config() {
 
   DOCKERFILE="$(jq -r '.dockerfile' <<<"$IMAGE_CONFIG_JSON")"
   REPO="$(jq -r '.repo' <<<"$IMAGE_CONFIG_JSON")"
-  PROD_TAG="$(jq -r '.prodTag // empty' <<<"$IMAGE_CONFIG_JSON")"
-  DEV_TAG="$(jq -r '.devTag // "develop"' <<<"$IMAGE_CONFIG_JSON")"
+  PROD_TAG="$(jq -r '(.prodTags // [])[0] // empty' <<<"$IMAGE_CONFIG_JSON")"
+  DEV_TAG="$(jq -r '(.devTags // ["develop"])[0]' <<<"$IMAGE_CONFIG_JSON")"
   DEV_TARGET="$(jq -r '.devTarget // empty' <<<"$IMAGE_CONFIG_JSON")"
   LINT_TARGET="$(jq -r '.lintTarget // "lint"' <<<"$IMAGE_CONFIG_JSON")"
 
@@ -138,7 +144,7 @@ run_clean() {
 
 # --- PRODUCTION BUILD ---
 run_prod_build() {
-  [[ -n "$PROD_TAG" ]] || fail "prodTag is not set for key '$IMAGE_KEY' in $CONFIG_FILE"
+  [[ -n "$PROD_TAG" ]] || fail "prodTags array is empty or not set for key '$IMAGE_KEY' in $CONFIG_FILE"
   log_info "Building PROD: ${REPO}:${PROD_TAG}"
 
   docker build \

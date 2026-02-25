@@ -13,7 +13,7 @@ Reminder: repo root is always the build context. Be sure you reach out to
 ## New Image Overview
 - **New image name:** `images/<new-image>/`
 - **Final image tag(s):** `squirrelworksllc/<new-image>:<tag>` (planned)
-- **Purpose / use-case:**
+- **Purpose / Target Audience:** (What is this image for, and who will be using it?)
 - **Base image / tag (and why):**
 - **Upstream project (if applicable):**
 - **Expected size / build time (rough):**
@@ -32,12 +32,20 @@ Reminder: repo root is always the build context. Be sure you reach out to
 - [ ] `production` target exists (default)
 
 ## Security / Supply Chain Notes
-- **Downloads:** (what gets downloaded, from where, how verified?)
-- **GPG / checksums used?** (yes/no + details)
-- **Any credentials or private repos involved?** (should be “no”)
+*This section is critical for maintaining a secure and reliable build process.*
+
+- **Downloads:** List all external artifacts being downloaded (e.g., `.deb` packages, binaries from `curl`, git clones).
+- **Verification:** For each download, how is its integrity verified?
+  - [ ] GPG signature check
+  - [ ] SHA256 checksum validation
+  - [ ] Download is from a trusted, official package repository (e.g., Ubuntu main, official PPA)
+  - [ ] No verification possible (explain why)
+- **Credentials:** Confirm that no secrets, tokens, or credentials are used or stored in the image.
 
 ## Validation / Testing
-### Lint (required)
+*All commands should be run from the repository root.*
+
+### 1. Lint (Required)
 ```bash
 docker build --target lint -f images/<new-image>/Dockerfile .
 ```
