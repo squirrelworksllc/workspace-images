@@ -73,10 +73,10 @@ jobs:
           MATRIX="$(jq -c '{include: [.images[] | select(.key != "ubuntu-noble-core") | {
             key: .key,
             dockerfile: .dockerfile,
-            repo: .repo,
-            devTag: .devTag,
             devTarget: .devTarget,
-            lintTarget: .lintTarget
+            lintTarget: .lintTarget,
+            tags: (.devTags // []) | map(.repo + ":" + .) | join("\n"),
+            architectures: .architectures // ["linux/amd64", "linux/arm64"] | join(",")
           }]}' "$IMAGES_JSON")"
 
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
@@ -143,9 +143,13 @@ jobs:
         run: |
           CORE_CONFIG=$(jq -r '.images[] | select(.key == "ubuntu-noble-core")' "$IMAGES_JSON")
           echo "dockerfile=$(echo "$CORE_CONFIG" | jq -r '.dockerfile')" >> "$GITHUB_OUTPUT"
-          echo "repo=$(echo "$CORE_CONFIG" | jq -r '.repo')" >> "$GITHUB_OUTPUT"
-          echo "devTag=$(echo "$CORE_CONFIG" | jq -r '.devTag')" >> "$GITHUB_OUTPUT"
           echo "devTarget=$(echo "$CORE_CONFIG" | jq -r '.devTarget')" >> "$GITHUB_OUTPUT"
+          echo "architectures=$(echo "$CORE_CONFIG" | jq -r '.architectures | join(",")')" >> "$GITHUB_OUTPUT"
+          {
+            echo 'tags<<EOF'
+            echo "$CORE_CONFIG" | jq -r '(.devTags // []) | .[] | .repo + ":" + .'
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -162,9 +166,9 @@ jobs:
           context: .
           file: ${{ steps.core-config.outputs.dockerfile }}
           target: ${{ steps.core-config.outputs.devTarget }}
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ steps.core-config.outputs.architectures }}
           push: true
-          tags: ${{ steps.core-config.outputs.repo }}:${{ steps.core-config.outputs.devTag }}
+          tags: ${{ steps.core-config.outputs.tags }}
 
   # Builds and publishes all non-core images in parallel. Individual build failures are allowed and will not stop the workflow.
   publish-others:
@@ -195,10 +199,9 @@ jobs:
           context: .
           file: ${{ matrix.dockerfile }}
           target: ${{ matrix.devTarget }}
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ matrix.architectures }}
           push: true
-          tags: |
-            ${{ matrix.repo }}:${{ matrix.devTag }}
+          tags: ${{ matrix.tags }}
           cache-from: type=gha,scope=pubdev-${{ matrix.key }}
           cache-to: type=gha,mode=max,scope=pubdev-${{ matrix.key }}
 

@@ -97,8 +97,9 @@ CMD ["--tail-log"]
 # ############################################################################
 FROM --platform=$BUILDPLATFORM build AS develop
 ENV DEBUG=true
-# Allow the REMnux installer script to run on ARM64 for local dev builds.
-ENV FORCE_REMNUX_INSTALL_ON_ARM=true
+# This image is amd64-only. The FORCE_REMNUX_INSTALL_ON_ARM override is removed.
+# Local dev builds on ARM will now gracefully skip the REMnux installation,
+# which is the correct and expected behavior.
 
 # ############################################################################
 # ----------------------------- PRODUCTION -------------------------------- #

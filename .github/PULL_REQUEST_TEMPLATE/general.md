@@ -24,6 +24,15 @@ Quick rules:
 - [ ] .vscode/images.json (matrix registration)
 - [ ] docs / README / other
 
+## Risk & Impact
+- **Risk Level:** (Low / Medium / High)
+  - *Low: Docs, non-critical refactors, typo fixes.*
+  - *Medium: Most bug fixes, feature additions to a single image.*
+  - *High: Changes to core shared scripts (`src/`), base images, or CI workflows.*
+- **Breaking change?** (Yes/No)
+  - *If yes, please explain the impact and migration path below.*
+
+---
 ## Type of Change
 - [ ] Bug fix
 - [ ] Refactor / cleanup (no behavior change)
@@ -33,16 +42,15 @@ Quick rules:
 - [ ] Breaking change (explain below)
 
 ## How This Was Tested
-Provide the exact commands you ran locally (or explain why you didn’t).
-
-### Lint (required)
+*Describe the validation you performed. All commands should be run from the repository root.*
 ```bash
-docker build --target lint -f images/<image>/Dockerfile .
-```
+# 1. Lint (Required)
+docker build --target lint -f images/path/to/your/Dockerfile .
 
-### Production build (optional / recommended when touching installers)
-```bash
-docker build --target production -f images/<image>/Dockerfile .
+# 2. Local Build (Recommended when touching installers)
+docker build -f images/path/to/your/Dockerfile .
+
+# 3. Smoke Test (Describe any manual steps taken to verify the change)
 ```
 
 ## Notes for Reviewers

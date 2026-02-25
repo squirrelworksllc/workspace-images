@@ -93,8 +93,8 @@ parse_image_config() {
 
   DOCKERFILE="$(jq -r '.dockerfile' <<<"$IMAGE_CONFIG_JSON")"
   REPO="$(jq -r '.repo' <<<"$IMAGE_CONFIG_JSON")"
-  PROD_TAG="$(jq -r '.prodTag // empty' <<<"$IMAGE_CONFIG_JSON")"
-  DEV_TAG="$(jq -r '.devTag // "develop"' <<<"$IMAGE_CONFIG_JSON")"
+  PROD_TAG="$(jq -r '(.prodTags // [])[0] // empty' <<<"$IMAGE_CONFIG_JSON")"
+  DEV_TAG="$(jq -r '(.devTags // ["develop"])[0]' <<<"$IMAGE_CONFIG_JSON")"
   DEV_TARGET="$(jq -r '.devTarget // empty' <<<"$IMAGE_CONFIG_JSON")"
   LINT_TARGET="$(jq -r '.lintTarget // "lint"' <<<"$IMAGE_CONFIG_JSON")"
 
@@ -138,7 +138,7 @@ run_clean() {
 
 # --- PRODUCTION BUILD ---
 run_prod_build() {
-  [[ -n "$PROD_TAG" ]] || fail "prodTag is not set for key '$IMAGE_KEY' in $CONFIG_FILE"
+  [[ -n "$PROD_TAG" ]] || fail "prodTags array is empty or not set for key '$IMAGE_KEY' in $CONFIG_FILE"
   log_info "Building PROD: ${REPO}:${PROD_TAG}"
 
   docker build \
