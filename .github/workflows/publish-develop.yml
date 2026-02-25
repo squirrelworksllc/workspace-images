@@ -16,8 +16,9 @@ env:
   IMAGES_JSON: .vscode/images.json
 
 jobs:
-  publish-core:
-    name: Publish dev – ubuntu-noble-core
+  # Lints the core image (ubuntu-noble-core) to ensure it meets quality standards.
+  validate-core:
+    name: Lint dev – ubuntu-noble-core
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -29,9 +30,6 @@ jobs:
         run: |
           CORE_CONFIG=$(jq -r '.images[] | select(.key == "ubuntu-noble-core")' "$IMAGES_JSON")
           echo "dockerfile=$(echo "$CORE_CONFIG" | jq -r '.dockerfile')" >> "$GITHUB_OUTPUT"
-          echo "repo=$(echo "$CORE_CONFIG" | jq -r '.repo')" >> "$GITHUB_OUTPUT"
-          echo "devTag=$(echo "$CORE_CONFIG" | jq -r '.devTag')" >> "$GITHUB_OUTPUT"
-          echo "devTarget=$(echo "$CORE_CONFIG" | jq -r '.devTarget')" >> "$GITHUB_OUTPUT"
           echo "lintTarget=$(echo "$CORE_CONFIG" | jq -r '.lintTarget')" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
@@ -51,16 +49,7 @@ jobs:
           target: ${{ steps.core-config.outputs.lintTarget }}
           push: false
 
-      - name: Build & push – ubuntu-noble-core
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ${{ steps.core-config.outputs.dockerfile }}
-          target: ${{ steps.core-config.outputs.devTarget }}
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.core-config.outputs.repo }}:${{ steps.core-config.outputs.devTag }}
-
+  # Generates a dynamic JSON matrix of all non-core images from the images.json file.
   matrix-others:
     name: Build matrix (non-core)
     runs-on: ubuntu-latest
@@ -92,15 +81,14 @@ jobs:
 
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
 
-  publish-others:
-    name: Publish dev – ${{ matrix.key }}
+  # Lints all non-core images in parallel using the matrix from the 'matrix-others' job.
+  validate-others:
+    name: Lint dev – ${{ matrix.key }}
     runs-on: ubuntu-latest
-    needs: [publish-core, matrix-others]
-
+    needs: [matrix-others]
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.matrix-others.outputs.matrix) }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -115,8 +103,6 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Lint – ${{ matrix.key }}
-        id: lint
-        continue-on-error: true
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -127,9 +113,82 @@ jobs:
           cache-from: type=gha,scope=pubdev-${{ matrix.key }}
           cache-to: type=gha,mode=max,scope=pubdev-${{ matrix.key }}
 
+  # Acts as the primary status check for branch protection. It runs after all linting jobs and succeeds only if they all pass.
+  lint-gate:
+    name: lint / gate
+    runs-on: ubuntu-latest
+    needs: [validate-core, validate-others]
+    if: always()
+    steps:
+      - name: Check linting results
+        run: |
+          if [[ "${{ needs.validate-core.result }}" != "success" || "${{ needs.validate-others.result }}" != "success" ]]; then
+            echo "One or more lint checks failed. This will block the PR."
+            exit 1
+          fi
+          echo "All lint checks passed."
+
+  # Builds and publishes the multi-arch core image after all lint checks have passed.
+  publish-core:
+    name: Publish dev – ubuntu-noble-core
+    runs-on: ubuntu-latest
+    needs: lint-gate
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get core image config
+        id: core-config
+        shell: bash
+        run: |
+          CORE_CONFIG=$(jq -r '.images[] | select(.key == "ubuntu-noble-core")' "$IMAGES_JSON")
+          echo "dockerfile=$(echo "$CORE_CONFIG" | jq -r '.dockerfile')" >> "$GITHUB_OUTPUT"
+          echo "repo=$(echo "$CORE_CONFIG" | jq -r '.repo')" >> "$GITHUB_OUTPUT"
+          echo "devTag=$(echo "$CORE_CONFIG" | jq -r '.devTag')" >> "$GITHUB_OUTPUT"
+          echo "devTarget=$(echo "$CORE_CONFIG" | jq -r '.devTarget')" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & push – ubuntu-noble-core
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ steps.core-config.outputs.dockerfile }}
+          target: ${{ steps.core-config.outputs.devTarget }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.core-config.outputs.repo }}:${{ steps.core-config.outputs.devTag }}
+
+  # Builds and publishes all non-core images in parallel. Individual build failures are allowed and will not stop the workflow.
+  publish-others:
+    name: Publish dev – ${{ matrix.key }}
+    runs-on: ubuntu-latest
+    needs: [publish-core, matrix-others]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.matrix-others.outputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Build & push – ${{ matrix.key }}
         id: push
-        if: steps.lint.outcome == 'success'
         continue-on-error: true
         uses: docker/build-push-action@v6
         with:
@@ -148,7 +207,6 @@ jobs:
         shell: bash
         run: |
           echo "Image: ${{ matrix.repo }}"
-          echo "Lint outcome: ${{ steps.lint.outcome }}"
           echo "Push outcome: ${{ steps.push.outcome || 'skipped' }}"
 
       - name: Mark this image failed (but don't block others)
@@ -156,14 +214,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          LINT_OUTCOME="${{ steps.lint.outcome }}"
           PUSH_OUTCOME="${{ steps.push.outcome }}"
-
-          # Treat anything other than success as a failure signal for this image.
-          if [ "$LINT_OUTCOME" != "success" ]; then
-            echo "Lint failed for ${{ matrix.repo }} — marking this leg failed."
-            exit 1
-          fi
 
           if [ "$PUSH_OUTCOME" != "success" ]; then
             echo "Build/push failed (or was skipped unexpectedly) for ${{ matrix.repo }} — marking this leg failed."
