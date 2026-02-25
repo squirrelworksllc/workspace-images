@@ -93,8 +93,8 @@ parse_image_config() {
 
   DOCKERFILE="$(jq -r '.dockerfile' <<<"$IMAGE_CONFIG_JSON")"
   REPO="$(jq -r '.repo' <<<"$IMAGE_CONFIG_JSON")"
-  PROD_TAG="$(jq -r '(.prodTags // [])[0] // empty' <<<"$IMAGE_CONFIG_JSON")"
-  DEV_TAG="$(jq -r '(.devTags // ["develop"])[0]' <<<"$IMAGE_CONFIG_JSON")"
+  PROD_TAG="$(jq -r '((if .prodTags then .prodTags else [] end)[0]) | (if . == null then empty else . end)' <<<"$IMAGE_CONFIG_JSON")"
+  DEV_TAG="$(jq -r '(if .devTags then .devTags else ["develop"] end)[0]' <<<"$IMAGE_CONFIG_JSON")"
   DEV_TARGET="$(jq -r '.devTarget // empty' <<<"$IMAGE_CONFIG_JSON")"
   LINT_TARGET="$(jq -r '.lintTarget // "lint"' <<<"$IMAGE_CONFIG_JSON")"
 
