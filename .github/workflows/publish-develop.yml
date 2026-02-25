@@ -65,21 +65,48 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ ! -f "$IMAGES_JSON" ]; then
-            echo "Missing $IMAGES_JSON"
-            exit 1
-          fi
+          # Get an array of JSON objects for non-core images
+          mapfile -t IMAGES_ARRAY < <(jq -c '.images[] | select(.key != "ubuntu-noble-core")' "$IMAGES_JSON")
 
-          MATRIX="$(jq -c '{include: [.images[] | select(.key != "ubuntu-noble-core") | {
-            key: .key,
-            dockerfile: .dockerfile,
-            devTarget: .devTarget,
-            lintTarget: .lintTarget,
-            tags: if .devTags | length > 0 then .repo + ":" + (.devTags | join("\n" + .repo + ":")) else "" end,
-            architectures: (if .architectures then .architectures else ["linux/amd64", "linux/arm64"] end) | join(",")
-          }]}' "$IMAGES_JSON")"
+          JSON_ENTRIES=""
+          for image_str in "${IMAGES_ARRAY[@]}"; do
+            # Extract fields. Use jq's -r for raw strings.
+            key=$(jq -r '.key' <<< "$image_str")
+            dockerfile=$(jq -r '.dockerfile' <<< "$image_str")
+            devTarget=$(jq -r '.devTarget' <<< "$image_str")
+            lintTarget=$(jq -r '.lintTarget' <<< "$image_str")
+            repo=$(jq -r '.repo' <<< "$image_str")
 
-          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+            # Build architectures string with a fallback
+            archs=$(jq -r '(if .architectures then .architectures else ["linux/amd64", "linux/arm64"] end) | join(",")' <<< "$image_str")
+
+            # Build tags string in bash
+            tags_array=$(jq '.devTags' <<< "$image_str")
+            tag_string=""
+            if [[ "$tags_array" != "null" ]]; then
+              mapfile -t tags < <(jq -r '.[]' <<< "$tags_array")
+              for tag in "${tags[@]}"; do
+                if [[ -z "$tag_string" ]]; then
+                  tag_string="${repo}:${tag}"
+                else
+                  tag_string+=$(printf '\n%s:%s' "$repo" "$tag")
+                fi
+              done
+            fi
+
+            # Use jq to safely construct the JSON entry to handle escaping
+            entry=$(jq -c -n \
+              --arg key "$key" --arg dockerfile "$dockerfile" --arg devTarget "$devTarget" \
+              --arg lintTarget "$lintTarget" --arg repo "$repo" --arg tags "$tag_string" \
+              --arg architectures "$archs" \
+              '{key: $key, dockerfile: $dockerfile, devTarget: $devTarget, lintTarget: $lintTarget, repo: $repo, tags: $tags, architectures: $architectures}')
+
+            JSON_ENTRIES+="${entry},"
+          done
+
+          # Construct the final matrix JSON, removing the trailing comma
+          MATRIX="{\"include\":[${JSON_ENTRIES%,}]}"
+          echo "matrix=${MATRIX}" >> "$GITHUB_OUTPUT"
 
   # Lints all non-core images in parallel using the matrix from the 'matrix-others' job.
   validate-others:
@@ -144,10 +171,22 @@ jobs:
           CORE_CONFIG=$(jq -r '.images[] | select(.key == "ubuntu-noble-core")' "$IMAGES_JSON")
           echo "dockerfile=$(echo "$CORE_CONFIG" | jq -r '.dockerfile')" >> "$GITHUB_OUTPUT"
           echo "devTarget=$(echo "$CORE_CONFIG" | jq -r '.devTarget')" >> "$GITHUB_OUTPUT"
-          echo "architectures=$(echo "$CORE_CONFIG" | jq -r '.architectures | join(",")')" >> "$GITHUB_OUTPUT"
+          echo "architectures=$(echo "$CORE_CONFIG" | jq -r '(if .architectures then .architectures else ["linux/amd64", "linux/arm64"] end) | join(",")')" >> "$GITHUB_OUTPUT"
+
+          repo=$(echo "$CORE_CONFIG" | jq -r '.repo')
+          tags_array=$(echo "$CORE_CONFIG" | jq '.devTags')
+          tag_string=""
+          if [[ "$tags_array" != "null" ]]; then
+            mapfile -t tags < <(jq -r '.[]' <<< "$tags_array")
+            for tag in "${tags[@]}"; do
+              tag_string+=$(printf '%s:%s\n' "$repo" "$tag")
+            done
+          fi
+
           {
             echo 'tags<<EOF'
-            echo "$CORE_CONFIG" | jq -r 'if .devTags | length > 0 then .repo + ":" + (.devTags | join("\n" + .repo + ":")) else "" end'
+            # Trim trailing newline
+            printf "%s" "$tag_string"
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
 
