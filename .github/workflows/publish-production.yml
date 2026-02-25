@@ -59,8 +59,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up jq
-        uses: crazy-max/ghaction-setup-jq@v3
+      - name: Install jq
+        run: |
+          sudo apt-get update && sudo apt-get install -y jq
 
       - name: Generate matrix from images.json
         id: set
@@ -139,8 +140,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up jq
-        uses: crazy-max/ghaction-setup-jq@v3
+      - name: Install jq
+        run: |
+          sudo apt-get update && sudo apt-get install -y jq
 
       - name: Get core image config
         id: core-config
