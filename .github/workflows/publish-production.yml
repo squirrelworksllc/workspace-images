@@ -59,10 +59,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install jq
-        run: |
-          sudo apt-get update && sudo apt-get install -y jq
-
       - name: Generate matrix from images.json
         id: set
         shell: bash
@@ -78,8 +74,8 @@ jobs:
             key: .key,
             dockerfile: .dockerfile,
             lintTarget: .lintTarget,
-            tags: .repo as $repo | (.prodTags // []) | map($repo + ":" + .) | join("\n"),
-            architectures: (.architectures // ["linux/amd64", "linux/arm64"]) | join(",")
+            tags: if .prodTags | length > 0 then .repo + ":" + (.prodTags | join("\n" + .repo + ":")) else "" end,
+            architectures: (if .architectures then .architectures else ["linux/amd64", "linux/arm64"] end) | join(",")
           }]}' "$IMAGES_JSON")"
 
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
@@ -140,10 +136,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install jq
-        run: |
-          sudo apt-get update && sudo apt-get install -y jq
-
       - name: Get core image config
         id: core-config
         shell: bash
@@ -153,7 +145,7 @@ jobs:
           echo "architectures=$(echo "$CORE_CONFIG" | jq -r '.architectures | join(",")')" >> "$GITHUB_OUTPUT"
           {
             echo 'tags<<EOF'
-            echo "$CORE_CONFIG" | jq -r '.repo as $repo | (.prodTags // []) | .[] | $repo + ":" + .'
+            echo "$CORE_CONFIG" | jq -r 'if .prodTags | length > 0 then .repo + ":" + (.prodTags | join("\n" + .repo + ":")) else "" end'
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
 
