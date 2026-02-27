@@ -87,9 +87,10 @@ RUN set -eux; \
     rm -rf "${INST_DIR}"
 
 # Userspace Runtime
-ENV HOME=/home/kasm-user
-WORKDIR ${HOME}
+ENV HOME=/home/kasm-default-profile
+WORKDIR /home/kasm-user
 USER 1000
+ENTRYPOINT ["/dockerstartup/kasm_init.sh"]
 CMD ["--tail-log"]
 
 # ############################################################################
