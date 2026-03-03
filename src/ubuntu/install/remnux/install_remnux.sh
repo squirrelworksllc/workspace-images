@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 # Install REMnux tools using the REMnux CLI on an existing Kasm image.
-# Intended for Dockerfile use in a pre-configured Kasm workspace image.
 #
-# New REMnux CLI method:
+# NOTE: The images/remnux Dockerfile no longer uses this script. It runs the
+# official REMnux installer inline (https://remnux.org/remnux, --mode=cloud),
+# aligned with upstream Dockerfile.noble. This script remains for reference
+# or one-off use (e.g. addon installs on existing containers).
+#
+# REMnux CLI method:
 #   wget https://REMnux.org/remnux-cli
 #   mv remnux-cli remnux
 #   chmod +x remnux

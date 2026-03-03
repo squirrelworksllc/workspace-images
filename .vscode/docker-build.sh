@@ -31,6 +31,11 @@ LINT_TARGET=""
 # Logging and Utility Functions
 ################################################################################
 
+# Simple lowercase helper (portable across bash versions)
+to_lower() {
+  printf '%s\n' "${1:-}" | tr '[:upper:]' '[:lower:]'
+}
+
 # Prints an error message and exits.
 # Usage: fail "Something went wrong"
 fail() {
@@ -48,12 +53,23 @@ log_info() {
 # Checks for required command-line tools.
 check_dependencies() {
   command -v jq >/dev/null || fail "jq is required but not found in PATH."
-  # Check for jq >= 1.5 which supports the '//' and 'as' operators
+  # Check for jq >= 1.5 which supports the '//' and 'as' operators.
+  # Avoid GNU-specific sort -V so this works on macOS as well.
   local jq_version
   jq_version="$(jq --version | sed 's/jq-//')"
-  if ! printf '%s\n%s\n' "1.5" "$jq_version" | sort -V -C 2>/dev/null; then
+  local jq_major jq_minor
+  jq_major="${jq_version%%.*}"        # "1" from "1.6"
+  jq_minor="${jq_version#*.}"         # "6" from "1.6"
+  jq_minor="${jq_minor%%.*}"          # strip any patch component
+
+  if ! [[ "$jq_major" =~ ^[0-9]+$ && "$jq_minor" =~ ^[0-9]+$ ]]; then
+    fail "Unable to parse jq version '${jq_version}'. jq 1.5 or newer is required."
+  fi
+
+  if (( jq_major < 1 || (jq_major == 1 && jq_minor < 5) )); then
     fail "jq version 1.5 or newer is required for this script. You have ${jq_version}. Please upgrade jq."
   fi
+
   command -v git >/dev/null || fail "git is required but not found in PATH."
   [[ -n "${REPO_ROOT}" ]] || fail "Could not determine repository root. Must be run inside a git repo."
   [[ -f "${CONFIG_FILE}" ]] || fail "Config file not found: ${CONFIG_FILE}"
@@ -78,7 +94,12 @@ prompt_for_mode() {
 
 # Prompts the user to select which image to build from images.json.
 prompt_for_image() {
-  mapfile -t image_keys < <(jq -r '.images[].key' "$CONFIG_FILE")
+  # Use a portable read loop instead of 'mapfile' (not available in older bash on macOS).
+  local image_keys=()
+  while IFS= read -r key; do
+    [[ -n "$key" ]] && image_keys+=("$key")
+  done < <(jq -r '.images[].key' "$CONFIG_FILE")
+
   [[ "${#image_keys[@]}" -gt 0 ]] || fail "No images found in $CONFIG_FILE"
 
   echo ""
@@ -126,7 +147,11 @@ run_lint_build() {
 run_clean() {
   log_info "Cleaning up local 'develop' images defined in ${CONFIG_FILE}..."
   local images_to_clean
-  mapfile -t images_to_clean < <(jq -r '.images[] | "docker.io/\(.repo):\(.devTag // "develop")"' "$CONFIG_FILE")
+  # Use a portable read loop instead of 'mapfile' (not available in older bash on macOS).
+  images_to_clean=()
+  while IFS= read -r img; do
+    [[ -n "$img" ]] && images_to_clean+=("$img")
+  done < <(jq -r '.images[] | "docker.io/\(.repo):\(.devTag // "develop")"' "$CONFIG_FILE")
 
   if [[ "${#images_to_clean[@]}" -eq 0 ]]; then
     log_info "No images to clean."
@@ -137,7 +162,9 @@ run_clean() {
   printf " - %s\n" "${images_to_clean[@]}"
   echo ""
   read -r -p "Continue? [Y/n] " ans
-  [[ "${ans,,}" == "n" ]] && fail "Clean operation cancelled."
+  if [[ "$(to_lower "${ans}")" == "n" ]]; then
+    fail "Clean operation cancelled."
+  fi
 
   docker image rm -f "${images_to_clean[@]}"
 }
@@ -164,7 +191,9 @@ run_dev_build() {
   # Ask user if they want to enable APT debug output, if supported by the Dockerfile.
   if grep -q 'ARG APT_DEBUG' "$DOCKERFILE"; then
     read -r -p "Enable APT debug output for this DEV build? [y/N]: " ans
-    [[ "${ans,,}" == "y" || "${ans,,}" == "yes" ]] && build_args+=("--build-arg" "APT_DEBUG=true")
+    local ans_lc
+    ans_lc="$(to_lower "${ans}")"
+    [[ "${ans_lc}" == "y" || "${ans_lc}" == "yes" ]] && build_args+=("--build-arg" "APT_DEBUG=true")
   fi
 
   # --- Handle Internal Base Image Dependencies ---
@@ -189,7 +218,7 @@ run_dev_build() {
       echo ""
       log_info "Required base image is not available locally."
       read -r -p "Would you like to build it now? [Y/n] " ans_build_base
-      if [[ "${ans_build_base,,}" != "n" ]]; then
+      if [[ "$(to_lower "${ans_build_base}")" != "n" ]]; then
         build_missing_base "$internal_base_repo" "$required_base_image_full"
       else
         fail "Build cancelled. Please build '${required_base_image_full}' manually and retry."
