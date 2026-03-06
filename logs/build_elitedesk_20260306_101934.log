@@ -1,0 +1,129 @@
+🔨 Initializing build sequence on: elitedesk
+
+[INFO] Selected Image: remnux
+[INFO] Mode:           lint
+[INFO] Dockerfile:     images/remnux/Dockerfile
+[INFO] Context:        /mnt/e/Git Repos/SquirrelWorks LLC/workspace-images
+
+[INFO] Running LINT build for 'remnux' (target=lint)
+2026/03/06 10:19:38 http2: server: error reading preface from client dummy-1: read |0: file already closed
+#0 building with "elitedesk" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile:
+#1 transferring dockerfile: 6.42kB 0.0s done
+#1 DONE -5.4s
+
+#2 resolve image config for docker-image://docker.io/docker/dockerfile:1.7
+#2 DONE 6.2s
+
+#3 docker-image://docker.io/docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
+#3 resolve docker.io/docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e done
+#3 CACHED
+
+#4 [internal] load metadata for docker.io/squirrelworksllc/ubuntu-noble-core:1.18.0
+#4 DONE 0.3s
+
+#5 [internal] load .dockerignore
+#5 transferring context: 154B 0.0s done
+#5 DONE 0.0s
+
+#6 [internal] load build context
+#6 DONE 0.0s
+
+#7 [base 1/2] FROM docker.io/squirrelworksllc/ubuntu-noble-core:1.18.0@sha256:eb1a8344044bccc28f42182f9b8819d72067750f9d37e4582bf3b65eea01d7a9
+#7 resolve docker.io/squirrelworksllc/ubuntu-noble-core:1.18.0@sha256:eb1a8344044bccc28f42182f9b8819d72067750f9d37e4582bf3b65eea01d7a9 0.0s done
+#7 DONE 0.0s
+
+#8 [base 2/2] WORKDIR /home/kasm-default-profile
+#8 CACHED
+
+#9 [lint 1/5] WORKDIR /src
+#9 CACHED
+
+#6 [internal] load build context
+#6 transferring context: 105.60kB 0.6s done
+#6 DONE 0.6s
+
+#10 [lint 2/5] COPY . /src
+#10 DONE 0.1s
+
+#11 [lint 3/5] RUN bash /src/tools/ci/lint_installers.sh
+#11 0.624 Get:1 http://security.ubuntu.com/ubuntu noble-security InRelease [126 kB]
+#11 0.928 Hit:2 http://archive.ubuntu.com/ubuntu noble InRelease
+#11 0.928 Get:3 http://security.ubuntu.com/ubuntu noble-security/main i386 Packages [475 kB]
+#11 0.971 Get:4 http://archive.ubuntu.com/ubuntu noble-updates InRelease [126 kB]
+#11 1.089 Get:5 http://security.ubuntu.com/ubuntu noble-security/main amd64 Packages [1,895 kB]
+#11 1.164 Get:6 http://archive.ubuntu.com/ubuntu noble-backports InRelease [126 kB]
+#11 1.241 Get:7 http://security.ubuntu.com/ubuntu noble-security/main amd64 Components [25.4 kB]
+#11 1.241 Get:8 http://security.ubuntu.com/ubuntu noble-security/universe i386 Packages [769 kB]
+#11 1.245 Get:9 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 Packages [2,284 kB]
+#11 1.275 Get:10 http://security.ubuntu.com/ubuntu noble-security/universe amd64 Packages [1,260 kB]
+#11 1.322 Get:11 http://security.ubuntu.com/ubuntu noble-security/universe amd64 Components [94.7 kB]
+#11 1.325 Get:12 http://security.ubuntu.com/ubuntu noble-security/restricted amd64 Components [157 B]
+#11 1.325 Get:13 http://security.ubuntu.com/ubuntu noble-security/multiverse amd64 Components [158 B]
+#11 1.442 Get:14 http://archive.ubuntu.com/ubuntu noble-updates/main i386 Packages [743 kB]
+#11 1.469 Get:15 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 Components [238 kB]
+#11 1.476 Get:16 http://archive.ubuntu.com/ubuntu noble-updates/universe i386 Packages [1,307 kB]
+#11 1.514 Get:17 http://archive.ubuntu.com/ubuntu noble-updates/universe amd64 Packages [2,025 kB]
+#11 1.599 Get:18 http://archive.ubuntu.com/ubuntu noble-updates/universe amd64 Components [533 kB]
+#11 1.615 Get:19 http://archive.ubuntu.com/ubuntu noble-updates/restricted amd64 Components [160 B]
+#11 1.615 Get:20 http://archive.ubuntu.com/ubuntu noble-updates/multiverse amd64 Components [887 B]
+#11 1.615 Get:21 http://archive.ubuntu.com/ubuntu noble-backports/main amd64 Components [8,100 B]
+#11 1.616 Get:22 http://archive.ubuntu.com/ubuntu noble-backports/universe amd64 Components [11.4 kB]
+#11 1.616 Get:23 http://archive.ubuntu.com/ubuntu noble-backports/restricted amd64 Components [160 B]
+#11 1.616 Get:24 http://archive.ubuntu.com/ubuntu noble-backports/multiverse amd64 Components [162 B]
+#11 3.098 Fetched 12.0 MB in 1s (9,112 kB/s)
+#11 3.098 Reading package lists...
+#11 4.313 Reading package lists...
+#11 5.387 Building dependency tree...
+#11 5.603 Reading state information...
+#11 5.928 ca-certificates is already the newest version (20240203).
+#11 5.928 curl is already the newest version (8.5.0-2ubuntu10.7).
+#11 5.928 The following NEW packages will be installed:
+#11 5.928   shellcheck
+#11 6.063 0 upgraded, 1 newly installed, 0 to remove and 3 not upgraded.
+#11 6.063 Need to get 2,845 kB of archives.
+#11 6.063 After this operation, 19.5 MB of additional disk space will be used.
+#11 6.063 Get:1 http://archive.ubuntu.com/ubuntu noble/universe amd64 shellcheck amd64 0.9.0-1 [2,845 kB]
+#11 6.794 debconf: delaying package configuration, since apt-utils is not installed
+#11 6.852 Fetched 2,845 kB in 1s (5,367 kB/s)
+#11 6.906 Selecting previously unselected package shellcheck.
+#11 6.906 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 86724 files and directories currently installed.)
+#11 7.268 Preparing to unpack .../shellcheck_0.9.0-1_amd64.deb ...
+#11 7.275 Unpacking shellcheck (0.9.0-1) ...
+#11 7.476 Setting up shellcheck (0.9.0-1) ...
+#11 7.500 Processing triggers for man-db (2.12.0-4build2) ...
+#11 7.918 Haskell Dockerfile Linter 2.12.0
+#11 7.928 ShellCheck - shell script analysis tool
+#11 7.928 version: 0.9.0
+#11 7.928 license: GNU General Public License, version 3
+#11 7.928 website: https://www.shellcheck.net
+#11 DONE 8.0s
+
+#12 [lint 4/5] RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/remnux/Dockerfile
+#12 0.294 Hadolint: /src/images/remnux/Dockerfile
+#12 0.430 /src/images/remnux/Dockerfile:31 DL3002 [1m[93mwarning[0m: Last USER should not be root
+#12 0.430 /src/images/remnux/Dockerfile:51 DL3059 [92minfo[0m: Multiple consecutive `RUN` instructions. Consider consolidation.
+#12 0.430 /src/images/remnux/Dockerfile:52 DL3059 [92minfo[0m: Multiple consecutive `RUN` instructions. Consider consolidation.
+#12 0.430 /src/images/remnux/Dockerfile:75 DL3009 [92minfo[0m: Delete the apt-get lists after installing something
+#12 DONE 0.5s
+
+#13 [lint 5/5] RUN bash /src/tools/ci/lint-shell.sh
+#13 0.373 ShellCheck: 42 script(s)
+#13 DONE 1.3s
+
+#14 exporting to image
+#14 exporting layers
+#14 exporting layers 1.2s done
+#14 exporting manifest sha256:b690019a794e11b4ceaf25834cce00c5b3c49a999cd4ee8d7056d52f2d28026a 0.0s done
+#14 exporting config sha256:9f64568358327754fa116f2d579d0f7b2555764cf0f9b889b17372022a5ccb7d 0.0s done
+#14 exporting attestation manifest sha256:1ecbdc7158efcebf31d9a6995e718c38036c8b7204c4af63fa86d2e3e0ec0739 0.1s done
+#14 exporting manifest list sha256:09a0c885b6a54b7eac766a91e5a27cb0886f2cb84ce275793fa5af8a38e1598b
+#14 exporting manifest list sha256:09a0c885b6a54b7eac766a91e5a27cb0886f2cb84ce275793fa5af8a38e1598b 0.0s done
+#14 naming to moby-dangling@sha256:09a0c885b6a54b7eac766a91e5a27cb0886f2cb84ce275793fa5af8a38e1598b done
+#14 unpacking to moby-dangling@sha256:09a0c885b6a54b7eac766a91e5a27cb0886f2cb84ce275793fa5af8a38e1598b
+#14 unpacking to moby-dangling@sha256:09a0c885b6a54b7eac766a91e5a27cb0886f2cb84ce275793fa5af8a38e1598b 0.3s done
+#14 DONE 1.8s
+
+[INFO] Build script finished.

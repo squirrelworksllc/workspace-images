@@ -1,0 +1,13 @@
+🔨 Initializing build sequence on: elitedesk
+
+[INFO] Selected Image: remnux
+[INFO] Mode:           lint
+[INFO] Dockerfile:     images/remnux/Dockerfile
+[INFO] Context:        /mnt/e/Git Repos/SquirrelWorks LLC/workspace-images
+
+[INFO] Running LINT build for 'remnux' (target=lint)
+ERROR: docker: 'docker buildx build' requires 1 argument
+
+Usage:  docker buildx build [OPTIONS] PATH | URL | -
+
+Run 'docker buildx build --help' for more information

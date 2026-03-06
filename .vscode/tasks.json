@@ -5,7 +5,7 @@
       "label": "Docker: Build (menu)",
       "type": "shell",
       "command": "bash",
-      "args": ["-lc", ".vscode/docker-build.sh"],
+      "args": ["-lc", ".vscode/build-all.sh"],
       "options": {
         "cwd": "${workspaceFolder}"
       },
