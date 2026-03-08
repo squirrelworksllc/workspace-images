@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+###############################################################################
+# install_discord.sh
+#
+# Purpose: Installs discord.
+#
+# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+###############################################################################
 # This is a script to install Discord. It is meant to be called from a Dockerfile
 set -euo pipefail
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
@@ -19,16 +26,7 @@ cat >"$HOME/.config/discord/settings.json" <<'JSON'
 {"SKIP_HOST_UPDATE": true}
 JSON
 
-echo "Step 3: Fix Desktop files..."
-DESKTOP_FILE="/usr/share/applications/discord.desktop"
-if [ -f "$DESKTOP_FILE" ]; then
-  sed -i 's@^Exec=/usr/share/discord/Discord@Exec=/usr/share/discord/Discord --no-sandbox@g' "$DESKTOP_FILE"
-
-  mkdir -p "$HOME/Desktop"
-  cp "$DESKTOP_FILE" "$HOME/Desktop/discord.desktop"
-  chmod +x "$HOME/Desktop/discord.desktop"
-  chown 1000:1000 "$HOME/Desktop/discord.desktop" || true
-fi
+bash "${INST_DIR}/ubuntu/install/discord/configure_ui.sh"
 
 echo "Step 4: Cleaning up..."
 apt_cleanup

@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+###############################################################################
+# install_teams.sh
+#
+# Purpose: Installs teams.
+#
+# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+###############################################################################
 # This script installs Microsoft Teams. It is meant to be called from a Dockerfile
 # and installed on Ubuntu and/or a debian variant.
 set -euo pipefail
@@ -44,8 +51,7 @@ apt_refresh_after_repo_change
 echo "Step 3: Install teams-for-linux..."
 apt_install teams-for-linux
 
-echo "Step 4: Desktop shortcut..."
-mkdir -p "$HOME/Desktop" "$HOME/.config/teams-for-linux"
+bash "${INST_DIR}/ubuntu/install/teams/configure_ui.sh"
 
 DESKTOP_FILE="/usr/share/applications/teams-for-linux.desktop"
 if [ -f "$DESKTOP_FILE" ]; then

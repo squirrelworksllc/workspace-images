@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+###############################################################################
+# install_chromium.sh
+#
+# Purpose: Installs chromium.
+#
+# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+###############################################################################
 # Customized script to install Chromium. Depends on an environmental of "Install_Chrome" being either true/false
 # in the dockerfile this script is invoked from.
 set -euo pipefail
@@ -68,9 +75,7 @@ if [ "${ID}" != "ubuntu" ] && [ "${ID}" != "debian" ] && [ "${ID}" != "kali" ] &
   REAL_BIN="chromium-browser"
 fi
 
-echo "Step 3: Modify desktop icon..."
-mkdir -p "$HOME/Desktop"
-sed -i 's/-stable//g' "/usr/share/applications/${REAL_BIN}.desktop" || true
+bash "${INST_DIR}/ubuntu/install/chromium/configure_ui.sh"
 
 if [ "${ID}" != "kali" ]; then
   cp "/usr/share/applications/${REAL_BIN}.desktop" "$HOME/Desktop/"

@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+###############################################################################
+# install_remmina.sh
+#
+# Purpose: Installs remmina.
+#
+# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+###############################################################################
 # This script installs Remmina. It is meant to be called from a Dockerfile
 # and installed on Ubuntu and/or a debian variant.
 set -euo pipefail
@@ -7,7 +14,7 @@ source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 echo "======= Installing Remmina ======="
 
 . /etc/os-release
-mkdir -p "$HOME/Desktop"
+bash "${INST_DIR}/ubuntu/install/remmina/configure_ui.sh"
 
 echo "Step 1: Install packages..."
 apt_update_if_needed

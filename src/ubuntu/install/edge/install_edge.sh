@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+###############################################################################
+# install_edge.sh
+#
+# Purpose: Installs edge.
+#
+# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+###############################################################################
 # Script to install Microsoft Edge. This script is meant to be called from a Dockerfile
 # and may not work on it's own.
 set -euo pipefail
@@ -63,13 +70,7 @@ apt_refresh_after_repo_change
 # Install Edge
 apt_install microsoft-edge-stable
 
-# Desktop shortcut
-mkdir -p "$HOME/Desktop"
-if [ -f /usr/share/applications/microsoft-edge.desktop ]; then
-  cp /usr/share/applications/microsoft-edge.desktop "$HOME/Desktop/microsoft-edge.desktop"
-  chmod +x "$HOME/Desktop/microsoft-edge.desktop"
-  chown 1000:1000 "$HOME/Desktop/microsoft-edge.desktop" || true
-fi
+bash "${INST_DIR}/ubuntu/install/edge/configure_ui.sh"
 
 # Wrapper (idempotent-ish)
 if [ -f /usr/bin/microsoft-edge-stable ] && [ ! -f /usr/bin/microsoft-edge-stable-orig ]; then
@@ -108,7 +109,7 @@ chmod +x /usr/bin/microsoft-edge-stable
 sed -i '/\$HERE\/microsoft-edge/d' /usr/bin/x-www-browser || true
 echo "exec -a \"\$0\" \"\$HERE/microsoft-edge\" ${CHROME_ARGS} \"\$@\"" >> /usr/bin/x-www-browser
 
-# Edge policies (overwrite, don’t append)
+# Edge policies (overwrite, don�t append)
 mkdir -p /etc/opt/edge/policies/managed/
 cat >/etc/opt/edge/policies/managed/default_managed_policy.json <<'JSON'
 {"CommandLineFlagSecurityWarningsEnabled": false, "DefaultBrowserSettingEnabled": false}

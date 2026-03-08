@@ -1,23 +1,25 @@
 #!/usr/bin/env bash
-# Customized script to install Thunderbird email client using the DEB package instead of snap
+###############################################################################
+# install_thunderbird.sh
+#
+# Purpose: Installs thunderbird.
+#
+# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+###############################################################################
 set -euo pipefail
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
-echo "======= Installing Thunderbird (DEB, no snap) ======="
+log "======= Installing Thunderbird (DEB, no snap) ======="
 
 . /etc/os-release
 
 apt_update_if_needed
-apt_install ca-certificates
 
-mkdir -p "$HOME/Desktop"
+bash "${INST_DIR}/ubuntu/install/thunderbird/configure_ui.sh"
 
 case "${ID}" in
   ubuntu)
-    echo "Ubuntu detected: using mozillateam PPA to avoid snap wrapper."
-
-    # tools needed for add-apt-repository
-    apt_install software-properties-common
+    log "Ubuntu detected: using mozillateam PPA to avoid snap wrapper."
 
     # If snap exists, remove thunderbird snap (ignore errors)
     if command -v snap >/dev/null 2>&1; then
@@ -47,12 +49,12 @@ EOF
     ;;
 
   debian|kali)
-    echo "${ID} detected: installing Thunderbird from distro repos."
+    log "${ID} detected: installing Thunderbird from distro repos."
     apt_install thunderbird
     ;;
 
   *)
-    echo "Unsupported distro for Thunderbird installer: ${ID}" >&2
+    log "Unsupported distro for Thunderbird installer: ${ID}" >&2
     exit 1
     ;;
 esac
@@ -64,4 +66,4 @@ if [ -f /usr/share/applications/thunderbird.desktop ]; then
   chown 1000:1000 "$HOME/Desktop/thunderbird.desktop" 2>/dev/null || true
 fi
 
-echo "Thunderbird installed (DEB, no snap on Ubuntu)!"
+log "Thunderbird installed (DEB, no snap on Ubuntu)!"

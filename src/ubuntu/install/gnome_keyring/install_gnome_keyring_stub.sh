@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+###############################################################################
+# install_gnome_keyring.sh
+#
+# Purpose: Installs gnome_keyring.
+#
+# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+###############################################################################
 set -euo pipefail
 IFS=$'
 	'

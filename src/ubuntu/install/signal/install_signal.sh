@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+###############################################################################
+# install_signal.sh
+#
+# Purpose: Installs signal.
+#
+# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+###############################################################################
 # This script installs Signal. It is meant to be called from a Dockerfile
 # and installed on Ubuntu and/or a debian variant.
 # This script installs Signal. It is meant to be called from a Dockerfile
@@ -55,12 +62,6 @@ echo "Step 5: Install the app..."
 apt_refresh_after_repo_change
 apt_install signal-desktop
 
-echo "Step 6: Fixing the desktop icon (best effort)..."
-mkdir -p "$HOME/Desktop"
-if [ -f /usr/share/applications/signal-desktop.desktop ]; then
-  cp /usr/share/applications/signal-desktop.desktop "$HOME/Desktop/"
-  chmod +x "$HOME/Desktop/signal-desktop.desktop"
-  chown 1000:1000 "$HOME/Desktop/signal-desktop.desktop" 2>/dev/null || true
-fi
+bash "${INST_DIR}/ubuntu/install/signal/configure_ui.sh"
 
 echo "Signal is now installed!"

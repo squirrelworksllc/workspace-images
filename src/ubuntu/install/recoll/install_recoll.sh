@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+###############################################################################
+# install_recoll.sh
+#
+# Purpose: Installs recoll.
+#
+# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+###############################################################################
 set -euo pipefail
 IFS=$'\n\t'
 
@@ -12,7 +19,7 @@ IFS=$'\n\t'
 # Ubuntu: optionally enables Recoll backports PPA:
 #   ppa:recoll-backports/recoll-1.15-on
 #
-# NOTE: No cleanup here — repository cleanup is handled by your global cleanup
+# NOTE: No cleanup here � repository cleanup is handled by your global cleanup
 # script after all installers run.
 ###############################################################################
 

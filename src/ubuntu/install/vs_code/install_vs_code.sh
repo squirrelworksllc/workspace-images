@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
-# Copied from official KasmTech repo at "https://github.com/kasmtech/workspaces-images/blob/develop/src/ubuntu/install/"
-# Modified to remove non-ubuntu references and apply updated logic
+###############################################################################
+# install_vs_code.sh
+#
+# Purpose: Installs vs_code.
+#
+# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+###############################################################################
 set -euo pipefail
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
-echo "======= Installing VS Code ======="
-echo "Step 1: Download and install..."
+log "======= Installing VS Code ======="
+log "Step 1: Download and install..."
 
 # VS Code uses "x64" naming; map dpkg arch -> code arch token
 ARCH="$(dpkg --print-architecture)"
@@ -13,13 +18,12 @@ case "${ARCH}" in
   amd64) CODE_ARCH="x64" ;;
   arm64) CODE_ARCH="arm64" ;;
   *)
-    echo "Unsupported arch for VS Code: ${ARCH}" >&2
+    log "Unsupported arch for VS Code: ${ARCH}" >&2
     exit 1
     ;;
 esac
 
 apt_update_if_needed
-apt_install ca-certificates curl
 
 TMP_DEB="/tmp/vscode.deb"
 URL="https://update.code.visualstudio.com/latest/linux-deb-${CODE_ARCH}/stable"
@@ -31,12 +35,6 @@ curl -fL --retry 5 --retry-delay 2 -o "${TMP_DEB}" "${URL}"
 apt-get install -y "${TMP_DEB}"
 rm -f "${TMP_DEB}"
 
-echo "Step 2: Desktop shortcut..."
-mkdir -p "$HOME/Desktop"
-if [ -f /usr/share/applications/code.desktop ]; then
-  cp /usr/share/applications/code.desktop "$HOME/Desktop/code.desktop"
-  chmod +x "$HOME/Desktop/code.desktop"
-  chown 1000:1000 "$HOME/Desktop/code.desktop" 2>/dev/null || true
-fi
+bash "${INST_DIR}/ubuntu/install/vs_code/configure_ui.sh"
 
-echo "VS Code installed!"
+log "VS Code installed!"

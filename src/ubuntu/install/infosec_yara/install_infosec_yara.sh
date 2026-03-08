@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+###############################################################################
+# install_infosec_yara.sh
+#
+# Purpose: Installs infosec_yara.
+#
+# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+###############################################################################
 # This script is designed to install the complete environment needed to test and/or develop YARA rules inside
 # of a docker container. This includes a pre-defined Yara release, a Yara Language Server (YLS-Yara)
 # and extensions for Visual Studio as well as commandline utilities.

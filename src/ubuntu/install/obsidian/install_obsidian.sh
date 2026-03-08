@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+###############################################################################
+# install_obsidian.sh
+#
+# Purpose: Installs obsidian.
+#
+# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+###############################################################################
 # This script installs Obsidian Text Editor. It is meant to be called from a Dockerfile
 # and installed on Ubuntu and/or a debian variant.
 set -euo pipefail
@@ -51,18 +58,7 @@ chmod +x /opt/Obsidian/squashfs-root/launcher
 
 DESKTOP_SRC="/opt/Obsidian/squashfs-root/obsidian.desktop"
 if [ ! -f "$DESKTOP_SRC" ]; then
-  echo "ERROR: obsidian.desktop not found after extraction" >&2
-  exit 1
-fi
-
-sed -i 's@^Exec=.*@Exec=/opt/Obsidian/squashfs-root/launcher@g' "$DESKTOP_SRC"
-sed -i 's@^Icon=.*@Icon=/opt/Obsidian/squashfs-root/obsidian.png@g' "$DESKTOP_SRC"
-
-mkdir -p "$HOME/Desktop"
-cp "$DESKTOP_SRC" "$HOME/Desktop/obsidian.desktop"
-cp "$DESKTOP_SRC" /usr/share/applications/obsidian.desktop
-chmod +x "$HOME/Desktop/obsidian.desktop" /usr/share/applications/obsidian.desktop
-chown 1000:1000 "$HOME/Desktop/obsidian.desktop" 2>/dev/null || true
+bash "${INST_DIR}/ubuntu/install/obsidian/configure_ui.sh"
 
 # Optional: only needed if you want the runtime user to be able to modify /opt/Obsidian
 chown -R 1000:1000 /opt/Obsidian 2>/dev/null || true

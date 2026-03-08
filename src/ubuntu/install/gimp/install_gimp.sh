@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+###############################################################################
+# install_gimp.sh
+#
+# Purpose: Installs gimp.
+#
+# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+###############################################################################
 # This script file installs Gimp. It is meant to be called from a Dockerfile
 set -euo pipefail
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
@@ -43,8 +50,7 @@ exec /opt/gimp-3/squashfs-root/AppRun
 EOL
 chmod +x /opt/gimp-3/squashfs-root/launcher
 
-echo "Step 4: Desktop integration..."
-mkdir -p "$HOME/Desktop"
+bash "${INST_DIR}/ubuntu/install/gimp/configure_ui.sh"
 
 DESKTOP_SRC="$(ls -1 /opt/gimp-3/squashfs-root/*.desktop 2>/dev/null | head -n1 || true)"
 if [ -z "${DESKTOP_SRC}" ]; then

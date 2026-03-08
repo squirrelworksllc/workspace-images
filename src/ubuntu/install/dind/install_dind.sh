@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+###############################################################################
+# install_dind.sh
+#
+# Purpose: Installs dind.
+#
+# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+###############################################################################
 # Script to install "Docker In A Docker" (DIND).
 # Meant to be called from a Dockerfile, may not run on its own.
 set -euo pipefail

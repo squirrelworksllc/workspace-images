@@ -1,20 +1,8 @@
 #!/usr/bin/env bash
-set -euo pipefail
-IFS=$'\n\t'
-
 ###############################################################################
 # install_tor.sh
 #
-# Debian-based only (Debian / Ubuntu)
-# Installs the Tor daemon (system tor) and optionally writes a minimal config.
-#
-# Docker-friendly behavior:
-# - Installs packages only (does NOT rely on services starting during build)
-# - Does NOT force-enable/start tor.service
-#
-# Cleanup:
-# - Repository and package cleanup is handled by your global cleanup script
-#   executed after all application installers.
+# Purpose: Installs tor.
 #
 # Env overrides:
 #   TOR_PACKAGE          (default: tor)
@@ -26,7 +14,11 @@ IFS=$'\n\t'
 #   TOR_CONTROL_PORT     (default: 9051)
 #   TOR_COOKIE_AUTH      (default: true)
 #   TOR_LOG_LEVEL        (default: notice) # debug|info|notice|warn|err
+#
+# Note: Common Pre-Requisite apt packages are called via install_tools.sh
 ###############################################################################
+set -euo pipefail
+IFS=$'\n\t'
 
 log() { echo "[tor] $*"; }
 

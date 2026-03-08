@@ -1,25 +1,14 @@
 #!/usr/bin/env bash
-set -euo pipefail
-IFS=$'
-	'
-
 ###############################################################################
 # install_wireshark.sh
 #
-# Debian-based only (Debian / Ubuntu).
-# Intended to be called non-interactively from a Dockerfile to install
-# Wireshark into a Kasm-enabled Ubuntu image.
+# Purpose: Installs wireshark.
 #
-# Responsibilities:
-#   - Add the official wireshark-dev PPA
-#   - Install Wireshark and tshark with a robust retry mechanism to bypass
-#     flaky Launchpad connections.
-#   - Place a launcher on the user's Desktop and set ownership.
-#
-# Env expectations:
-#   INST_DIR   (default: /dockerstartup/install) - location of apt helper
+# Note: Common Pre-Requisite apt packages are called via install_tools.sh
 ###############################################################################
-
+set -euo pipefail
+IFS=$'
+	'
 : "${INST_DIR:=/dockerstartup/install}"
 # shellcheck source=/dev/null
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
@@ -50,7 +39,6 @@ main() {
 
   log "Step 1: Installing prerequisites for PPA"
   apt_update_if_needed
-  apt_install software-properties-common
 
   log "Step 2: Adding Wireshark Dev PPA"
   # Default to false for install-setuid prompt (REMnux handles its own groups later)

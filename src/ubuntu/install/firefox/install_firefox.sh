@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+###############################################################################
+# install_firefox.sh
+#
+# Purpose: Installs firefox.
+#
+# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+###############################################################################
 # This script is meant to install Firefox browser and to be called from a Dockerfile.
 set -euo pipefail
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
@@ -63,13 +70,7 @@ if [ -n "$FF_BIN" ]; then
   "$FF_BIN" -headless -CreateProfile "kasm $HOME/.mozilla/firefox/kasm" || true
 fi
 
-# Desktop shortcut (if available)
-mkdir -p "$HOME/Desktop"
-if [ -f /usr/share/applications/firefox.desktop ]; then
-  cp /usr/share/applications/firefox.desktop "$HOME/Desktop/firefox.desktop"
-elif [ -f /usr/share/applications/firefox-esr.desktop ]; then
-  cp /usr/share/applications/firefox-esr.desktop "$HOME/Desktop/firefox.desktop"
-fi
+bash "${INST_DIR}/ubuntu/install/firefox/configure_ui.sh"
 
 chmod +x "$HOME/Desktop/firefox.desktop" 2>/dev/null || true
 chown 1000:1000 "$HOME/Desktop/firefox.desktop" 2>/dev/null || true

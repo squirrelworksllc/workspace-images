@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+###############################################################################
+# install_ansible.sh
+#
+# Purpose: Installs ansible.
+#
+# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+###############################################################################
 # This script install Ansible. It is meant to be called from inside of a Dockerfile.
 set -euo pipefail
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"

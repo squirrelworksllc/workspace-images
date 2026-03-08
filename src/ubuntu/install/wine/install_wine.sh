@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
-set -euo pipefail
-IFS=$'
-	'
-
 ###############################################################################
 # install_wine.sh
 #
-# Intended to be called non-interactively from a Dockerfile to install
-# WineHQ into a Kasm-enabled Ubuntu image.
+# Purpose: Installs wine.
+#
+# Note: Common Pre-Requisite apt packages are called via install_tools.sh
 ###############################################################################
-
+set -euo pipefail
+IFS=$'
+	'
 : "${INST_DIR:=/dockerstartup/install}"
 # shellcheck source=/dev/null
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
@@ -29,7 +28,6 @@ main() {
   echo "======= Installing Wine ======="
 
   apt_update_if_needed
-  apt_install wget gnupg ca-certificates software-properties-common
 
   # Add 32-bit architecture
   dpkg --add-architecture i386

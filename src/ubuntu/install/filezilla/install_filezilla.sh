@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+###############################################################################
+# install_filezilla.sh
+#
+# Purpose: Installs filezilla.
+#
+# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+###############################################################################
 # This script installs Filezilla. It is meant to be called from a Dockerfile.
 set -euo pipefail
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"

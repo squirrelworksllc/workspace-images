@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+###############################################################################
+# install_chrome.sh
+#
+# Purpose: Installs chrome.
+#
+# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+###############################################################################
 # Custom script to install Google Chrome
 set -euo pipefail
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
@@ -28,11 +35,7 @@ apt-get install -y /tmp/chrome.deb
 rm -f /tmp/chrome.deb
 
 echo "Step 3: Set App Files and Preferences..."
-mkdir -p "$HOME/Desktop"
-sed -i 's/-stable//g' /usr/share/applications/google-chrome.desktop || true
-cp /usr/share/applications/google-chrome.desktop "$HOME/Desktop/"
-chown 1000:1000 "$HOME/Desktop/google-chrome.desktop" || true
-chmod +x "$HOME/Desktop/google-chrome.desktop"
+bash "${INST_DIR}/ubuntu/install/chrome/configure_ui.sh"
 
 mv /usr/bin/google-chrome /usr/bin/google-chrome-orig
 

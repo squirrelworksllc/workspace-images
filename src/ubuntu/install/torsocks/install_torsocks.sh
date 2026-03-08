@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-set -euo pipefail
-IFS=$'\n\t'
-
 ###############################################################################
 # install_torsocks.sh
 #
@@ -14,7 +11,11 @@ IFS=$'\n\t'
 #   TORSOCKS_CONF_PATH (default: /etc/tor/torsocks.conf)
 #   INSTALL_GUARD      (default: true)
 #   GUARD_PATH         (default: /usr/local/bin/torsocks-guard)
+#
+# Note: Common Pre-Requisite apt packages are called via install_tools.sh
 ###############################################################################
+set -euo pipefail
+IFS=$'\n\t'
 
 # Align with other installers (Slack, etc.)
 : "${INST_DIR:=/dockerstartup/install}"

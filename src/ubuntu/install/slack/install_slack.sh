@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+###############################################################################
+# install_slack.sh
+#
+# Purpose: Installs slack.
+#
+# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+###############################################################################
 # This script installs Slack. It is meant to be called from a Dockerfile
 # and installed on Ubuntu and/or a debian variant.
 set -euo pipefail
@@ -46,12 +53,7 @@ echo "Step 4: Installing Slack..."
 apt_refresh_after_repo_change
 apt_install slack-desktop
 
-echo "Step 5: Desktop shortcut (best effort)..."
-mkdir -p "$HOME/Desktop"
-if [ -f /usr/share/applications/slack.desktop ]; then
-  # Add --no-sandbox safely
-  sed -i 's@^Exec=/usr/bin/slack@Exec=/usr/bin/slack --no-sandbox@' \
-    /usr/share/applications/slack.desktop || true
+bash "${INST_DIR}/ubuntu/install/slack/configure_ui.sh"
 
   cp /usr/share/applications/slack.desktop "$HOME/Desktop/slack.desktop"
   chmod +x "$HOME/Desktop/slack.desktop"
