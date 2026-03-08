@@ -9,7 +9,7 @@
 # context in Windows Docker Desktop is available via 'docker.exe'.
 get_docker_context() {
   if command -v docker.exe >/dev/null 2>&1; then
-    docker.exe context show | tr -d ''
+    docker.exe context show | tr -d '\r'
   else
     docker context show
   fi

@@ -3,7 +3,7 @@ set -euo pipefail
 IFS=$'\n\t'
 
 ###############################################################################
-# Kasm Default Background Override
+# Kasm Default Background Override - Remnux specific
 #
 # Kasm Workspaces uses /usr/share/backgrounds/bg_default.png
 # as the enforced default wallpaper during session startup.
@@ -26,7 +26,7 @@ main() {
 
   # Where the repo asset lives during build
   local inst_dir="${INST_DIR:-/dockerstartup/install}"
-  local source_img="${inst_dir}/ubuntu/resources/images/noble_numbat_bg.png"
+  local source_img="${inst_dir}/ubuntu/resources/images/remnux_bg.png"
 
   # Where Kasm EXPECTS the default background
   local target_dir="/usr/share/backgrounds"

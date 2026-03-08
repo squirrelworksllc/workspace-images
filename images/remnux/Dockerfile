@@ -77,12 +77,12 @@ COPY ./src/tools/runtime/runtime_validation.sh /dockerstartup/tools/runtime_vali
 RUN chmod 0755 /dockerstartup/tools/runtime_validation.sh
 
 # 1) Base tools (curl, gnupg, git, etc.) so REMnux installer can run
-RUN apt-get update && bash "${INST_DIR}/ubuntu/install/tools/install_tools.sh"
-
-# 2) REMnux: official installer (upstream Noble style) + purge + cleanup
-#    Ref: https://github.com/REMnux/docker/blob/master/remnux-distro/Dockerfile.noble
-# 1) Base tools (curl, gnupg, git, etc.) so REMnux installer can run
-RUN apt-get update && bash "${INST_DIR}/ubuntu/install/tools/install_tools.sh"
+RUN apt-get update && bash "${INST_DIR}/ubuntu/install/tools/install_tools.sh" \
+    && bash "${INST_DIR}/ubuntu/install/gnome_keyring/install_gnome_keyring_stub.sh" \
+    && bash "${INST_DIR}/ubuntu/install/wine/install_wine.sh" \
+    && bash "${INST_DIR}/ubuntu/install/wireshark/install_wireshark.sh" \
+    && bash "${INST_DIR}/ubuntu/install/vs_code/install_vs_code.sh" \
+    && bash "${INST_DIR}/ubuntu/install/firefox/install_firefox.sh"
 
 # 2) REMnux: official installer (upstream Noble style) + purge + cleanup
 #    Ref: https://github.com/REMnux/docker/blob/master/remnux-distro/Dockerfile.noble
@@ -91,15 +91,11 @@ RUN set -eux; \
     if [ "${ARCH}" != "amd64" ]; then \
       echo "REMnux is amd64-only; current arch: ${ARCH}"; exit 1; \
     fi; \
-    ARCH="$(dpkg --print-architecture)"; \
-    if [ "${ARCH}" != "amd64" ]; then \
-      echo "REMnux is amd64-only; current arch: ${ARCH}"; exit 1; \
-    fi; \
     apt-get update; \
     apt-get install -y --no-install-recommends curl gnupg git; \
     curl -fsSL -o /tmp/remnux-installer https://remnux.org/remnux; \
     chmod +x /tmp/remnux-installer; \
-    /tmp/remnux-installer install --mode=cloud --user=kasm-user; \
+    /tmp/remnux-installer install --mode=cloud --user=kasm-user || true; \
     apt-get purge -y \
       snapd libbison-dev docker-ce-cli \
       code \
@@ -141,61 +137,26 @@ RUN set -eux; \
       mv /root/cast-results.yaml /var/cache/cast/installer/logs/results.yaml; \
     fi
 
+# 2b) Restore KasmVNC dependencies that may have been autoremoved
+RUN apt-get update && apt-get install -y --no-install-recommends pulseaudio
+
+# 2c) Set custom background for Remnux
+RUN "${INST_DIR}/ubuntu/install/desktop/set_wallpaper-remnux.sh"
+
 # 3) Kasm-oriented cleanup (xdg autostart, caches, apt lists)
 RUN SKIP_CLEAN=false bash "${INST_DIR}/ubuntu/install/common/01_cleanup.sh" || true
 
 # 4) Kasm permissions and runtime setup
-RUN "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \
-    apt-get install -y --no-install-recommends curl gnupg git; \
-    curl -fsSL -o /tmp/remnux-installer https://remnux.org/remnux; \
-    chmod +x /tmp/remnux-installer; \
-    /tmp/remnux-installer install --mode=cloud --user=kasm-user; \
-    apt-get purge -y \
-      snapd libbison-dev docker-ce-cli \
-      code \
-      winehq-staging wine-staging wine-staging-amd64 wine-staging-i386 \
-      scdbg runsc \
-      || true; \
-    apt-get autoremove -y; \
-    apt-get clean; \
-    if [ -f /var/cache/cast/installer/logs/results.yaml ]; then \
-      mv /var/cache/cast/installer/logs/results.yaml /root/cast-results.yaml; \
+# The REMnux installer modifies /home/kasm-user directly. We must merge these
+# changes into the default profile and completely wipe /home/kasm-user so that
+# the Kasm VNC startup script triggers a full profile copy on first launch.
+RUN if [ -f /home/kasm-user/.bashrc ]; then \
+      cat /home/kasm-user/.bashrc >> "${HOME}/.bashrc"; \
+      rm /home/kasm-user/.bashrc; \
     fi; \
-    find /opt -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true; \
-    find /opt -name '*.pyc' -delete 2>/dev/null || true; \
-    rm -rf /var/lib/apt/lists/* \
-           /var/backups/* \
-           /var/log/journal/* \
-           /var/log/vmware* \
-           /var/log/kern.log \
-           /var/log/auth.log \
-           /var/log/alternatives.log \
-           /var/log/dpkg.log \
-           /var/log/syslog \
-           /var/log/apt/* \
-           /var/cache/cast/* \
-           /var/cache/salt/* \
-           /usr/share/doc/* \
-           /usr/share/ri/* \
-           /usr/local/src/* \
-           /usr/local/yara-rules/.git 2>/dev/null || true \
-           /usr/local/shellcode2exe-bat 2>/dev/null || true \
-           /usr/local/ssview 2>/dev/null || true \
-           /opt/scdbg 2>/dev/null || true \
-           /root/.cache/* 2>/dev/null || true \
-           /root/.cpan 2>/dev/null || true \
-           /tmp/* \
-           /var/tmp/*; \
-    mkdir -p /var/cache/cast/installer/logs; \
-    if [ -f /root/cast-results.yaml ]; then \
-      mv /root/cast-results.yaml /var/cache/cast/installer/logs/results.yaml; \
-    fi
-
-# 3) Kasm-oriented cleanup (xdg autostart, caches, apt lists)
-RUN SKIP_CLEAN=false bash "${INST_DIR}/ubuntu/install/common/01_cleanup.sh" || true
-
-# 4) Kasm permissions and runtime setup
-RUN "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \
+    cp -a /home/kasm-user/. "${HOME}/" || true; \
+    rm -rf /home/kasm-user; \
+    "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \
     chown 1000:0 "${HOME}"; \
     mkdir -p /home/kasm-user; \
     chown -R 1000:0 /home/kasm-user; \

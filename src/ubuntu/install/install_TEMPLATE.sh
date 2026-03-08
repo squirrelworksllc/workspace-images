@@ -1,62 +1,75 @@
 #!/usr/bin/env bash
-# This file acts as a template for new app installers. You should create a new folder, then add an install_APPNAME.sh file into it.
-# Then adjust the text up here to describe what the file does.
 set -euo pipefail
+IFS=$'\n\t'
+
+###############################################################################
+# install_APPNAME.sh
+#
+# Debian-based only (Debian / Ubuntu).
+# Intended to be called non-interactively from a Dockerfile to install
+# [APP NAME] into a Kasm-enabled Ubuntu image.
+#
+# Responsibilities:
+#   - Install [APP NAME] via apt or external tarball/binary
+#   - Create desktop entry in /usr/share/applications
+#   - Place a launcher on the user's Desktop and set ownership to uid/gid 1000
+#
+# Env expectations:
+#   INST_DIR   (default: /dockerstartup/install) - location of apt helper
+###############################################################################
+
+: "${INST_DIR:=/dockerstartup/install}"
+# shellcheck source=/dev/null
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
-# ----------------------------- CONFIG -----------------------------
-APP_NAME="REPLACE_ME"                  # e.g., "VLC"
-DESKTOP_NAME="replace-me.desktop"      # e.g., "vlc.desktop" (optional)
-SUPPORTED_IDS="ubuntu debian kali"     # adjust if needed
-# -----------------------------------------------------------------
+log() { echo "[APPNAME] $*"; }
 
-echo "======= Installing ${APP_NAME} ======="
-
-# Optional: distro gate (keep if the installer is Debian-family only)
-. /etc/os-release
-case "${ID}" in
-  ubuntu|debian|kali) ;;
-  *)
-    echo "Unsupported distro for ${APP_NAME}: ${ID}" >&2
+require_root() {
+  if [ "$(id -u)" -ne 0 ]; then
+    echo "[APPNAME] ERROR: must be run as root" >&2
     exit 1
-    ;;
-esac
+  fi
+}
 
-# Optional: arch gate (use only when upstream is arch-limited)
-# ARCH="$(dpkg --print-architecture)"
-# if [ "${ARCH}" != "amd64" ]; then
-#   echo "${APP_NAME} not supported on ${ARCH}; skipping."
-#   exit 0
-# fi
+main() {
+  require_root
 
-echo "Step 1: Install packages..."
-apt_update_if_needed
-# Use apt_install so you always get --no-install-recommends from your helper
-# Example:
-# apt_install package1 package2
-apt_install REPLACE_ME_PACKAGE_NAMES
+  # Fail early with a clear message if helper functions aren't present
+  command -v apt_install >/dev/null 2>&1 || {
+    echo "[APPNAME] ERROR: apt_install not defined (apt helper not sourced?)" >&2
+    exit 1
+  }
+  command -v apt_update_if_needed >/dev/null 2>&1 || {
+    echo "[APPNAME] ERROR: apt_update_if_needed not defined (apt helper not sourced?)" >&2
+    exit 1
+  }
 
-echo "Step 2: Desktop shortcut (best effort)..."
-mkdir -p "$HOME/Desktop"
+  echo "======= Installing APPNAME ======="
 
-# If the system desktop entry exists, copy it to the user desktop
-if [ -n "${DESKTOP_NAME}" ] && [ -f "/usr/share/applications/${DESKTOP_NAME}" ]; then
-  cp "/usr/share/applications/${DESKTOP_NAME}" "$HOME/Desktop/${DESKTOP_NAME}"
-  chmod +x "$HOME/Desktop/${DESKTOP_NAME}"
-  chown 1000:1000 "$HOME/Desktop/${DESKTOP_NAME}" 2>/dev/null || true
-fi
+  # Step 1: Detect architecture if needed
+  local arch
+  arch="$(dpkg --print-architecture)"
+  log "Detected architecture: ${arch}"
 
-# Optional: create your own desktop file instead of copying
-# cat >"/usr/share/applications/${DESKTOP_NAME}" <<'EOL'
-# [Desktop Entry]
-# Version=1.0
-# Name=REPLACE_ME
-# Exec=/usr/bin/REPLACE_ME
-# Icon=REPLACE_ME
-# Type=Application
-# Categories=Utility;
-# EOL
-# chmod +x "/usr/share/applications/${DESKTOP_NAME}"
-# cp "/usr/share/applications/${DESKTOP_NAME}" "$HOME/Desktop/${DESKTOP_NAME}"
+  # Step 2: Install packages
+  log "Step 2: Installing packages"
+  apt_update_if_needed
+  # apt_install package1 package2
 
-echo "${APP_NAME} installed!"
+  # Step 3: Desktop shortcut
+  log "Step 3: Setting up desktop shortcut"
+  local desktop_dir="${HOME}/Desktop"
+  mkdir -p "${desktop_dir}"
+
+  # if [ -f "/usr/share/applications/APPNAME.desktop" ]; then
+  #   cp "/usr/share/applications/APPNAME.desktop" "${desktop_dir}/APPNAME.desktop"
+  #   chmod +x "${desktop_dir}/APPNAME.desktop" 2>/dev/null || true
+  #   chown 1000:1000 "${desktop_dir}/APPNAME.desktop" 2>/dev/null || true
+  # else
+  #   log "WARNING: APPNAME.desktop not found."
+  # fi
+
+  log "APPNAME install complete."
+}
+
+main "$@"

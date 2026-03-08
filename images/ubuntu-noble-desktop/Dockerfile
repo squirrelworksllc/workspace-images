@@ -108,7 +108,7 @@
         "/ubuntu/install/torsocks/install_torsocks.sh" \
         "/ubuntu/install/recoll/install_recoll.sh" \
         "/ubuntu/install/telegram/install_telegram.sh" \
-        "/ubuntu/install/desktop/set_wallpaper.sh" \
+        "/ubuntu/install/desktop/set_wallpaper-noble_desktop.sh" \
         "/ubuntu/install/common/01_cleanup.sh" \
       ); \
       \

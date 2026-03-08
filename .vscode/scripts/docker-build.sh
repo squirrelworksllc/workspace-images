@@ -89,7 +89,7 @@ run_dev_build() {
       local ans_build_base="${ARG_AUTO_BUILD_BASE}"
       if [[ -z "$ans_build_base" ]]; then
         if [[ "$ARG_BG_RUNNING" == "true" ]]; then
-          ans_build_base="n"
+          ans_build_base="y"
         else
           echo ""
           log_info "Required base image is not available locally."
