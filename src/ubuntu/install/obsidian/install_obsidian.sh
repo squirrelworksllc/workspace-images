@@ -1,66 +1,47 @@
 #!/usr/bin/env bash
 ###############################################################################
 # install_obsidian.sh
-#
-# Purpose: Installs obsidian.
-#
-# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+# Purpose: Installs Obsidian via official .deb for SquirrelWorks 1.1
 ###############################################################################
-# This script installs Obsidian Text Editor. It is meant to be called from a Dockerfile
-# and installed on Ubuntu and/or a debian variant.
 set -euo pipefail
+: "${INST_DIR:=/dockerstartup/install}"
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
-echo "======= Installing Obsidian ======="
+log() { echo "[OBSIDIAN-INSTALL] $*"; }
 
-ARCH="$(dpkg --print-architecture)"
-case "${ARCH}" in
-  amd64|arm64) ;;
-  *)
-    echo "Unsupported architecture for Obsidian AppImage: ${ARCH}" >&2
-    exit 1
-    ;;
-esac
+main() {
+    log "======= Installing Obsidian ======="
 
-echo "Step 1: Dependencies..."
-apt_update_if_needed
-apt_install curl jq libfuse2 ca-certificates
+    ARCH="$(dpkg --print-architecture)"
+    # Map dpkg arch to Obsidian naming (usually amd64 or arm64)
+    apt_update_if_needed
+    apt_install curl jq
 
-echo "Step 2: Discover latest AppImage URL..."
-RELEASE_JSON="$(curl -fsSL https://api.github.com/repos/obsidianmd/obsidian-releases/releases/latest)"
+    log "Step 1: Finding latest .deb release..."
+    RELEASE_JSON="$(curl -fsSL https://api.github.com/repos/obsidianmd/obsidian-releases/releases/latest)"
+    
+    # Filter for the .deb asset matching our architecture
+    DOWNLOAD_URL=$(echo "$RELEASE_JSON" | jq -r ".assets[] | select(.name | endswith(\".deb\")) | select(.name | contains(\"${ARCH}\")) | .browser_download_url" | head -n1)
 
-if [ "${ARCH}" = "amd64" ]; then
-  DOWNLOAD_URL="$(printf '%s\n' "$RELEASE_JSON" | jq -r '.assets[] | select(.name | test("AppImage$") and (contains("arm64") | not)) | .browser_download_url' | head -n1)"
-else
-  DOWNLOAD_URL="$(printf '%s\n' "$RELEASE_JSON" | jq -r '.assets[] | select(.name | test("arm64") and test("AppImage$")) | .browser_download_url' | head -n1)"
-fi
+    if [ -z "${DOWNLOAD_URL}" ] || [ "${DOWNLOAD_URL}" = "null" ]; then
+        log "ERROR: Could not find .deb for ${ARCH}" >&2
+        exit 1
+    fi
 
-if [ -z "${DOWNLOAD_URL}" ] || [ "${DOWNLOAD_URL}" = "null" ]; then
-  echo "ERROR: Failed to determine Obsidian AppImage download URL for ARCH=${ARCH}" >&2
-  exit 1
-fi
+    log "Step 2: Downloading and Installing..."
+    curl -fsSL "$DOWNLOAD_URL" -o /tmp/obsidian.deb
+    
+    # Using apt to install the local deb handles all electron/library dependencies
+    apt-get install -y /tmp/obsidian.deb
+    rm -f /tmp/obsidian.deb
 
-echo "Step 3: Download + extract..."
-mkdir -p /opt/Obsidian
-cd /opt/Obsidian
-curl -fsSL "$DOWNLOAD_URL" -o Obsidian.AppImage
-chmod +x Obsidian.AppImage
-./Obsidian.AppImage --appimage-extract
-rm -f Obsidian.AppImage
+    log "Step 3: Triggering UI and environment configuration..."
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [ -f "${SCRIPT_DIR}/configure_ui.sh" ]; then
+        bash "${SCRIPT_DIR}/configure_ui.sh"
+    fi
 
-echo "Step 4: Launcher + desktop integration..."
-cat >/opt/Obsidian/squashfs-root/launcher <<'EOL'
-#!/usr/bin/env bash
-export APPDIR=/opt/Obsidian/squashfs-root
-exec /opt/Obsidian/squashfs-root/AppRun --no-sandbox "$@"
-EOL
-chmod +x /opt/Obsidian/squashfs-root/launcher
+    log "Obsidian installation complete."
+}
 
-DESKTOP_SRC="/opt/Obsidian/squashfs-root/obsidian.desktop"
-if [ ! -f "$DESKTOP_SRC" ]; then
-bash "${INST_DIR}/ubuntu/install/obsidian/configure_ui.sh"
-
-# Optional: only needed if you want the runtime user to be able to modify /opt/Obsidian
-chown -R 1000:1000 /opt/Obsidian 2>/dev/null || true
-
-echo "Obsidian installed!"
+main "$@"

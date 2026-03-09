@@ -1,41 +1,47 @@
 #!/usr/bin/env bash
 ###############################################################################
 # install_ansible.sh
-#
-# Purpose: Installs ansible.
-#
-# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+# Purpose: Installs Ansible and Linting tools for SquirrelWorks 1.1
 ###############################################################################
-# This script install Ansible. It is meant to be called from inside of a Dockerfile.
 set -euo pipefail
+: "${INST_DIR:=/dockerstartup/install}"
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
-echo "======= Installing Ansible ======="
+log() { echo "[ANSIBLE-INSTALL] $*"; }
 
-. /etc/os-release
+main() {
+    log "======= Installing Ansible Automation Suite ======="
 
-apt_update_if_needed
+    . /etc/os-release
+    apt_update_if_needed
 
-case "${ID}" in
-  ubuntu)
-    # Noble has ansible in the default repos; older Ubuntu can use the PPA if you want newer builds.
-    if [ "${VERSION_CODENAME:-}" = "noble" ]; then
-      apt_install ansible
-    else
-      apt_install software-properties-common
-      apt-add-repository --yes ppa:ansible/ansible
-      apt_refresh_after_repo_change
-      apt_install ansible
+    case "${ID}" in
+        ubuntu)
+            if [ "${VERSION_CODENAME:-}" != "noble" ]; then
+                log "Legacy Ubuntu detected - adding Ansible PPA..."
+                apt_install software-properties-common
+                apt-add-repository --yes ppa:ansible/ansible
+                apt_refresh_after_repo_change
+            fi
+            # Noble (24.04) has Ansible 9.x+ in the main repo
+            apt_install ansible ansible-lint
+            ;;
+        debian|kali)
+            apt_install ansible ansible-lint
+            ;;
+        *)
+            log "ERROR: Unsupported distro: ${ID}" >&2
+            exit 1
+            ;;
+    esac
+
+    log "Triggering environment configuration..."
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [ -f "${SCRIPT_DIR}/configure_ui.sh" ]; then
+        bash "${SCRIPT_DIR}/configure_ui.sh"
     fi
-    ;;
-  debian|kali)
-    # Use distro packages (no PPAs here)
-    apt_install ansible
-    ;;
-  *)
-    echo "Unsupported distro for Ansible installer: ${ID}" >&2
-    exit 1
-    ;;
-esac
 
-echo "Ansible installed!"
+    log "Ansible installation complete."
+}
+
+main "$@"

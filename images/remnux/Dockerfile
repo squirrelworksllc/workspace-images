@@ -1,38 +1,25 @@
 # syntax=docker/dockerfile:1.7
 
-# ----------------------------- DESCRIPTION -----------------------------
-# REMnux (Kasm-compatible) for Ubuntu Noble.
-#
-# Built on the SquirrelWorks Ubuntu Noble core image and extended with the
-# official REMnux installer (https://remnux.org/remnux), aligned with
-# REMnux upstream Dockerfile.noble (--mode=cloud). Keeps Kasm entrypoint
-# and users (kasm-user, kasm-default-profile).
-# official REMnux installer (https://remnux.org/remnux), aligned with
-# REMnux upstream Dockerfile.noble (--mode=cloud). Keeps Kasm entrypoint
-# and users (kasm-user, kasm-default-profile).
-#
-# Provides:
-#   - lint target (hadolint + shellcheck)
-#   - develop target
-#   - production target (default)
-#
-# IMPORTANT:
-# This Dockerfile assumes the BUILD CONTEXT is the REPO ROOT.
-# Example builds:
-#   Lint: docker build --target lint -f images/remnux/Dockerfile .
-#   Prod: docker build -t squirrelworksllc/remnux:1.18.0 -f images/remnux/Dockerfile .
-#   Dev : docker build --target develop -t squirrelworksllc/remnux:develop -f images/remnux/Dockerfile .
-# ----------------------------------------------------------------------
+################################################################################
+# SquirrelWorks 1.1 - Ubuntu Noble REMNux (Forensic Edition)
+# 
+# ARCHITECTURE: Modular Registry + SaltStack Overlay
+# BUILD CONTEXT: Repo Root
+# DESIGN PHILOSOPHY: Pre-condition -> Install REMNux -> Polish -> Cleanup
+################################################################################
 
+# ----------------------------- BASE IMAGE -----------------------------
 ARG BASE_IMAGE="squirrelworksllc/ubuntu-noble-core"
 ARG BASE_TAG="1.18.0"
 
 # ############################################################################
-# -------------------------------- BASE ----------------------------------- #
+# ------------------------------ BASE STAGE -------------------------------- #
 # ############################################################################
 FROM --platform=$BUILDPLATFORM ${BASE_IMAGE}:${BASE_TAG} AS base
+
 USER root
 
+# Shared Environment Variables
 ENV HOME=/home/kasm-default-profile \
     STARTUPDIR=/dockerstartup \
     DEBIAN_FRONTEND=noninteractive \
@@ -49,119 +36,109 @@ WORKDIR ${HOME}
 FROM --platform=$BUILDPLATFORM base AS lint
 WORKDIR /src
 COPY . /src
-
 RUN bash /src/tools/ci/lint_installers.sh
 RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/remnux/Dockerfile
 RUN bash /src/tools/ci/lint-shell.sh
-
 USER 1000
 
 # ############################################################################
-# ------------------------------ BUILD TARGET ------------------------------ #
+# -------------------------- COMMON BUILD TARGET --------------------------- #
 # ############################################################################
 FROM --platform=$BUILDPLATFORM base AS build
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Guard: fail fast if build context isn't repo root (COPY fails if missing)
+# --- Context Guard ---
 COPY ./src/ubuntu/install/ ./__context_check__/ubuntu_install/
 RUN rm -rf ./__context_check__
 
-# Copy ubuntu install tree (for install_tools.sh, 01_cleanup.sh, helpers)
-# Copy ubuntu install tree (for install_tools.sh, 01_cleanup.sh, helpers)
+# --- Stage Resources ---
 COPY ./src/ubuntu/ ${INST_DIR}/ubuntu/
+RUN find "${INST_DIR}/ubuntu/install" -maxdepth 4 -type f -name '*.sh' -exec chmod +x {} \;
 
-# Validation script
-# Validation script
+# --- Runtime Validation Tools ---
 RUN mkdir -p /dockerstartup/tools
 COPY ./src/tools/runtime/runtime_validation.sh /dockerstartup/tools/runtime_validation.sh
 RUN chmod 0755 /dockerstartup/tools/runtime_validation.sh
 
-# 1) Base tools (curl, gnupg, git, etc.) so REMnux installer can run
-RUN apt-get update && bash "${INST_DIR}/ubuntu/install/tools/install_tools.sh" \
-    && bash "${INST_DIR}/ubuntu/install/gnome_keyring/install_gnome_keyring_stub.sh" \
-    && bash "${INST_DIR}/ubuntu/install/wine/install_wine.sh" \
-    && bash "${INST_DIR}/ubuntu/install/wireshark/install_wireshark.sh" \
-    && bash "${INST_DIR}/ubuntu/install/vs_code/install_vs_code.sh" \
-    && bash "${INST_DIR}/ubuntu/install/firefox/install_firefox.sh"
+# --- Global Build Orchestration ---
+ARG APT_DEBUG=false
 
-# 2) REMnux: official installer (upstream Noble style) + purge + cleanup
-#    Ref: https://github.com/REMnux/docker/blob/master/remnux-distro/Dockerfile.noble
 RUN set -eux; \
-    ARCH="$(dpkg --print-architecture)"; \
-    if [ "${ARCH}" != "amd64" ]; then \
-      echo "REMnux is amd64-only; current arch: ${ARCH}"; exit 1; \
-    fi; \
     apt-get update; \
-    apt-get install -y --no-install-recommends curl gnupg git; \
+    \
+    # =========================================================================
+    # SQUIRRELWORKS MODULE REGISTRY (REMNux Prerequisites)
+    # =========================================================================
+    SCRIPTS=( \
+      # GROUP 1: Core System & REMNux "Salt-Fail" Prevention
+      "/ubuntu/install/tools/install_tools.sh" \
+      "/ubuntu/install/common/00_apt_helper.sh" \
+      "/ubuntu/install/gnome_keyring/install_gnome_keyring_stub.sh" \
+      \
+      # GROUP 2: Forensic UI Tools (REMNux expects these pre-installed)
+      "/ubuntu/install/firefox/install_firefox.sh" \
+      "/ubuntu/install/vs_code/install_vs_code.sh" \
+      "/ubuntu/install/wireshark/install_wireshark.sh" \
+      \
+      # GROUP 3: Binary Compatibility & Analysis
+      "/ubuntu/install/wine/install_wine.sh" \
+      \
+      # GROUP 4: Branding (Noble-native or REMNux themed)
+      "/ubuntu/install/desktop/install.sh" \
+    ); \
+    \
+    # Execution Loop for Prereqs
+    for SCRIPT in "${SCRIPTS[@]}"; do \
+      echo ">>> Executing Module: ${SCRIPT}"; \
+      if [[ "${SCRIPT}" == *"set_wallpaper.sh" ]]; then \
+        # Passing 'remnux' for the forensic theme, or 'noble' for standard numbat
+        bash "${INST_DIR}${SCRIPT}" remnux; \
+      else \
+        bash "${INST_DIR}${SCRIPT}"; \
+      fi || { exit 1; }; \
+    done; \
+    \
+    # =========================================================================
+    # STEP 5: THE REMNUX CORE INSTALLER
+    # =========================================================================
+    log() { echo "[REMNUX-INSTALLER] $*"; }; \
+    ARCH="$(dpkg --print-architecture)"; \
+    if [ "${ARCH}" != "amd64" ]; then log "ERROR: amd64 only"; exit 1; fi; \
+    \
+    log "Downloading REMNux SaltStack Installer..."; \
     curl -fsSL -o /tmp/remnux-installer https://remnux.org/remnux; \
     chmod +x /tmp/remnux-installer; \
+    \
+    log "Running REMNux (Cloud Mode)... this will take time."; \
     /tmp/remnux-installer install --mode=cloud --user=kasm-user || true; \
-    apt-get purge -y \
-      snapd libbison-dev docker-ce-cli \
-      code \
-      winehq-staging wine-staging wine-staging-amd64 wine-staging-i386 \
-      scdbg runsc \
-      || true; \
-    apt-get autoremove -y; \
-    apt-get clean; \
-    if [ -f /var/cache/cast/installer/logs/results.yaml ]; then \
-      mv /var/cache/cast/installer/logs/results.yaml /root/cast-results.yaml; \
-    fi; \
-    find /opt -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true; \
-    find /opt -name '*.pyc' -delete 2>/dev/null || true; \
-    rm -rf /var/lib/apt/lists/* \
-           /var/backups/* \
-           /var/log/journal/* \
-           /var/log/vmware* \
-           /var/log/kern.log \
-           /var/log/auth.log \
-           /var/log/alternatives.log \
-           /var/log/dpkg.log \
-           /var/log/syslog \
-           /var/log/apt/* \
-           /var/cache/cast/* \
-           /var/cache/salt/* \
-           /usr/share/doc/* \
-           /usr/share/ri/* \
-           /usr/local/src/* \
-           /usr/local/yara-rules/.git 2>/dev/null || true \
-           /usr/local/shellcode2exe-bat 2>/dev/null || true \
-           /usr/local/ssview 2>/dev/null || true \
-           /opt/scdbg 2>/dev/null || true \
-           /root/.cache/* 2>/dev/null || true \
-           /root/.cpan 2>/dev/null || true \
-           /tmp/* \
-           /var/tmp/*; \
-    mkdir -p /var/cache/cast/installer/logs; \
-    if [ -f /root/cast-results.yaml ]; then \
-      mv /root/cast-results.yaml /var/cache/cast/installer/logs/results.yaml; \
-    fi
-
-# 2b) Restore KasmVNC dependencies that may have been autoremoved
-RUN apt-get update && apt-get install -y --no-install-recommends pulseaudio
-
-# 2c) Set custom background for Remnux
-RUN "${INST_DIR}/ubuntu/install/desktop/set_wallpaper-remnux.sh"
-
-# 3) Kasm-oriented cleanup (xdg autostart, caches, apt lists)
-RUN SKIP_CLEAN=false bash "${INST_DIR}/ubuntu/install/common/01_cleanup.sh" || true
-
-# 4) Kasm permissions and runtime setup
-# The REMnux installer modifies /home/kasm-user directly. We must merge these
-# changes into the default profile and completely wipe /home/kasm-user so that
-# the Kasm VNC startup script triggers a full profile copy on first launch.
-RUN if [ -f /home/kasm-user/.bashrc ]; then \
+    \
+    # =========================================================================
+    # STEP 6: POST-REMNUX REPAIR & CLEANUP
+    # =========================================================================
+    log "Restoring Kasm-critical dependencies (PulseAudio)..."; \
+    apt-get update && apt-get install -y --no-install-recommends pulseaudio; \
+    \
+    log "Running Global SquirrelWorks Cleanup..."; \
+    SKIP_CLEAN=false bash "${INST_DIR}/ubuntu/install/common/01_cleanup.sh"; \
+    \
+    # --- Final Session Preparation ---
+    # Merge REMNux-created bashrc into the default profile
+    if [ -f /home/kasm-user/.bashrc ]; then \
       cat /home/kasm-user/.bashrc >> "${HOME}/.bashrc"; \
       rm /home/kasm-user/.bashrc; \
     fi; \
     cp -a /home/kasm-user/. "${HOME}/" || true; \
     rm -rf /home/kasm-user; \
+    \
     "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \
     chown 1000:0 "${HOME}"; \
     mkdir -p /home/kasm-user; \
     chown -R 1000:0 /home/kasm-user; \
-    rm -rf "${INST_DIR}"
+    \
+    # Deep cleanup of temporary build assets
+    rm -rf "${INST_DIR}/ubuntu/install" /tmp/* /var/cache/salt
 
+# ----------------------------- FINALIZATION -----------------------------
 ENV HOME=/home/kasm-user
 WORKDIR ${HOME}
 USER 1000

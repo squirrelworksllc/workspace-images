@@ -1,77 +1,55 @@
 #!/usr/bin/env bash
 ###############################################################################
 # install_dind.sh
-#
-# Purpose: Installs dind.
-#
-# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+# Purpose: Installs Docker, k3d, and kubectl for SquirrelWorks 1.1
 ###############################################################################
-# Script to install "Docker In A Docker" (DIND).
-# Meant to be called from a Dockerfile, may not run on its own.
 set -euo pipefail
+: "${INST_DIR:=/dockerstartup/install}"
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
-ARCH="$(dpkg --print-architecture)"
-. /etc/os-release
+log() { echo "[DIND-INSTALL] $*"; }
 
-echo "======= Installing Docker-In-A-Docker ======="
+main() {
+    log "======= Installing Docker-In-Docker (DinD) ======="
 
-echo "Step 1: Enabling Docker repo..."
-apt_update_if_needed
-apt_install ca-certificates curl
+    ARCH="$(dpkg --print-architecture)"
+    . /etc/os-release
+    apt_update_if_needed
 
-install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-chmod a+r /etc/apt/keyrings/docker.gpg
+    log "Step 1: Adding Docker Official Repository..."
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    echo "deb [arch=${ARCH} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu ${VERSION_CODENAME} stable" > /etc/apt/sources.list.d/docker.list
 
-cat >/etc/apt/sources.list.d/docker.list <<EOF
-deb [arch=${ARCH} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu ${VERSION_CODENAME} stable
-EOF
+    apt_refresh_after_repo_change
 
-apt_refresh_after_repo_change
+    log "Step 2: Installing Docker Engine and Core Dependencies..."
+    apt_install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin \
+                fuse-overlayfs iptables kmod uidmap sudo supervisor
 
-echo "Step 2: Installing dependencies..."
-apt_install \
-  dbus-user-session \
-  docker-buildx-plugin \
-  docker-ce \
-  docker-ce-cli \
-  docker-compose-plugin \
-  fuse-overlayfs \
-  iptables \
-  kmod \
-  openssh-client \
-  sudo \
-  supervisor \
-  uidmap \
-  wget \
-  gnupg
+    log "Step 3: Fetching Moby DinD Hack and Entrypoints..."
+    curl -fsSL -o /usr/local/bin/dind https://raw.githubusercontent.com/moby/moby/master/hack/dind
+    curl -fsSL -o /usr/local/bin/dockerd-entrypoint.sh https://kasm-ci.s3.amazonaws.com/dockerd-entrypoint.sh
+    chmod +x /usr/local/bin/dind /usr/local/bin/dockerd-entrypoint.sh
 
-echo "Step 3: Installing DIND..."
-useradd -U dockremap || true
-grep -q '^dockremap:165536:65536$' /etc/subuid || echo 'dockremap:165536:65536' >> /etc/subuid
-grep -q '^dockremap:165536:65536$' /etc/subgid || echo 'dockremap:165536:65536' >> /etc/subgid
+    log "Step 4: Installing Kubernetes Tooling (k3d/kubectl)..."
+    wget -q -O - https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=v5.6.0 bash
+    curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/${ARCH}/kubectl"
+    chmod +x /usr/local/bin/kubectl
 
-curl -fsSL -o /usr/local/bin/dind https://raw.githubusercontent.com/moby/moby/master/hack/dind
-chmod +x /usr/local/bin/dind
+    log "Step 5: Configuring SubUID/SubGID for Rootless/DinD..."
+    useradd -U dockremap || true
+    echo "dockremap:165536:65536" >> /etc/subuid
+    echo "dockremap:165536:65536" >> /etc/subgid
+    
+    # Ensure the Kasm user is in the docker group
+    usermod -aG docker kasm-user || true
 
-curl -fsSL -o /usr/local/bin/dockerd-entrypoint.sh https://kasm-ci.s3.amazonaws.com/dockerd-entrypoint.sh
-chmod +x /usr/local/bin/dockerd-entrypoint.sh
+    log "Triggering UI/Config configuration..."
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [ -f "${SCRIPT_DIR}/configure_ui.sh" ]; then
+        bash "${SCRIPT_DIR}/configure_ui.sh"
+    fi
+}
 
-echo 'hosts: files dns' > /etc/nsswitch.conf
-usermod -aG docker kasm-user || true
-
-echo "Step 4: Install k3d tools..."
-wget -q -O - https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
-curl -fsSL -o /usr/local/bin/kubectl \
-  "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/${ARCH}/kubectl"
-chmod +x /usr/local/bin/kubectl
-
-echo "Step 5: Passwordless sudo..."
-echo 'kasm-user:kasm-user' | chpasswd
-echo 'kasm-user ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
-
-echo "Step 6: Cleaning up..."
-apt_cleanup
-
-echo "Docker-In-A-Docker is installed! Please practice Inception Responsibly."
+main "$@"

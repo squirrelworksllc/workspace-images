@@ -2,115 +2,79 @@
 ###############################################################################
 # install_torboost.sh
 #
-# Purpose: Installs torboost.
-# Intended for Dockerfile use on Ubuntu/Debian variants.
-#
-# Assumptions:
-# - Standard Kasm user is UID/GID 1000
-#
-# Env overrides:
-#   TORBOOST_VERSION   (default: latest)
-#   TORBOOST_VENV_DIR  (default: /opt/torboost-venv)
-#
-# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+# Purpose: Installs torboost and configures the Tor Control Port for Kasm 1.18+
 ###############################################################################
 set -euo pipefail
 
-log() { echo "[torboost] $*"; }
+log() { echo "[torboost-install] $*"; }
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd) "
+
+# Source Kasm apt helpers
+: "${INST_DIR:=/dockerstartup/install}"
+source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
 require_root() {
   if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
-    echo "[torboost] ERROR: must run as root" >&2
+    log "ERROR: must run as root" >&2
     exit 1
   fi
 }
 
-# Source shared apt helper functions used across this repo.
-# In Docker builds, installers live under: /dockerstartup/install/ubuntu/install/**.
-source_apt_helpers() {
-  local candidates=(
-    "/dockerstartup/install/ubuntu/install/common/00_apt_helper.sh"
-    "${SCRIPT_DIR}/../common/00_apt_helper.sh"
-    "${SCRIPT_DIR}/../common/00_apt_helpers.sh"
-  )
-
-  for f in "${candidates[@]}"; do
-    if [[ -r "$f" ]]; then
-      # shellcheck disable=SC1090
-      . "$f"
-      return 0
-    fi
-  done
-
-  log "[torboost] ERROR: could not locate apt helper script (00_apt_helper.sh)" >&2
-  return 1
-}
-
-require_helpers() {
-  local missing=0
-  for fn in apt_update_if_needed apt_install; do
-    if ! command -v "$fn" >/dev/null 2>&1; then
-      log "[torboost] ERROR: missing helper function: $fn" >&2
-      missing=1
-    fi
-  done
-  [[ "$missing" -eq 0 ]]
-}
-
 main() {
   require_root
-  source_apt_helpers
-  require_helpers
-
+  
   local kasm_uid=1000
-  local kasm_gid=1000
-
   local venv_dir="${TORBOOST_VENV_DIR:-/opt/torboost-venv}"
   local torboost_version="${TORBOOST_VERSION:-}"
 
   log "Step 1: Installing system prerequisites..."
   apt_update_if_needed
-  # venv isolates Python installs from system Python (PEP 668 safe)
-  apt_install python3 python3-venv python3-pip tor
+  # We need 'tor' but also 'netcat' or 'curl' for health checks
+  apt_install python3-venv python3-pip tor netcat-openbsd
 
-  log "Step 2: Creating torboost virtualenv at ${venv_dir}..."
+  log "Step 2: Setting up Python venv at ${venv_dir}..."
   rm -rf "$venv_dir"
   python3 -m venv "$venv_dir"
-
-  log "Step 3: Upgrading pip tooling inside the venv..."
   "${venv_dir}/bin/python" -m pip install --no-cache-dir --upgrade pip setuptools wheel
 
-  log "Step 4: Installing torboost into the venv..."
+  log "Step 3: Installing torboost..."
   if [[ -n "$torboost_version" ]]; then
-    log "Using pinned torboost version: ${torboost_version}"
     "${venv_dir}/bin/python" -m pip install --no-cache-dir "torboost==${torboost_version}"
   else
-    log "Installing latest torboost"
     "${venv_dir}/bin/python" -m pip install --no-cache-dir torboost
   fi
 
-  log "Step 5: Creating wrapper at /usr/local/bin/torboost..."
-  install -m 0755 -d /usr/local/bin
+  log "Step 4: Creating global wrapper..."
   cat >/usr/local/bin/torboost <<EOF
 #!/usr/bin/env bash
-set -euo pipefail
+# TorBoost Wrapper
 exec "${venv_dir}/bin/torboost" "\$@"
 EOF
   chmod 0755 /usr/local/bin/torboost
 
-  log "Step 6: Setting ownership for standard Kasm user (${kasm_uid}:${kasm_gid})..."
-  chown -R "${kasm_uid}:${kasm_gid}" "$venv_dir"
+  log "Step 5: Configuring Tor for Control Port access (Required for TorBoost)..."
+  # TorBoost needs to talk to Tor. We enable the ControlPort without a password 
+  # for the local container environment.
+  cat >>/etc/tor/torrc <<EOF
+ControlPort 9051
+CookieAuthentication 0
+DataDirectory /var/lib/tor
+EOF
+  
+  # Ensure the tor user/group can actually write to its data dir in the container
+  mkdir -p /var/lib/tor
+  chown -R debian-tor:debian-tor /var/lib/tor
 
-  log "Step 7: Verifying install..."
-  command -v tor >/dev/null 2>&1
-  command -v torboost >/dev/null 2>&1
-  torboost --help >/dev/null 2>&1 || true
+  log "Step 6: Setting ownership for Kasm user..."
+  chown -R 1000:1000 "$venv_dir"
 
-  log "Step 8: Done."
-  log "torboost installed in venv: ${venv_dir}"
-  log "run: torboost --help"
+  log "Step 7: Creating UI Configuration (Start Menu)..."
+  if [[ -x "${SCRIPT_DIR}/configure_ui.sh" ]]; then
+      bash "${SCRIPT_DIR}/configure_ui.sh"
+  fi
+
+  log "torboost installation complete!"
 }
 
 main "$@"

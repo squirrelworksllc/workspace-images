@@ -1,28 +1,31 @@
 #!/usr/bin/env bash
 ###############################################################################
 # install_libre_office.sh
-#
-# Purpose: Installs libre_office.
-#
-# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+# Purpose: Installs LibreOffice for SquirrelWorks 1.1
 ###############################################################################
-# This script installs LibreOffice. It is meant to be called from a Dockerfile
-# and installed on Ubuntu and/or a debian variant.
 set -euo pipefail
+: "${INST_DIR:=/dockerstartup/install}"
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
-echo "======= Installing LibreOffice ======="
+log() { echo "[LIBREOFFICE-INSTALL] $*"; }
 
-echo "Step 1: Install packages..."
-apt_update_if_needed
-apt_install libreoffice
+main() {
+    log "======= Installing LibreOffice ======="
 
-bash "${INST_DIR}/ubuntu/install/libre_office/configure_ui.sh"
+    apt_update_if_needed
+    
+    # We install the core suite plus the GTK3 integration for better UI performance
+    # --no-install-recommends prevents 500MB of unnecessary fonts/languages
+    apt_install libreoffice-calc libreoffice-draw libreoffice-impress \
+                libreoffice-writer libreoffice-gtk3 libreoffice-common
 
-if [ -f /usr/share/applications/libreoffice-startcenter.desktop ]; then
-  cp /usr/share/applications/libreoffice-startcenter.desktop "$HOME/Desktop/"
-  chmod +x "$HOME/Desktop/libreoffice-startcenter.desktop"
-  chown 1000:1000 "$HOME/Desktop/libreoffice-startcenter.desktop" 2>/dev/null || true
-fi
+    log "Triggering UI configuration..."
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [ -f "${SCRIPT_DIR}/configure_ui.sh" ]; then
+        bash "${SCRIPT_DIR}/configure_ui.sh"
+    fi
 
-echo "LibreOffice installed!"
+    log "LibreOffice installation complete."
+}
+
+main "$@"

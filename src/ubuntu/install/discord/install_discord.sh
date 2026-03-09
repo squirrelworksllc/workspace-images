@@ -1,34 +1,35 @@
 #!/usr/bin/env bash
 ###############################################################################
 # install_discord.sh
-#
-# Purpose: Installs discord.
-#
-# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+# Purpose: Installs Discord for SquirrelWorks 1.1
 ###############################################################################
-# This is a script to install Discord. It is meant to be called from a Dockerfile
 set -euo pipefail
+: "${INST_DIR:=/dockerstartup/install}"
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
-echo "======= Installing Discord ======="
+log() { echo "[DISCORD-INSTALL] $*"; }
 
-echo "Step 1: Install the app..."
-apt_update_if_needed
-apt_install curl ca-certificates
+main() {
+    log "======= Installing Discord ======="
 
-curl -fsSL -o /tmp/discord.deb "https://discord.com/api/download?platform=linux&format=deb"
-apt-get install -y /tmp/discord.deb
-rm -f /tmp/discord.deb
+    apt_update_if_needed
+    apt_install libnss3 libasound2t64 libatk-bridge2.0-0
 
-echo "Step 2: Set config values..."
-mkdir -p "$HOME/.config/discord"
-cat >"$HOME/.config/discord/settings.json" <<'JSON'
-{"SKIP_HOST_UPDATE": true}
-JSON
+    log "Step 1: Downloading latest Discord DEB..."
+    # Discord always redirects this URL to the newest stable version
+    curl -fsSL -o /tmp/discord.deb "https://discord.com/api/download?platform=linux&format=deb"
 
-bash "${INST_DIR}/ubuntu/install/discord/configure_ui.sh"
+    log "Step 2: Installing package..."
+    apt-get install -y /tmp/discord.deb
+    rm -f /tmp/discord.deb
 
-echo "Step 4: Cleaning up..."
-apt_cleanup
+    log "Step 3: Triggering UI configuration..."
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [ -f "${SCRIPT_DIR}/configure_ui.sh" ]; then
+        bash "${SCRIPT_DIR}/configure_ui.sh"
+    fi
 
-echo "Discord is now installed!"
+    log "Discord installation complete."
+}
+
+main "$@"

@@ -1,78 +1,43 @@
 #!/usr/bin/env bash
 ###############################################################################
 # install_firefox.sh
-#
-# Purpose: Installs firefox.
-#
-# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+# Purpose: Installs Firefox via Mozilla APT (Non-Snap) for SquirrelWorks 1.1
 ###############################################################################
-# This script is meant to install Firefox browser and to be called from a Dockerfile.
 set -euo pipefail
+: "${INST_DIR:=/dockerstartup/install}"
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
-echo "======= Install Firefox ======="
+log() { echo "[FIREFOX-INSTALL] $*"; }
 
-. /etc/os-release
-ARCH="$(dpkg --print-architecture)"
+main() {
+    log "======= Installing Firefox (Mozilla Repo) ======="
 
-apt_update_if_needed
-apt_install gnupg
+    . /etc/os-release
+    apt_update_if_needed
 
-if [ "${ID}" = "ubuntu" ]; then
-  echo "Ubuntu detected: installing Firefox from Mozilla APT repo (non-snap)."
+    log "Step 1: Configuring Mozilla APT Repository..."
+    install -m 0755 -d /etc/apt/keyrings
+    wget -qO- https://packages.mozilla.org/apt/repo-signing-key.gpg | gpg --dearmor -o /etc/apt/keyrings/mozilla.gpg
+    
+    echo "deb [signed-by=/etc/apt/keyrings/mozilla.gpg] https://packages.mozilla.org/apt mozilla main" > /etc/apt/sources.list.d/mozilla.firefox.list
 
-  KEYRING_PATH="/etc/apt/keyrings/mozilla.gpg"
-  LIST_FILE="/etc/apt/sources.list.d/mozilla-firefox.list"
-  PREF_FILE="/etc/apt/preferences.d/mozilla-firefox"
-
-  install -m 0755 -d /etc/apt/keyrings
-
-  wget -qO /tmp/mozilla.gpg https://packages.mozilla.org/apt/repo-signing-key.gpg
-  gpg --dearmor -o "${KEYRING_PATH}" /tmp/mozilla.gpg
-  rm -f /tmp/mozilla.gpg
-  chmod a+r "${KEYRING_PATH}"
-
-  cat >"${LIST_FILE}" <<EOF
-deb [signed-by=${KEYRING_PATH}] https://packages.mozilla.org/apt mozilla main
-EOF
-
-  # Pin only Firefox packages, not Package: *
-  cat >"${PREF_FILE}" <<'EOF'
+    # Prioritize Mozilla repo over Ubuntu's empty snap-wrapper
+    cat > /etc/apt/preferences.d/mozilla-firefox <<EOF
 Package: firefox*
 Pin: origin packages.mozilla.org
 Pin-Priority: 1000
 EOF
 
-  apt_refresh_after_repo_change
-  apt_install firefox
+    apt_refresh_after_repo_change
+    apt_install firefox
 
-else
-  echo "${ID} detected: installing Firefox ESR from distro repos."
-  apt_install firefox-esr
-fi
+    log "Step 2: Triggering Hardening and UI configuration..."
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [ -f "${SCRIPT_DIR}/configure_ui.sh" ]; then
+        bash "${SCRIPT_DIR}/configure_ui.sh"
+    fi
 
-echo "Firefox version installed:"
-(firefox --version || firefox-esr --version) || true
+    log "Firefox installation complete."
+}
 
-# Optional: create a default profile for the Kasm user home
-echo "Creating default profile..."
-mkdir -p "$HOME/.mozilla/firefox"
-
-# Use whichever binary exists
-FF_BIN=""
-if command -v firefox >/dev/null 2>&1; then
-  FF_BIN="firefox"
-elif command -v firefox-esr >/dev/null 2>&1; then
-  FF_BIN="firefox-esr"
-fi
-
-if [ -n "$FF_BIN" ]; then
-  "$FF_BIN" -headless -CreateProfile "kasm $HOME/.mozilla/firefox/kasm" || true
-fi
-
-bash "${INST_DIR}/ubuntu/install/firefox/configure_ui.sh"
-
-chmod +x "$HOME/Desktop/firefox.desktop" 2>/dev/null || true
-chown 1000:1000 "$HOME/Desktop/firefox.desktop" 2>/dev/null || true
-
-echo "Firefox installed!"
+main "$@"

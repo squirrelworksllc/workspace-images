@@ -40,4 +40,6 @@ apt_install \
   tar \
   unzip \
   xz-utils \
-  gpgv
+  gpgv \
+  software-properties-common \
+  jq

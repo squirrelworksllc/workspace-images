@@ -1,23 +1,19 @@
 #!/usr/bin/env bash
 ###############################################################################
 # install_wireshark.sh
-#
-# Purpose: Installs wireshark.
-#
-# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+# Purpose: Installs Wireshark from PPA and triggers UI/Permission config.
 ###############################################################################
 set -euo pipefail
-IFS=$'
-	'
+IFS=$'\n\t'
+
 : "${INST_DIR:=/dockerstartup/install}"
-# shellcheck source=/dev/null
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
-log() { echo "[wireshark] $*"; }
+log() { echo "[wireshark-install] $*"; }
 
 require_root() {
   if [ "$(id -u)" -ne 0 ]; then
-    echo "[wireshark] ERROR: must be run as root" >&2
+    log "ERROR: must be run as root" >&2
     exit 1
   fi
 }
@@ -25,69 +21,41 @@ require_root() {
 main() {
   require_root
 
-  # Fail early with a clear message if helper functions aren't present
-  command -v apt_install >/dev/null 2>&1 || {
-    echo "[wireshark] ERROR: apt_install not defined (apt helper not sourced?)" >&2
-    exit 1
-  }
-  command -v apt_update_if_needed >/dev/null 2>&1 || {
-    echo "[wireshark] ERROR: apt_update_if_needed not defined (apt helper not sourced?)" >&2
-    exit 1
-  }
+  log "======= Installing Wireshark ======="
 
-  echo "======= Installing Wireshark ======="
+  # Pre-seed debconf to avoid the interactive "Should non-superusers be able to capture packets?" prompt
+  echo "wireshark-common wireshark-common/install-setuid boolean true" | debconf-set-selections
 
-  log "Step 1: Installing prerequisites for PPA"
-  apt_update_if_needed
-
-  log "Step 2: Adding Wireshark Dev PPA"
-  # Default to false for install-setuid prompt (REMnux handles its own groups later)
-  echo "wireshark-common wireshark-common/install-setuid boolean false" | debconf-set-selections
-  
-  # Attempt to add the PPA
+  log "Step 1: Adding Wireshark Dev PPA..."
   add-apt-repository -y ppa:wireshark-dev/stable
-
-  log "Step 3: Installing Wireshark with retries"
   apt_update_if_needed
-  
-  # Launchpad PPAs can drop connections intermittently. We wrap the installation in a loop.
-  local max_retries=5
+
+  log "Step 2: Installing Wireshark and Tshark..."
+  # Retry logic for build stability
+  local max_retries=3
   local attempt=1
   local success=false
-
   while [ "$attempt" -le "$max_retries" ]; do
-    log "Install attempt $attempt of $max_retries..."
     if apt_install wireshark tshark; then
-      success=true
-      break
+      success=true; break
     else
-      log "Attempt $attempt failed. Waiting 10 seconds before retrying..."
-      sleep 10
-      # Clean out bad lists/partials and update again
-      apt-get clean -y
-      apt_get update -o Acquire::Retries=3
-      attempt=$((attempt + 1))
+      log "Attempt $attempt failed. Retrying..."
+      sleep 5; attempt=$((attempt + 1))
     fi
   done
 
   if [ "$success" = false ]; then
-    echo "[wireshark] ERROR: Failed to install Wireshark after $max_retries attempts." >&2
+    log "ERROR: Failed to install Wireshark." >&2
     exit 1
   fi
 
-  log "Step 4: Setting up desktop shortcut"
-  local desktop_dir="${HOME}/Desktop"
-  mkdir -p "${desktop_dir}"
-
-  if [ -f /usr/share/applications/wireshark.desktop ]; then
-    cp /usr/share/applications/wireshark.desktop "${desktop_dir}/wireshark.desktop"
-    chmod +x "${desktop_dir}/wireshark.desktop" 2>/dev/null || true
-    chown 1000:1000 "${desktop_dir}/wireshark.desktop" 2>/dev/null || true
-  else
-    log "WARNING: wireshark.desktop not found in /usr/share/applications/"
+  log "Step 3: Triggering UI and Permission configuration..."
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  if [ -f "${SCRIPT_DIR}/configure_ui.sh" ]; then
+      bash "${SCRIPT_DIR}/configure_ui.sh"
   fi
 
-  log "Wireshark install complete."
+  log "Wireshark installation complete!"
 }
 
 main "$@"

@@ -1,19 +1,12 @@
 # syntax=docker/dockerfile:1.7
 
-# ----------------------------- DESCRIPTION -----------------------------
-# Ubuntu Noble (Kasm base) + Docker-in-Docker workspace.
-# Provides:
-#   - lint target (hadolint + shellcheck)
-#   - develop target
-#   - production target (default)
-#
-# IMPORTANT:
-# This Dockerfile assumes the BUILD CONTEXT is the REPO ROOT.
-# Example builds:
-#   Lint: docker build --target lint -f images/ubuntu-noble-dind/Dockerfile .
-#   Prod: docker build -t squirrelworksllc/ubuntu-noble-dind:1.18.0 -f images/ubuntu-noble-dind/Dockerfile .
-#   Dev : docker build --target develop -t squirrelworksllc/ubuntu-noble-dind:develop -f images/ubuntu-noble-dind/Dockerfile .
-# ----------------------------------------------------------------------
+################################################################################
+# SquirrelWorks 1.1 - Ubuntu Noble DinD (Docker-in-Docker)
+# 
+# ARCHITECTURE: Modular Registry
+# BUILD CONTEXT: Repo Root
+# SPECIALTY: High-privilege container for dev/ops and orchestration
+################################################################################
 
 # ----------------------------- BASE IMAGE -----------------------------
 ARG BASE_IMAGE="squirrelworksllc/ubuntu-noble-core"
@@ -26,24 +19,19 @@ FROM --platform=$BUILDPLATFORM ${BASE_IMAGE}:${BASE_TAG} AS base
 
 USER root
 
+# Shared Environment Variables
 ENV HOME=/home/kasm-default-profile \
-    STARTUPDIR=/dockerstartup 
-
-WORKDIR ${HOME}
-
-# If Chrome is being installed in the image:
-#   INSTALL_CHROME=true and SKIP_CHROMIUM=false
-# If you want to force Chrome and skip Chromium, set SKIP_CHROMIUM=true
-ENV INSTALL_CHROME=false \
-    SKIP_CHROMIUM=false
-
-# Environment config
-ENV DEBUG=false \
+    STARTUPDIR=/dockerstartup \
     DEBIAN_FRONTEND=noninteractive \
     SKIP_CLEAN=true \
-    KASM_RX_HOME=${STARTUPDIR}/kasmrx \
+    KASM_RX_HOME=/dockerstartup/kasmrx \
     DONT_PROMPT_WSL_INSTALL="No_Prompt_please" \
-    INST_DIR=${STARTUPDIR}/install
+    INST_DIR=/dockerstartup/install \
+    INSTALL_CHROME=false \
+    SKIP_CHROMIUM=false \
+    DEBUG=false
+
+WORKDIR ${HOME}
 
 # ############################################################################
 # ------------------------------ LINT TARGET ------------------------------- #
@@ -65,81 +53,81 @@ USER 1000
 FROM --platform=$BUILDPLATFORM base AS build
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Guard: fail fast if build context isn't repo root (COPY fails if missing)
+# --- Context Guard ---
 COPY ./src/ubuntu/install/ ./__context_check__/ubuntu_install/
 RUN rm -rf ./__context_check__
 
-# Copy ubuntu/ into /dockerstartup/install/ubuntu/
+# --- Stage Resources ---
 COPY ./src/ubuntu/ ${INST_DIR}/ubuntu/
+RUN find "${INST_DIR}/ubuntu/install" -maxdepth 4 -type f -name '*.sh' -exec chmod +x {} \;
 
-# Startup scripts specific to DIND
-COPY ./src/ubuntu/install/dind/custom_startup.sh ${STARTUPDIR}/custom_startup.sh
-COPY ./src/ubuntu/install/dind/dockerd.conf /etc/supervisor/conf.d/
-RUN chmod 0755 ${STARTUPDIR}/custom_startup.sh
-
-# Move validation script to base tools folder.
+# --- Runtime Validation Tools ---
 RUN mkdir -p /dockerstartup/tools
 COPY ./src/tools/runtime/runtime_validation.sh /dockerstartup/tools/runtime_validation.sh
 RUN chmod 0755 /dockerstartup/tools/runtime_validation.sh
 
-# Run installations
-#
-# Debug toggle:
-#   docker build --progress=plain --no-cache --build-arg APT_DEBUG=true ...
+# --- Global Build Orchestration ---
 ARG APT_DEBUG=false
 
 RUN set -eux; \
     apt-get update; \
     \
+    # =========================================================================
+    # SQUIRRELWORKS MODULE REGISTRY (DinD Flavor)
+    # =========================================================================
     SCRIPTS=( \
+      # GROUP 1: Core System Tools & Helpers
       "/ubuntu/install/tools/install_tools.sh" \
+      "/ubuntu/install/common/00_apt_helper.sh" \
+      \
+      # GROUP 2: Virtualization & Containerization
       "/ubuntu/install/dind/install_dind.sh" \
     ); \
     \
+    # Conditional Group: Browser selection
     if [ "${SKIP_CHROMIUM}" != "true" ]; then \
       SCRIPTS+=( "/ubuntu/install/chromium/install_chromium.sh" ); \
-    else \
-      echo ">>> SKIP_CHROMIUM=true; skipping Chromium installer"; \
     fi; \
     \
+    # GROUP 3: Developer Productivity
     SCRIPTS+=( \
       "/ubuntu/install/vs_code/install_vs_code.sh" \
+      \
+      # GROUP 4: Branding & Final Polish
+      "/ubuntu/install/desktop/install.sh" \
       "/ubuntu/install/common/01_cleanup.sh" \
     ); \
     \
+    # Execution Loop
     for SCRIPT in "${SCRIPTS[@]}"; do \
-      echo ">>> Running ${SCRIPT}"; \
-      bash "${INST_DIR}${SCRIPT}" || { \
-        rc=$?; \
-        echo "FAILED: ${SCRIPT} (rc=$rc)"; \
-        if [ "${APT_DEBUG}" = "true" ]; then \
-          echo "----- apt logs (tail) -----"; \
-          tail -n 200 /var/log/apt/term.log 2>/dev/null || true; \
-          tail -n 200 /var/log/apt/history.log 2>/dev/null || true; \
-          echo "----- dpkg log (tail) -----"; \
-          tail -n 200 /var/log/dpkg.log 2>/dev/null || true; \
-          echo "----- free -h -----"; \
-          free -h || true; \
-          echo "----- df -h -----"; \
-          df -h || true; \
-          echo "----- ps (top RSS) -----"; \
-          ps aux --sort=-rss | head -n 15 || true; \
-        fi; \
+      echo ">>> Executing Module: ${SCRIPT}"; \
+      if [[ "${SCRIPT}" == *"set_wallpaper.sh" ]]; then \
+        bash "${INST_DIR}${SCRIPT}" noble; \
+      else \
+        bash "${INST_DIR}${SCRIPT}"; \
+      fi || { \
+        rc=$?; echo "FAILED: ${SCRIPT} (rc=$rc)"; \
+        [ "${APT_DEBUG}" = "true" ] && tail -n 100 /var/log/apt/term.log || true; \
         exit "$rc"; \
       }; \
     done; \
     \
+    # --- Final Session Preparation ---
     "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \
     rm -f /etc/X11/xinit/Xclients; \
     chown 1000:0 "${HOME}"; \
     mkdir -p /home/kasm-user; \
     chown -R 1000:0 /home/kasm-user; \
-    rm -rf "${INST_DIR}"
+    \
+    # Cleanup ephemeral build scripts
+    rm -rf "${INST_DIR}/ubuntu/install"
 
-# Userspace Runtime
+# ----------------------------- FINALIZATION -----------------------------
 ENV HOME=/home/kasm-user
 WORKDIR ${HOME}
 USER 1000
+
+# Entrypoint for Kasm Workspaces
 CMD ["--tail-log"]
 
 # ############################################################################

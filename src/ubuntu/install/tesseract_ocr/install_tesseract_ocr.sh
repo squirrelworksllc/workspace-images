@@ -2,18 +2,16 @@
 ###############################################################################
 # install_tesseract_ocr.sh
 #
-# Purpose: Installs tesseract_ocr. Although this script may work alone it was
-#          not designed to do so and was designed to be invoked via Dockerfile.
-#          This script assumes Ubuntu and/or pure debian.
-#
-# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+# Purpose: Installs Tesseract OCR and NormCap.
 ###############################################################################
 set -euo pipefail
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
+log() { echo "[TESSERACT-INSTALL] $*"; }
+
 log "======= Installing Tesseract OCR Environment ======="
 
-log "Step 1: Installing packages..."
+log "Step 1: Installing system packages..."
 apt_update_if_needed
 
 apt_install \
@@ -27,24 +25,15 @@ apt_install \
   wl-clipboard \
   gimagereader
 
-log "Step 2: Installing normcap (venv)..."
+log "Step 2: Installing normcap into /opt/venv..."
 python3 -m venv /opt/venv
 /opt/venv/bin/pip install --no-cache-dir --upgrade pip
 /opt/venv/bin/pip install --no-cache-dir normcap
 ln -sf /opt/venv/bin/normcap /usr/local/bin/normcap
 
-bash "${INST_DIR}/ubuntu/install/tesseract_ocr/configure_ui.sh"
+log "Step 3: Triggering UI configuration..."
+# Dynamically find the script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+bash "${SCRIPT_DIR}/configure_ui.sh"
 
-if [ -f /ubuntu/install/tesseract_ocr/tesseract.desktop ]; then
-  cp /ubuntu/install/tesseract_ocr/tesseract.desktop "$HOME/Desktop/"
-  chmod +x "$HOME/Desktop/tesseract.desktop" 2>/dev/null || true
-  chown 1000:1000 "$HOME/Desktop/tesseract.desktop" 2>/dev/null || true
-fi
-
-if [ -f /ubuntu/install/tesseract_ocr/documentation.desktop ]; then
-  cp /ubuntu/install/tesseract_ocr/documentation.desktop "$HOME/Desktop/"
-  chmod +x "$HOME/Desktop/documentation.desktop" 2>/dev/null || true
-  chown 1000:1000 "$HOME/Desktop/documentation.desktop" 2>/dev/null || true
-fi
-
-log "Tesseract OCR Environment is now installed!"
+log "Tesseract OCR Environment installation complete!"

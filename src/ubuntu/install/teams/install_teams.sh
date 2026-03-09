@@ -6,16 +6,14 @@
 #
 # Note: Common Pre-Requisite apt packages are called via install_tools.sh
 ###############################################################################
-# This script installs Microsoft Teams. It is meant to be called from a Dockerfile
-# and installed on Ubuntu and/or a debian variant.
 set -euo pipefail
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
-echo "======= Install Microsoft Teams (teams-for-linux) ======="
+log "======= Install Microsoft Teams (teams-for-linux) ======="
 
 ARCH="$(dpkg --print-architecture)"
 if [ "${ARCH}" != "amd64" ]; then
-  echo "teams-for-linux repo is amd64-only; skipping on ${ARCH}."
+  log "teams-for-linux repo is amd64-only; skipping on ${ARCH}."
   exit 0
 fi
 
@@ -23,16 +21,15 @@ fi
 case "${ID}" in
   ubuntu|debian|kali) ;;
   *)
-    echo "Unsupported distro for teams-for-linux installer: ${ID}" >&2
+    log "Unsupported distro for teams-for-linux installer: ${ID}" >&2
     exit 1
     ;;
 esac
 
-echo "Step 1: Install deps..."
+log "Step 1: Install deps..."
 apt_update_if_needed
-apt_install wget gnupg ca-certificates
 
-echo "Step 2: Add teams-for-linux repo..."
+log "Step 2: Add teams-for-linux repo..."
 install -m 0755 -d /etc/apt/keyrings
 wget -qO /etc/apt/keyrings/teams-for-linux.asc https://repo.teamsforlinux.de/teams-for-linux.asc
 chmod a+r /etc/apt/keyrings/teams-for-linux.asc
@@ -48,16 +45,11 @@ EOF
 
 apt_refresh_after_repo_change
 
-echo "Step 3: Install teams-for-linux..."
+log "Step 3: Install teams-for-linux..."
 apt_install teams-for-linux
 
-bash "${INST_DIR}/ubuntu/install/teams/configure_ui.sh"
+log "Step 4: Triggering UI configuration..."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+bash "${SCRIPT_DIR}/configure_ui.sh"
 
-DESKTOP_FILE="/usr/share/applications/teams-for-linux.desktop"
-if [ -f "$DESKTOP_FILE" ]; then
-  cp "$DESKTOP_FILE" "$HOME/Desktop/"
-  chmod +x "$HOME/Desktop/teams-for-linux.desktop"
-  chown 1000:1000 "$HOME/Desktop/teams-for-linux.desktop" 2>/dev/null || true
-fi
-
-echo "teams-for-linux installed!"
+log "teams-for-linux installed!"
