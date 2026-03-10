@@ -15,20 +15,17 @@ log() { echo "[KEYRING-STARTUP] $*"; }
 if command -v gnome-keyring-daemon > /dev/null; then
     log "Initializing GNOME Keyring..."
     
-    # Start the daemon
+    # Start the daemon and capture environment variables
     eval $(gnome-keyring-daemon --start --components=pkcs11,secrets,ssh)
     export SSH_AUTH_SOCK
 
     # 2. Automated Unlock/Creation Logic
-    # We target 'login' as it's the standard keyring name apps look for.
+    # Define the directory first to satisfy Step 3
     KEYRING_DIR="$HOME/.local/share/keyrings"
     mkdir -p "$KEYRING_DIR"
 
-    # Use 'kasm_user' as the default password (matches Kasm UID 1000 profile)
-    # This pipe creates the keyring if missing and unlocks it if it exists.
-    echo -n "kasm_user" | gnome-keyring-daemon --unlock <<EOF
-login
-EOF
+    # Merge inputs to satisfy ShellCheck SC2259
+    { echo "kasm_user"; echo "login"; } | gnome-keyring-daemon --unlock
 
     # 3. Ensure the login keyring is the default
     if [ ! -f "$KEYRING_DIR/default" ]; then
