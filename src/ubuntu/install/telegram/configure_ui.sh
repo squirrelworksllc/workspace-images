@@ -2,7 +2,7 @@
 ###############################################################################
 # configure_ui.sh
 #
-# Purpose: Configures UI elements and shortcuts for telegram.
+# Purpose: Configures UI, prevents duplicates, and REMOVES desktop shortcut.
 # Optimized for: Kasm 1.18+ / Ubuntu Noble
 ###############################################################################
 set -euo pipefail
@@ -11,6 +11,13 @@ log() { echo "[TELEGRAM-UI] $*"; }
 
 # Kasm 1.18+ Dynamic Home Detection
 KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile")
+
+# --- Step 0: Nuclear Duplicate & Desktop Cleanup ---
+log "Cleaning up duplicate menu entries and desktop shortcuts..."
+rm -f /usr/share/applications/telegram-desktop.desktop
+rm -f /usr/share/applications/org.telegram.desktop.desktop
+# Nuclear: Remove the shortcut from the desktop if it exists
+rm -f "$KASM_HOME/Desktop/telegram.desktop"
 
 # 1. Determine Binary Path
 if [ -f "/opt/Telegram/Telegram" ]; then
@@ -28,8 +35,7 @@ else
     exit 1
 fi
 
-log "Writing desktop entry to /usr/share/applications/telegram.desktop"
-# We add -workdir so Telegram doesn't try to litter the root of the home dir
+log "Writing single source-of-truth: /usr/share/applications/telegram.desktop"
 cat >/usr/share/applications/telegram.desktop <<EOL
 [Desktop Entry]
 Version=1.0
@@ -53,31 +59,25 @@ if command -v update-desktop-database > /dev/null; then
     update-desktop-database /usr/share/applications/
 fi
 
-# 3. Kasm Desktop Shortcut
-DESKTOP_DIR="$KASM_HOME/Desktop"
-mkdir -p "$DESKTOP_DIR"
+# 3. FIX: Disable Autostart (Nuclear Style)
+log "Step 3: Disabling auto-start at login..."
+rm -f /etc/xdg/autostart/telegramdesktop.desktop
 
-log "Creating desktop shortcut..."
-cp /usr/share/applications/telegram.desktop "$DESKTOP_DIR/telegram.desktop"
-chmod +x "$DESKTOP_DIR/telegram.desktop"
-chown 1000:1000 "$DESKTOP_DIR/telegram.desktop" 2>/dev/null || true
-
-# 4. FIX: Disable Autostart
-log "Step 4: Disabling auto-start at login..."
 AUTOSTART_DIR="$KASM_HOME/.config/autostart"
 mkdir -p "$AUTOSTART_DIR"
 
-# Note: Flush-left EOF is mandatory
 cat <<EOF > "$AUTOSTART_DIR/telegramdesktop.desktop"
 [Desktop Entry]
 Type=Application
 Name=Telegram Desktop
 Exec=$EXEC_PATH -workdir $KASM_HOME/.local/share/TelegramDesktop -startintray
 X-GNOME-Autostart-enabled=false
+Hidden=true
 NoDisplay=true
 EOF
 
+# Ensure the Kasm user owns their config/local directories
 chown -R 1000:1000 "$KASM_HOME/.config"
 chown -R 1000:1000 "$KASM_HOME/.local"
 
-log "Telegram UI configuration complete."
+log "Telegram UI configuration complete. Menu entry created; Desktop clean."

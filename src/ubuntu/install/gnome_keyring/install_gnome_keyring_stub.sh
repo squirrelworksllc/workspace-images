@@ -13,7 +13,10 @@ main() {
     log "======= Pre-conditioning GNOME Keyring for REMnux ======="
 
     apt_update_if_needed
-    apt_install gnome-keyring
+    apt_install gnome-keyring \
+        dbus-x11 \
+        libpam-gnome-keyring \
+        pinentry-gnome3
 
     log "Step 1: Creating target autostart directory..."
     mkdir -p /etc/xdg/autostart
