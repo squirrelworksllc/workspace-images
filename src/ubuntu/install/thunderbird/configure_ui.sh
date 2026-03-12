@@ -51,14 +51,4 @@ if [ -f /usr/share/applications/thunderbird.desktop ]; then
   log "Start Menu entry configured."
 fi
 
-# 2. Desktop Shortcut
-mkdir -p "$KASM_HOME/Desktop"
-if [ -f /usr/share/applications/thunderbird.desktop ]; then
-  cp /usr/share/applications/thunderbird.desktop "$KASM_HOME/Desktop/thunderbird.desktop"
-  chmod +x "$KASM_HOME/Desktop/thunderbird.desktop"
-  # Set permissions for the Kasm user (1000)
-  chown 1000:1000 "$KASM_HOME/Desktop/thunderbird.desktop" 2>/dev/null || true
-  log "Desktop shortcut created."
-fi
-
 log "Thunderbird UI configuration complete."

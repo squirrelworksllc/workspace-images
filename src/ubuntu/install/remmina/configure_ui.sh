@@ -53,10 +53,6 @@ if [ ! -f "$DESKTOP_FILE" ]; then
 fi
 
 if [ -f "$DESKTOP_FILE" ]; then
-    mkdir -p "$KASM_HOME/Desktop"
-    cp "$DESKTOP_FILE" "$KASM_HOME/Desktop/Remmina.desktop"
-    chmod +x "$KASM_HOME/Desktop/Remmina.desktop"
-    
     # Ensure it's in 'Network' and 'RemoteAccess' categories
     sed -i 's/Categories=.*/Categories=Network;RemoteAccess;/g' "$DESKTOP_FILE"
 fi
@@ -73,6 +69,6 @@ X-GNOME-Autostart-enabled=false
 NoDisplay=true
 EOF
 
-chown -R 1000:1000 "$KASM_HOME/.config" "$KASM_HOME/.local" "$KASM_HOME/Desktop"
+chown -R 1000:1000 "$KASM_HOME/.config" "$KASM_HOME/.local"
 
 log "Remmina UI configuration complete."

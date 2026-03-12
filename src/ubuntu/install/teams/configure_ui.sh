@@ -33,13 +33,11 @@ if [ -f "$DESKTOP_FILE" ]; then
         update-desktop-database /usr/share/applications/
     fi
 
-    # 3. Desktop Shortcut Logic
-    log "Deploying Desktop shortcut to $KASM_HOME"
-    cp "$DESKTOP_FILE" "$KASM_HOME/Desktop/teams-for-linux.desktop"
-    chmod +x "$KASM_HOME/Desktop/teams-for-linux.desktop"
-    
-    # 4. FIX: Disable Autostart at Session Login
-    log "Disabling auto-launch to preserve session RAM..."
+    # 3. FIX: Disable Autostart (Nuclear Option)
+    log "Aggressively disabling auto-launch for Teams..."
+    rm -f /etc/xdg/autostart/teams-for-linux.desktop
+    rm -f /usr/share/autostart/teams-for-linux.desktop
+
     AUTOSTART_DIR="$KASM_HOME/.config/autostart"
     mkdir -p "$AUTOSTART_DIR"
 
@@ -50,10 +48,11 @@ Type=Application
 Name=Teams for Linux
 Exec=/usr/bin/teams-for-linux --no-sandbox
 X-GNOME-Autostart-enabled=false
+Hidden=true
 NoDisplay=true
 EOF
 
-    # 5. Global Permissions Sync
+    # 4. Global Permissions Sync
     chown -R 1000:1000 "$KASM_HOME/Desktop"
     chown -R 1000:1000 "$KASM_HOME/.config"
     

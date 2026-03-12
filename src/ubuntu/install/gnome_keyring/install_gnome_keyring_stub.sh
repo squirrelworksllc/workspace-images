@@ -39,6 +39,10 @@ EOF
         fi
     fi
 
+    log "Step 3: Masking D-Bus secrets service to prevent UI popups..."
+    rm -f /usr/share/dbus-1/services/org.freedesktop.secrets.service
+    rm -f /usr/share/dbus-1/services/org.gnome.keyring.SystemPrompter.service
+
     log "Keyring stub is in place. REMnux Salt states can now proceed."
 }
 

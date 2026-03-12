@@ -76,6 +76,10 @@ EOF
     bash "${SCRIPT_DIR}/configure_ui.sh"
   fi
 
+  log "Cleaning up WineHQ repository files to prevent conflicts with REMnux installer..."
+  rm -f /etc/apt/sources.list.d/winehq.sources
+  rm -f /etc/apt/keyrings/winehq-archive.key
+
   log "Wine installation complete."
 }
 

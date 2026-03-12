@@ -30,9 +30,9 @@ Type=Link
 Name=Tesseract Documentation
 Comment=Official Command-Line Usage Guide
 Icon=accessories-dictionary
+Categories=Documentation;
 URL=https://github.com/tesseract-ocr/tessdoc/blob/main/Command-Line-Usage.md
 EOF
-cp /usr/share/applications/documentation.desktop "$KASM_HOME/Desktop/"
 
 # 3. NormCap (OCR Tool) & Documentation
 log "Configuring NormCap UI and Help..."
@@ -53,19 +53,16 @@ Type=Link
 Name=NormCap Documentation
 Comment=Usage and Shortcuts
 Icon=help-browser
+Categories=Documentation;
 URL=https://dynasite.github.io/normcap/
 EOF
-
-# Copy both to Desktop
-cp /usr/share/applications/normcap.desktop "$KASM_HOME/Desktop/"
-cp /usr/share/applications/normcap-doc.desktop "$KASM_HOME/Desktop/"
 
 # 4. Final Permissions and Database Refresh
 log "Finalizing permissions and refreshing Start Menu..."
 # Ensure kasm user owns everything on the desktop
 chown -R 1000:1000 "$KASM_HOME/Desktop/"
 # Make shortcuts executable (essential for XFCE/Ubuntu 'Allow Launching')
-chmod +x "$KASM_HOME/Desktop/"*.desktop
+chmod +x "$KASM_HOME/Desktop/"*.desktop 2>/dev/null || true
 
 if command -v update-desktop-database > /dev/null; then
     update-desktop-database /usr/share/applications/

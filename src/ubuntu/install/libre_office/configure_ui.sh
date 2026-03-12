@@ -24,20 +24,21 @@ cat <<EOF > "$CONF_DIR/registrymodifications.xcu"
 </oor:items>
 EOF
 
-log "Step 2: Deploying Desktop Shortcut..."
+log "Step 2: Start Menu Integration..."
 SRC_DESKTOP="/usr/share/applications/libreoffice-startcenter.desktop"
 
+# Fix LD_LIBRARY_PATH in all LibreOffice desktop files to prevent crashes
+log "Applying LD_LIBRARY_PATH fix to LibreOffice shortcuts..."
+if ls /usr/share/applications/libreoffice-*.desktop 1> /dev/null 2>&1; then
+    sed -i "s@Exec=libreoffice@Exec=env LD_LIBRARY_PATH=:/usr/lib/libreoffice/program:/usr/lib/\$(arch)-linux-gnu/ libreoffice@g" /usr/share/applications/libreoffice-*.desktop
+fi
+
 if [ -f "$SRC_DESKTOP" ]; then
-    mkdir -p "$KASM_HOME/Desktop"
-    # Create a cleaner name on the desktop
-    cp "$SRC_DESKTOP" "$KASM_HOME/Desktop/LibreOffice.desktop"
-    chmod +x "$KASM_HOME/Desktop/LibreOffice.desktop"
-    
     # Noble fix: Ensure icons are properly mapped
-    sed -i 's/Icon=libreoffice-startcenter/Icon=libreoffice-main/g' "$KASM_HOME/Desktop/LibreOffice.desktop"
+    sed -i 's/Icon=libreoffice-startcenter/Icon=libreoffice-main/g' "$SRC_DESKTOP"
 fi
 
 # Ownership sync
-chown -R 1000:1000 "$KASM_HOME/.config/libreoffice" "$KASM_HOME/Desktop"
+chown -R 1000:1000 "$KASM_HOME/.config/libreoffice"
 
 log "LibreOffice UI configuration complete."
