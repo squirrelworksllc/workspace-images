@@ -118,7 +118,7 @@ RUN set -eux; \
     # Execution Loop
     for SCRIPT in "${SCRIPTS[@]}"; do \
       echo ">>> Executing Module: ${SCRIPT}"; \
-      if [[ "${SCRIPT}" == *"set_wallpaper.sh" ]]; then \
+      if [[ "${SCRIPT}" == *"desktop/install.sh" ]]; then \
         bash "${INST_DIR}${SCRIPT}" noble; \
       else \
         bash "${INST_DIR}${SCRIPT}"; \

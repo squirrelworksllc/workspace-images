@@ -90,7 +90,7 @@ RUN set -eux; \
     # Execution Loop for Prereqs
     for SCRIPT in "${SCRIPTS[@]}"; do \
       echo ">>> Executing Module: ${SCRIPT}"; \
-      if [[ "${SCRIPT}" == *"set_wallpaper.sh" ]]; then \
+      if [[ "${SCRIPT}" == *"desktop/install.sh" ]]; then \
         # Passing 'remnux' for the forensic theme, or 'noble' for standard numbat
         bash "${INST_DIR}${SCRIPT}" remnux; \
       else \
