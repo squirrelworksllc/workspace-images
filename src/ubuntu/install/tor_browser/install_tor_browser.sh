@@ -1,79 +1,32 @@
 #!/usr/bin/env bash
-# Install Tor Browser from the official Tor Project tarball with OpenPGP
-# signature verification, then perform desktop integration.
+###############################################################################
+# install_tor_browser.sh
 #
-# - No Tor daemon
-# - Hardened tarball + signature verification
-# - Desktop integration is automatically executed from the same directory
-# - Intended to be called from a Dockerfile (Ubuntu/Debian, Kasm images)
-#
-# Assumptions:
-# - Standard Kasm user (UID/GID 1000)
-# - If this script runs, Tor Browser is wanted and desktop integration is required
-#
-# Env overrides:
-#   TORBROWSER_VERSION     (default: auto-detect latest)
-#   TORBROWSER_INSTALL_DIR (default: /opt/tor-browser)
-
+# Purpose: Securely installs Tor Browser via Tarball + GPG verification.
+# Target: Kasm 1.18+ (Ubuntu Noble / Debian)
+###############################################################################
 set -euo pipefail
 IFS=$'\n\t'
 
-log() { echo "[tor-browser] $*"; }
+log() { echo "[tor-browser-install] $*"; }
+
+# Source Kasm apt helpers
+: "${INST_DIR:=/dockerstartup/install}"
+source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Global temp dir so EXIT trap can always see it (avoid "tmp: unbound variable" with set -u)
+# Cleanup for the GPG/Download temp space
 tmp=""
-cleanup() {
-  [[ -n "${tmp:-}" ]] && rm -rf "${tmp}"
-}
+cleanup() { [[ -n "${tmp:-}" ]] && rm -rf "${tmp}"; }
 trap cleanup EXIT
-
-require_root() {
-  if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
-    echo "[tor-browser] ERROR: must run as root" >&2
-    exit 1
-  fi
-}
-
-# Source shared apt helper functions used across this repo.
-# In Docker builds, installers live under: /dockerstartup/install/ubuntu/install/**.
-source_apt_helpers() {
-  local candidates=(
-    "/dockerstartup/install/ubuntu/install/common/00_apt_helper.sh"
-    "${SCRIPT_DIR}/../common/00_apt_helper.sh"
-    "${SCRIPT_DIR}/../common/00_apt_helpers.sh"
-  )
-
-  for f in "${candidates[@]}"; do
-    if [[ -r "$f" ]]; then
-      # shellcheck disable=SC1090
-      . "$f"
-      return 0
-    fi
-  done
-
-  echo "[tor-browser] ERROR: could not locate apt helper script (00_apt_helper.sh)" >&2
-  return 1
-}
-
-require_helpers() {
-  local missing=0
-  for fn in apt_update_if_needed apt_install; do
-    if ! command -v "$fn" >/dev/null 2>&1; then
-      echo "[tor-browser] ERROR: missing helper function: $fn" >&2
-      missing=1
-    fi
-  done
-  [[ "$missing" -eq 0 ]]
-}
 
 detect_arch() {
   case "$(uname -m)" in
     x86_64|amd64) echo "x86_64" ;;
     aarch64|arm64) echo "aarch64" ;;
     *)
-      echo "[tor-browser] ERROR: unsupported architecture: $(uname -m)" >&2
+      log "ERROR: unsupported architecture: $(uname -m)" >&2
       exit 1
       ;;
   esac
@@ -89,7 +42,7 @@ detect_latest_version() {
     | sed -E 's/.*-([0-9]+\.[0-9]+(\.[0-9]+)?)\.tar\.xz/\1/')"
 
   if [[ -z "${ver:-}" ]]; then
-    echo "[tor-browser] ERROR: unable to auto-detect Tor Browser version" >&2
+    echo "ERROR: unable to auto-detect Tor Browser version" >&2
     exit 1
   fi
 
@@ -97,112 +50,78 @@ detect_latest_version() {
 }
 
 main() {
-  require_root
-  source_apt_helpers
-  require_helpers
+    log "======= Installing Tor Browser (Kasm 1.18+ Standard) ======="
+    
+    local install_dir="${TORBROWSER_INSTALL_DIR:-/opt/tor-browser}"
+    local arch=$(detect_arch)
+    
+    local version="${TORBROWSER_VERSION:-}"
+    if [[ -z "$version" ]]; then
+        version=$(detect_latest_version)
+        log "Detected latest version: ${version}"
+    else
+        log "Using pinned version: ${version}"
+    fi
+    
+    local base_url="https://www.torproject.org/dist/torbrowser/${version}"
+    local tarball="tor-browser-linux-${arch}-${version}.tar.xz"
+    local sig="${tarball}.asc"
 
-  # Standard Kasm user
-  local owner_uid=1000
-  local owner_gid=1000
+    tmp="$(mktemp -d)"
 
-  local install_dir="${TORBROWSER_INSTALL_DIR:-/opt/tor-browser}"
+    log "Step 2: Installing prerequisites..."
+    apt_update_if_needed
 
-  local arch version base_url tarball sig
-  arch="$(detect_arch)"
+    log "Step 3: Downloading Tor Browser tarball and signature..."
+    curl -fL --retry 3 --retry-delay 2 -o "${tmp}/${tarball}" "${base_url}/${tarball}"
+    curl -fL --retry 3 --retry-delay 2 -o "${tmp}/${sig}"     "${base_url}/${sig}"
 
-  echo "Step 1: Determining Tor Browser version..."
-  version="${TORBROWSER_VERSION:-}"
-  if [[ -z "$version" ]]; then
-    version="$(detect_latest_version)"
-    log "Detected latest version: ${version}"
-  else
-    log "Using pinned version: ${version}"
-  fi
+    log "Step 4: Fetching Tor Browser Developers signing key (WKD)..."
+    local expected_fp="EF6E286DDA85EA2A4BA7DE684E2C6E8793298290"
 
-  base_url="https://www.torproject.org/dist/torbrowser/${version}"
-  tarball="tor-browser-linux-${arch}-${version}.tar.xz"
-  sig="${tarball}.asc"
+    export GNUPGHOME="${tmp}/gnupg"
+    install -m 0700 -d "$GNUPGHOME"
 
-  tmp="$(mktemp -d)"
+    gpg --batch --auto-key-locate nodefault,wkd \
+        --locate-keys torbrowser@torproject.org >/dev/null
 
-  echo "Step 2: Installing prerequisites..."
-  apt_update_if_needed
-  # gpgv is sometimes separate; include explicitly for predictable builds
-  apt_install ca-certificates curl gnupg gpgv xz-utils tar
+    log "Step 5: Verifying signing key fingerprint..."
+    local got_fp
+    got_fp="$(gpg --batch --with-colons --fingerprint torbrowser@torproject.org \
+      | awk -F: '$1=="fpr"{print $10; exit}')"
 
-  echo "Step 3: Downloading Tor Browser tarball and signature..."
-  curl -fL --retry 3 --retry-delay 2 -o "${tmp}/${tarball}" "${base_url}/${tarball}"
-  curl -fL --retry 3 --retry-delay 2 -o "${tmp}/${sig}"     "${base_url}/${sig}"
+    if [[ "$got_fp" != "$expected_fp" ]]; then
+      log "ERROR: signing key fingerprint mismatch!" >&2
+      log "Expected: ${expected_fp}" >&2
+      log "Got:      ${got_fp:-<none>}" >&2
+      exit 1
+    fi
 
-  echo "Step 4: Fetching Tor Browser Developers signing key (WKD)..."
-  # Official Tor Browser Developers signing key fingerprint
-  local expected_fp="EF6E286DDA85EA2A4BA7DE684E2C6E8793298290"
+    log "Step 6: Verifying Tor Browser tarball signature..."
+    gpg --batch --output "${tmp}/tor.keyring" --export "${expected_fp}" >/dev/null
+    gpgv --keyring "${tmp}/tor.keyring" "${tmp}/${sig}" "${tmp}/${tarball}"
 
-  export GNUPGHOME="${tmp}/gnupg"
-  install -m 0700 -d "$GNUPGHOME"
+    log "Extracting to ${install_dir}"
+    rm -rf "${install_dir}"
+    mkdir -p "${install_dir}"
+    tar -xJf "${tmp}/tor-browser-linux-${arch}-${version}.tar.xz" -C "${install_dir}" --strip-components=1
 
-  gpg --batch --auto-key-locate nodefault,wkd \
-      --locate-keys torbrowser@torproject.org >/dev/null
+    # Ensure UID 1000 owns the install so the internal updater works
+    chown -R 1000:1000 "${install_dir}"
 
-  echo "Step 5: Verifying signing key fingerprint..."
-  local got_fp
-  got_fp="$(gpg --batch --with-colons --fingerprint torbrowser@torproject.org \
-    | awk -F: '$1=="fpr"{print $10; exit}')"
-
-  if [[ "$got_fp" != "$expected_fp" ]]; then
-    echo "[tor-browser] ERROR: signing key fingerprint mismatch!" >&2
-    echo "[tor-browser] Expected: ${expected_fp}" >&2
-    echo "[tor-browser] Got:      ${got_fp:-<none>}" >&2
-    exit 1
-  fi
-
-  echo "Step 6: Verifying Tor Browser tarball signature..."
-  gpg --batch --output "${tmp}/tor.keyring" --export "${expected_fp}" >/dev/null
-  gpgv --keyring "${tmp}/tor.keyring" "${tmp}/${sig}" "${tmp}/${tarball}"
-
-  echo "Step 7: Installing Tor Browser to ${install_dir}..."
-  rm -rf "${install_dir}"
-  install -m 0755 -d "${install_dir}"
-
-  tar -xJf "${tmp}/${tarball}" \
-      -C "${install_dir}" \
-      --strip-components=1
-
-  # Allow standard Kasm user to update Tor Browser at runtime
-  chown -R "${owner_uid}:${owner_gid}" "${install_dir}"
-
-  # Real launcher
-  local start_bin="${install_dir}/Browser/start-tor-browser"
-  if [[ ! -x "$start_bin" ]]; then
-    echo "[tor-browser] ERROR: expected launcher not found or not executable: ${start_bin}" >&2
-    exit 1
-  fi
-
-  echo "Step 8: Creating CLI launcher..."
-  install -m 0755 -d /usr/local/bin
-  cat >/usr/local/bin/tor-browser <<EOF
+    log "Creating CLI wrapper"
+    cat >/usr/local/bin/tor-browser <<EOF
 #!/usr/bin/env bash
-set -euo pipefail
-exec "${start_bin}" "\$@"
+exec "${install_dir}/Browser/start-tor-browser" "--detach" "\$@"
 EOF
-  chmod 0755 /usr/local/bin/tor-browser
+    chmod 0755 /usr/local/bin/tor-browser
 
-  echo "Step 9: Running desktop integration..."
-  local desktop_script="${SCRIPT_DIR}/integrate_tor_browser_desktop.sh"
+    log "Step 9: Executing UI integration"
+    if [[ -x "${SCRIPT_DIR}/integrate_tor_browser_desktop.sh" ]]; then
+        TORBROWSER_INSTALL_DIR="${install_dir}" bash "${SCRIPT_DIR}/integrate_tor_browser_desktop.sh"
+    fi
 
-  if [[ ! -x "$desktop_script" ]]; then
-    echo "[tor-browser] ERROR: desktop integration script not found or not executable:" >&2
-    echo "  ${desktop_script}" >&2
-    exit 1
-  fi
-
-  TORBROWSER_INSTALL_DIR="${install_dir}" \
-  TORBROWSER_DESKTOP_UID="${owner_uid}" \
-  TORBROWSER_DESKTOP_GID="${owner_gid}" \
-    "$desktop_script"
-
-  echo "Step 10: Tor Browser installation and integration complete."
-  log "Tor Browser ${version} installed and registered for Kasm desktop"
+    log "Tor Browser ${version} install complete."
 }
 
 main "$@"

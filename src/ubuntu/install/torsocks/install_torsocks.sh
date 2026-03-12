@@ -1,27 +1,15 @@
 #!/usr/bin/env bash
+###############################################################################
+# install_torsocks.sh
+# Optimized for SquirrelWorks Kasm 1.18+
+###############################################################################
 set -euo pipefail
 IFS=$'\n\t'
 
-###############################################################################
-# install_torsocks.sh
-#
-# Debian-based only (Debian / Ubuntu)
-#
-# Installs torsocks and applies defaults by copying torsocks.conf.
-#
-# Env overrides:
-#   TORSOCKS_PACKAGE   (default: torsocks)
-#   TORSOCKS_CONF_PATH (default: /etc/tor/torsocks.conf)
-#   INSTALL_GUARD      (default: true)
-#   GUARD_PATH         (default: /usr/local/bin/torsocks-guard)
-###############################################################################
-
-# Align with other installers (Slack, etc.)
 : "${INST_DIR:=/dockerstartup/install}"
-# shellcheck source=/dev/null
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
-log() { echo "[torsocks] $*"; }
+log() { echo "[torsocks-install] $*"; }
 
 require_root() {
   if [ "$(id -u)" -ne 0 ]; then
@@ -79,62 +67,30 @@ EOF
 }
 
 main() {
-  require_root
-
-  # Fail early with a clear message if helper functions aren't present
-  command -v apt_install >/dev/null 2>&1 || {
-    echo "[torsocks] ERROR: apt_install not defined (apt helper not sourced?)" >&2
-    exit 1
-  }
-  command -v apt_update_if_needed >/dev/null 2>&1 || {
-    echo "[torsocks] ERROR: apt_update_if_needed not defined (apt helper not sourced?)" >&2
-    exit 1
-  }
-
-  echo "======= Installing torsocks ======="
-
-  local pkg="${TORSOCKS_PACKAGE:-torsocks}"
-  local conf_path="${TORSOCKS_CONF_PATH:-/etc/tor/torsocks.conf}"
-  local install_guard="${INSTALL_GUARD:-true}"
-  local guard_path="${GUARD_PATH:-/usr/local/bin/torsocks-guard}"
-
-  log "package selected: ${pkg}"
-
-  log "checking apt metadata"
+  log "======= Installing torsocks Environment ======="
+  
   apt_update_if_needed
-
-  log "installing ${pkg}"
-  apt_install "${pkg}"
-
-  log "verifying torsocks binary"
-  command -v torsocks >/dev/null 2>&1 || {
-    echo "[torsocks] ERROR: torsocks not found after install" >&2
-    exit 1
-  }
-
-  log "installing torsocks.conf -> ${conf_path}"
-  mkdir -p "$(dirname "${conf_path}")"
-
-  # Prefer a config shipped alongside this script
-  local script_dir
-  script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-
+  apt_install torsocks
+  
+  # Deploy the custom config
+  local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  local conf_path="/etc/tor/torsocks.conf"
+  
   if [ -f "${script_dir}/torsocks.conf" ]; then
     cp -f "${script_dir}/torsocks.conf" "${conf_path}"
-  else
-    echo "[torsocks] ERROR: missing torsocks.conf next to installer: ${script_dir}/torsocks.conf" >&2
-    exit 1
+    chmod 0644 "${conf_path}"
+    log "Applied SquirrelWorks torsocks.conf"
   fi
 
-  chmod 0644 "${conf_path}"
+  # Deploy the Guard Helper
+  install_guard_helper "/usr/local/bin/torsocks-guard"
 
-  if [ "${install_guard}" = "true" ]; then
-    install_guard_helper "${guard_path}"
-  else
-    log "guard helper disabled (INSTALL_GUARD=false)"
+  # Trigger UI Integration
+  if [ -f "${script_dir}/configure_ui.sh" ]; then
+    bash "${script_dir}/configure_ui.sh"
   fi
 
-  log "torsocks install complete"
+  log "torsocks installation complete."
 }
 
 main "$@"

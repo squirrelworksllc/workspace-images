@@ -1,26 +1,27 @@
 #!/usr/bin/env bash
-# This script installs Filezilla. It is meant to be called from a Dockerfile.
+###############################################################################
+# install_filezilla.sh
+# Purpose: Installs FileZilla for SquirrelWorks 1.1
+###############################################################################
 set -euo pipefail
+: "${INST_DIR:=/dockerstartup/install}"
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
-echo "======= Installing FileZilla ======="
+log() { echo "[FILEZILLA-INSTALL] $*"; }
 
-apt_update_if_needed
-apt_install filezilla
+main() {
+    log "======= Installing FileZilla ======="
 
-# Default settings and desktop icon
-mkdir -p "$HOME/.config/filezilla" "$HOME/Desktop"
+    apt_update_if_needed
+    apt_install filezilla
 
-# Copy default config if it exists in the image
-if [ -f ${INST_DIR}/filezilla/filezilla.xml ]; then
-  cp ${INST_DIR}/filezilla/filezilla.xml "$HOME/.config/filezilla/filezilla.xml"
-  chown 1000:1000 "$HOME/.config/filezilla/filezilla.xml" 2>/dev/null || true
-fi
+    log "Triggering UI and Configuration integration..."
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [ -f "${SCRIPT_DIR}/configure_ui.sh" ]; then
+        bash "${SCRIPT_DIR}/configure_ui.sh"
+    fi
 
-if [ -f /usr/share/applications/filezilla.desktop ]; then
-  cp /usr/share/applications/filezilla.desktop "$HOME/Desktop/filezilla.desktop"
-  chmod +x "$HOME/Desktop/filezilla.desktop"
-  chown 1000:1000 "$HOME/Desktop/filezilla.desktop" 2>/dev/null || true
-fi
+    log "FileZilla installation complete."
+}
 
-echo "FileZilla installed!"
+main "$@"

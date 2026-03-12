@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+###############################################################################
+# install_tools.sh
+#
+# Purpose: Installs tools.
+#
+# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+###############################################################################
 # Installs common tools used by all squirrelworksllc base docker images.
 set -euo pipefail
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
@@ -29,4 +36,10 @@ apt_install \
   apt-transport-https \
   tmux \
   python3 \
-  python3-pip
+  python3-pip \
+  tar \
+  unzip \
+  xz-utils \
+  gpgv \
+  software-properties-common \
+  jq

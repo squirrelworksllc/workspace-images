@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+###############################################################################
+# install_remnux.sh
+#
+# Purpose: Installs remnux.
+#
+# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+###############################################################################
 # Install REMnux tools using the REMnux CLI on an existing Kasm image.
 #
 # NOTE: The images/remnux Dockerfile no longer uses this script. It runs the

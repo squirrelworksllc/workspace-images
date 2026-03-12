@@ -1,194 +1,38 @@
 #!/usr/bin/env bash
-set -euo pipefail
-IFS=$'\n\t'
-
 ###############################################################################
 # install_recoll.sh
-#
-# Debian-based only (Debian / Ubuntu)
-# Installs Recoll (desktop full-text search)
-# Project: https://www.recoll.org
-#
-# Ubuntu: optionally enables Recoll backports PPA:
-#   ppa:recoll-backports/recoll-1.15-on
-#
-# NOTE: No cleanup here — repository cleanup is handled by your global cleanup
-# script after all installers run.
+# Purpose: Installs Recoll for SquirrelWorks 1.1 (Noble/Debian)
 ###############################################################################
+set -euo pipefail
+: "${INST_DIR:=/dockerstartup/install}"
+source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
-log() { echo "[recoll] $*"; }
+log() { echo "[RECOLL-INSTALL] $*"; }
 
-require_root() {
-  if [ "$(id -u)" -ne 0 ]; then
-    echo "[recoll] ERROR: must be run as root" >&2
-    exit 1
+main() {
+  log "======= Installing Recoll Full-Text Search ======="
+
+  . /etc/os-release
+  apt_update_if_needed
+
+  if [ "${ID}" = "ubuntu" ]; then
+    log "Ubuntu detected - Adding Recoll PPA for modern indexing..."
+    # We use the 'recoll-1.15-on' PPA which is the standard for modern Ubuntu
+    add-apt-repository -y ppa:recoll-backports/recoll-1.15-on
+    apt_refresh_after_repo_change
   fi
+
+  # core: recoll, GUI: recollgui, CLI: recollcmd
+  # We also add 'python3-recoll' for potential automation scripts
+  apt_install recoll recollgui recollcmd python3-recoll
+
+  log "Triggering UI and Environment configuration..."
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  if [ -f "${SCRIPT_DIR}/configure_ui.sh" ]; then
+    bash "${SCRIPT_DIR}/configure_ui.sh"
+  fi
+
+  log "Recoll installation complete."
 }
 
-is_debian_based() {
-  grep -qiE '(^ID=(debian|ubuntu)$|^ID_LIKE=.*debian)' /etc/os-release
-}
-
-is_ubuntu() {
-  grep -qi '^ID=ubuntu$' /etc/os-release
-}
-
-# --- Start ---
-require_root
-
-if ! is_debian_based; then
-  echo "[recoll] ERROR: Unsupported OS. Debian-based systems only." >&2
-  exit 1
-fi
-
-export DEBIAN_FRONTEND=noninteractive
-
-# Prefer your shared apt helpers when present.
-APT_HELPER="/dockerstartup/install/ubuntu/install/common/00_apt_helper.sh"
-if [ -f "$APT_HELPER" ]; then
-  # shellcheck disable=SC1090
-  . "$APT_HELPER"
-  HAVE_APT_HELPER="true"
-  log "Using apt helper: $APT_HELPER"
-else
-  HAVE_APT_HELPER="false"
-  log "apt helper not found at $APT_HELPER; falling back to raw apt-get"
-fi
-
-apt_update() {
-  if [ "$HAVE_APT_HELPER" = "true" ] && command -v apt_update_if_needed >/dev/null 2>&1; then
-    apt_update_if_needed
-  else
-    apt-get update -y
-  fi
-}
-
-apt_install_pkgs() {
-  if [ "$HAVE_APT_HELPER" = "true" ] && command -v apt_install >/dev/null 2>&1; then
-    apt_install "$@"
-  else
-    apt-get install -y --no-install-recommends "$@"
-  fi
-}
-
-###############################################################################
-# STEP 1: Install packages
-###############################################################################
-echo "============================================================"
-echo "[recoll] STEP 1: Installing Recoll packages"
-echo "============================================================"
-
-apt_update
-
-if is_ubuntu; then
-  log "Ubuntu detected - attempting to enable Recoll backports PPA (optional)"
-  apt_install_pkgs software-properties-common
-
-  if add-apt-repository -y ppa:recoll-backports/recoll-1.15-on; then
-    log "PPA added successfully"
-    apt_update
-  else
-    log "WARNING: Could not add Recoll PPA; continuing with Ubuntu repo packages"
-  fi
-else
-  log "Debian detected - using distribution packages"
-fi
-
-# Ubuntu/Debian package names:
-# - recoll      (core)
-# - recollgui   (GUI / desktop entry)
-# - recollcmd   (CLI utilities, includes recollindex tools)
-apt_install_pkgs recoll recollgui recollcmd
-
-###############################################################################
-# STEP 2: Desktop integration (Kasm Desktop shortcut)
-###############################################################################
-echo "============================================================"
-echo "[recoll] STEP 2: Desktop integration"
-echo "============================================================"
-
-REC_DESKTOP_1="/usr/share/applications/recollgui.desktop"
-REC_DESKTOP_2="/usr/share/applications/recoll.desktop"
-
-REC_DESKTOP_SRC=""
-if [ -f "$REC_DESKTOP_1" ]; then
-  REC_DESKTOP_SRC="$REC_DESKTOP_1"
-elif [ -f "$REC_DESKTOP_2" ]; then
-  REC_DESKTOP_SRC="$REC_DESKTOP_2"
-fi
-
-if [ -n "$REC_DESKTOP_SRC" ]; then
-  log "Desktop entry present: $REC_DESKTOP_SRC"
-
-  # Try to determine the Kasm user's home directory.
-  KASM_HOME=""
-  KASM_USER=""
-
-  if id -u kasm-user >/dev/null 2>&1; then
-    KASM_USER="kasm-user"
-    KASM_HOME="$(getent passwd kasm-user | cut -d: -f6)"
-  elif id -u kasm-default-profile >/dev/null 2>&1; then
-    KASM_USER="kasm-default-profile"
-    KASM_HOME="$(getent passwd kasm-default-profile | cut -d: -f6)"
-  elif getent passwd 1000 >/dev/null 2>&1; then
-    KASM_USER="$(getent passwd 1000 | cut -d: -f1)"
-    KASM_HOME="$(getent passwd 1000 | cut -d: -f6)"
-  fi
-
-  if [ -n "$KASM_HOME" ] && [ -d "$KASM_HOME" ]; then
-    DESKTOP_DIR="$KASM_HOME/Desktop"
-    mkdir -p "$DESKTOP_DIR"
-
-    DEST_LAUNCHER="$DESKTOP_DIR/recollgui.desktop"
-    cp -f "$REC_DESKTOP_SRC" "$DEST_LAUNCHER"
-
-    # Make it behave like a proper clickable launcher in many desktop environments.
-    chmod 0755 "$DEST_LAUNCHER"
-
-    # Ensure ownership so the user can edit/remove it.
-    if [ -n "$KASM_USER" ]; then
-      chown "$KASM_USER:$KASM_USER" "$DEST_LAUNCHER" || true
-    else
-      # Fallback: match the home directory owner
-      chown --reference="$KASM_HOME" "$DEST_LAUNCHER" || true
-    fi
-
-    log "Copied launcher to Desktop: $DEST_LAUNCHER"
-  else
-    log "WARNING: Could not determine Kasm user's home directory; skipping Desktop shortcut"
-  fi
-else
-  log "No Recoll desktop entry found (non-fatal)"
-fi
-
-###############################################################################
-# STEP 3: Profile / defaults (if applicable)
-###############################################################################
-echo "============================================================"
-echo "[recoll] STEP 3: Default configuration / profiles"
-echo "============================================================"
-
-log "No system-wide Recoll defaults configured (per-user config lives in ~/.recoll)"
-
-###############################################################################
-# STEP 4: Verification
-###############################################################################
-echo "============================================================"
-echo "[recoll] STEP 4: Verification"
-echo "============================================================"
-
-if command -v recoll >/dev/null 2>&1; then
-  log "recoll found: $(command -v recoll)"
-else
-  echo "[recoll] ERROR: recoll binary not found after install" >&2
-  exit 1
-fi
-
-if command -v recollindex >/dev/null 2>&1; then
-  log "recollindex found: $(command -v recollindex)"
-else
-  log "recollindex not found (non-fatal)"
-fi
-
-log "Recoll Installation complete"
-echo "Recoll is now Installed!"
+main "$@"

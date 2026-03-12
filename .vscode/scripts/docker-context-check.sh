@@ -9,7 +9,7 @@
 # context in Windows Docker Desktop is available via 'docker.exe'.
 get_docker_context() {
   if command -v docker.exe >/dev/null 2>&1; then
-    docker.exe context show | tr -d ''
+    docker.exe context show | tr -d '\r'
   else
     docker context show
   fi
@@ -25,12 +25,22 @@ check_and_background() {
   local arg_auto_build_base="$6"
   local script_path="$7"
 
-  # 2. Check for Remote Context + skip if already backgrounded
-  if [[ "$current_context" != "default" && "$bg_running" != "true" ]]; then
+  # Determine if context is local or remote
+  local context_type="REMOTE"
+  if [[ "$current_context" == "default" || "$current_context" == "desktop-linux" ]]; then
+      context_type="LOCAL"
+  fi
+
+  # Skip if already backgrounded
+  if [[ "$bg_running" != "true" ]]; then
       echo "--------------------------------------------------------"
-      echo "🌐 REMOTE CONTEXT DETECTED: $current_context"
+      if [[ "$context_type" == "LOCAL" ]]; then
+          echo "🏠 LOCAL CONTEXT DETECTED: $current_context"
+      else
+          echo "🌐 REMOTE CONTEXT DETECTED: $current_context"
+      fi
       echo "--------------------------------------------------------"
-      read -r -p "❓ Would you like to run this in 'No-Hangup' background mode? (y/n): " choice
+      read -r -p "❓ Would you like to run this in 'No-Hangup' background mode to save logs? (y/n): " choice
       
       if [[ "$choice" =~ ^[Yy]$ ]]; then
           # Create a unique log file for this build
@@ -39,7 +49,7 @@ check_and_background() {
           mkdir -p "$LOG_DIR"
           
           # DYNAMIC ECHO: Tells you exactly where it is going
-          echo "🚀 Detaching process to remote engine: [$current_context]"
+          echo "🚀 Detaching process to engine: [$current_context]"
           echo "📝 Follow logs with: tail -f $LOG_NAME"
           
           # Re-execute the script with flags to prevent loops and pass state

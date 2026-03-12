@@ -1,58 +1,30 @@
 #!/usr/bin/env bash
+###############################################################################
+# SquirrelWorks 1.1 - Wallpaper Selection Module
+# Usage: ./set_wallpaper.sh [noble|remnux]
+###############################################################################
 set -euo pipefail
-IFS=$'\n\t'
 
-###############################################################################
-# Kasm Default Background Override
-#
-# Kasm Workspaces uses /usr/share/backgrounds/bg_default.png
-# as the enforced default wallpaper during session startup.
-#
-# The ONLY reliable way to set a custom default background is to
-# replace that file in-place.
-###############################################################################
+log() { echo "[WALLPAPER] $*"; }
 
-log() { echo "[wallpaper] $*"; }
+THEME="${1:-noble}" # Default to noble if no arg provided
+REPO_RESOURCES="${INST_DIR:-/dockerstartup/install}/ubuntu/resources/images"
+TARGET_IMG="/usr/share/backgrounds/bg_default.png"
 
-require_root() {
-  if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
-    echo "[wallpaper] ERROR: must run as root" >&2
+case "$THEME" in
+    remnux) SOURCE_IMG="${REPO_RESOURCES}/remnux_bg.png" ;;
+    noble)  SOURCE_IMG="${REPO_RESOURCES}/noble_numbat_bg.png" ;;
+    *) log "Unknown theme: $THEME"; exit 1 ;;
+esac
+
+log "Applying $THEME branding to $TARGET_IMG..."
+
+if [[ -f "$SOURCE_IMG" ]]; then
+    mkdir -p /usr/share/backgrounds
+    cp -f "$SOURCE_IMG" "$TARGET_IMG"
+    chmod 644 "$TARGET_IMG"
+    log "Branding successfully updated."
+else
+    log "ERROR: Source image $SOURCE_IMG not found!"
     exit 1
-  fi
-}
-
-main() {
-  require_root
-
-  # Where the repo asset lives during build
-  local inst_dir="${INST_DIR:-/dockerstartup/install}"
-  local source_img="${inst_dir}/ubuntu/resources/images/noble_numbat_bg.png"
-
-  # Where Kasm EXPECTS the default background
-  local target_dir="/usr/share/backgrounds"
-  local target_img="${target_dir}/bg_default.png"
-
-  log "Kasm default background override starting"
-  log "Source image: ${source_img}"
-  log "Target image: ${target_img}"
-
-  if [[ ! -f "$source_img" ]]; then
-    echo "[wallpaper] ERROR: source image not found: ${source_img}" >&2
-    exit 1
-  fi
-
-  log "Ensuring background directory exists"
-  install -m 0755 -d "$target_dir"
-
-  if [[ -f "$target_img" ]]; then
-    log "Existing bg_default.png found — replacing it"
-  else
-    log "bg_default.png not found — creating it"
-  fi
-
-  install -m 0644 "$source_img" "$target_img"
-
-  log "Kasm default background successfully replaced"
-}
-
-main "$@"
+fi

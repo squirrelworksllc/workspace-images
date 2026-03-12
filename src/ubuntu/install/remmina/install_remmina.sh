@@ -1,82 +1,52 @@
 #!/usr/bin/env bash
-# This script installs Remmina. It is meant to be called from a Dockerfile
-# and installed on Ubuntu and/or a debian variant.
+###############################################################################
+# install_remmina.sh
+# Purpose: Installs Remmina + RDP, VNC, and SPICE for Kasm 1.18+
+###############################################################################
 set -euo pipefail
+: "${INST_DIR:=/dockerstartup/install}"
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
-echo "======= Installing Remmina ======="
+log() { echo "[REMMINA-INSTALL] $*"; }
 
-. /etc/os-release
-mkdir -p "$HOME/Desktop"
+main() {
+    log "======= Installing Remmina (Full Plugin Suite) ======="
 
-echo "Step 1: Install packages..."
-apt_update_if_needed
+    . /etc/os-release
+    apt_update_if_needed
 
-case "${ID}" in
-  ubuntu)
-    # On Noble, Remmina is in repo; on older Ubuntus you may prefer the PPA.
-    if [ "${VERSION_CODENAME:-}" = "noble" ]; then
-      apt_install remmina remmina-plugin-rdp remmina-plugin-secret xdotool
-    else
-      apt_install software-properties-common
-      apt-add-repository -y ppa:remmina-ppa-team/remmina-next
-      apt_refresh_after_repo_change
-      apt_install remmina remmina-plugin-rdp remmina-plugin-secret remmina-plugin-spice xdotool
+    case "${ID}" in
+        ubuntu)
+            if [ "${VERSION_CODENAME:-}" = "noble" ]; then
+                log "Installing Noble native suite..."
+                # Added VNC and SPICE for broader compatibility
+                apt_install remmina remmina-plugin-rdp remmina-plugin-vnc \
+                            remmina-plugin-spice remmina-plugin-secret xdotool
+            else
+                log "Applying PPA for legacy Ubuntu..."
+                add-apt-repository -y ppa:remmina-ppa-team/remmina-next
+                apt_refresh_after_repo_change
+                apt_install remmina remmina-plugin-rdp remmina-plugin-vnc \
+                            remmina-plugin-spice remmina-plugin-secret xdotool
+            fi
+            ;;
+        debian|kali)
+            apt_install remmina remmina-plugin-rdp remmina-plugin-vnc \
+                        remmina-plugin-spice remmina-plugin-secret xdotool
+            ;;
+        *)
+            log "ERROR: Unsupported distro: ${ID}" >&2
+            exit 1
+            ;;
+    esac
+
+    log "Step 2: Triggering UI and Profile configuration..."
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [ -f "${SCRIPT_DIR}/configure_ui.sh" ]; then
+        bash "${SCRIPT_DIR}/configure_ui.sh"
     fi
-    ;;
-  debian|kali)
-    # Debian/Kali: use distro packages; no PPAs.
-    # Some repos may not have all plugins (spice/secret) depending on suite.
-    apt_install remmina remmina-plugin-rdp remmina-plugin-secret xdotool
-    ;;
-  *)
-    echo "Unsupported distro for Remmina installer: ${ID}" >&2
-    exit 1
-    ;;
-esac
 
-echo "Step 2: Desktop shortcut..."
-if [ -f /usr/share/applications/org.remmina.Remmina.desktop ]; then
-  cp /usr/share/applications/org.remmina.Remmina.desktop "$HOME/Desktop/"
-  chmod +x "$HOME/Desktop/org.remmina.Remmina.desktop"
-  chown 1000:1000 "$HOME/Desktop/org.remmina.Remmina.desktop" 2>/dev/null || true
-fi
+    log "Remmina installation complete!"
+}
 
-echo "Step 3: Default profiles..."
-DEFAULT_PROFILE_DIR="$HOME/.local/share/remmina/defaults"
-mkdir -p "$DEFAULT_PROFILE_DIR"
-
-cat >"$DEFAULT_PROFILE_DIR/default.vnc.remmina" <<'EOF'
-[remmina]
-name=vnc-connection
-protocol=VNC
-server=
-username=
-password=
-ignore-tls-errors=1
-viewmode=4
-window_width=640
-window_height=480
-colordepth=32
-quality=9
-EOF
-
-cat >"$DEFAULT_PROFILE_DIR/default.rdp.remmina" <<'EOF'
-[remmina]
-name=rdp-connection
-protocol=RDP
-server=
-username=
-password=
-ignore-tls-errors=1
-viewmode=4
-resolution_mode=2
-sound=off
-freerdp_log_level=INFO
-colordepth=99
-EOF
-
-# Ownership only for what we created (final cleanup handles broader ownership if you want)
-chown -R 1000:1000 "$DEFAULT_PROFILE_DIR" 2>/dev/null || true
-
-echo "Remmina installed!"
+main "$@"
