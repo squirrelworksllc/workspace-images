@@ -101,6 +101,7 @@ RUN set -eux; \
       "/ubuntu/install/tor_browser/install_tor_browser.sh" \
       "/ubuntu/install/torsocks/install_torsocks.sh" \
       "/ubuntu/install/recoll/install_recoll.sh" \
+      "/ubuntu/install/qbittorrent/install_qbittorrent.sh" \
       \
       # GROUP 5: Communication (Autostart Suppressed)
       "/ubuntu/install/signal/install_signal.sh" \
