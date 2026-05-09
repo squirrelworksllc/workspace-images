@@ -30,16 +30,16 @@
       "lintTarget": "lint",
       "architectures": ["linux/amd64"]
     },
-    {
-      "key": "bitcurator5",
-      "dockerfile": "images/bitcurator5/Dockerfile",
-      "repo": "squirrelworksllc/bitcurator5",
-      "prodTags": ["1.18.0", "1.18.1", "latest"],
-      "devTags": ["develop"],
-      "devTarget": "develop",
-      "lintTarget": "lint",
-      "architectures": ["linux/amd64", "linux/arm64"]
-    },
+    // {
+    //   "key": "bitcurator5",
+    //   "dockerfile": "images/bitcurator5/Dockerfile",
+    //   "repo": "squirrelworksllc/bitcurator5",
+    //   "prodTags": ["1.18.0", "1.18.1", "latest"],
+    //   "devTags": ["develop"],
+    //   "devTarget": "develop",
+    //   "lintTarget": "lint",
+    //   "architectures": ["linux/amd64", "linux/arm64"]
+    // },
     {
       "key": "ubuntu-noble-core",
       "dockerfile": "images/ubuntu-noble-core/Dockerfile",
