@@ -16,10 +16,11 @@ env:
   IMAGES_JSON: .vscode/images.json
 
 jobs:
-  # Lints the core image (ubuntu-noble-core) to ensure it meets quality standards.
   validate-core:
     name: Lint – ubuntu-noble-core
     runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.core-config.outputs.skip }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,14 +29,21 @@ jobs:
         id: core-config
         shell: bash
         run: |
-          CORE_CONFIG=$(jq -r '.images[] | select(.key == "ubuntu-noble-core")' "$IMAGES_JSON")
+          CORE_CONFIG=$(jq -r '.images[] | select(.key == "ubuntu-noble-core" and .enabled != false)' "$IMAGES_JSON")
+          if [ -z "$CORE_CONFIG" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
           echo "dockerfile=$(echo "$CORE_CONFIG" | jq -r '.dockerfile')" >> "$GITHUB_OUTPUT"
           echo "lintTarget=$(echo "$CORE_CONFIG" | jq -r '.lintTarget')" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
+        if: steps.core-config.outputs.skip == 'false'
         uses: docker/setup-buildx-action@v3
 
       - name: Lint – ubuntu-noble-core
+        if: steps.core-config.outputs.skip == 'false'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -43,12 +51,12 @@ jobs:
           target: ${{ steps.core-config.outputs.lintTarget }}
           push: false
 
-  # Generates a dynamic JSON matrix of all non-core images for linting.
   matrix-others:
     name: Build matrix (non-core)
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set.outputs.matrix }}
+      has_entries: ${{ steps.set.outputs.has_entries }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -58,19 +66,27 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          MATRIX="$(jq -c '{include: [.images[] | select(.key != "ubuntu-noble-core") | {
+          VALID_ENTRIES=$(jq -c '[.images[] | select(.key != "ubuntu-noble-core" and .enabled != false)]' "$IMAGES_JSON")
+          if [ "$VALID_ENTRIES" == "[]" ] || [ -z "$VALID_ENTRIES" ]; then
+            echo "matrix={\"include\":[]}" >> "$GITHUB_OUTPUT"
+            echo "has_entries=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          
+          MATRIX="$(jq -c '{include: [.images[] | select(.key != "ubuntu-noble-core" and .enabled != false) | {
             key: .key,
             dockerfile: .dockerfile,
             repo: .repo,
             lintTarget: .lintTarget
           }]}' "$IMAGES_JSON")"
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          echo "has_entries=true" >> "$GITHUB_OUTPUT"
 
-  # Lints all non-core images in parallel using the matrix from the 'matrix-others' job.
   validate-others:
     name: Lint – ${{ matrix.key }}
     runs-on: ubuntu-latest
     needs: [matrix-others]
+    if: needs.matrix-others.outputs.has_entries == 'true'
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.matrix-others.outputs.matrix) }}
@@ -92,7 +108,6 @@ jobs:
           cache-from: type=gha,scope=ci-${{ matrix.key }}
           cache-to: type=gha,mode=max,scope=ci-${{ matrix.key }}
 
-  # Acts as the primary status check for branch protection on Pull Requests.
   lint-gate:
     name: lint / gate
     runs-on: ubuntu-latest
@@ -101,8 +116,8 @@ jobs:
     steps:
       - name: Check linting results
         run: |
-          if [[ "${{ needs.validate-core.result }}" != "success" || "${{ needs.validate-others.result }}" != "success" ]]; then
-            echo "One or more lint checks failed. This will block the PR."
+          if [[ "${{ needs.validate-core.result }}" == "failure" || "${{ needs.validate-others.result }}" == "failure" ]]; then
+            echo "One or more lint checks explicitly failed. Blocking execution."
             exit 1
           fi
-          echo "All lint checks passed."
+          echo "All structural gates cleared successfully."

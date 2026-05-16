@@ -2,6 +2,7 @@
   "images": [
     {
       "key": "ubuntu-noble-dind",
+      "enabled": true,
       "dockerfile": "images/ubuntu-noble-dind/Dockerfile",
       "repo": "squirrelworksllc/ubuntu-noble-dind",
       "prodTags": ["1.18.0", "1.18.1", "latest"],
@@ -11,17 +12,8 @@
       "architectures": ["linux/amd64", "linux/arm64"]
     },
     {
-      "key": "ubuntu-noble-desktop",
-      "dockerfile": "images/ubuntu-noble-desktop/Dockerfile",
-      "repo": "squirrelworksllc/ubuntu-noble-desktop",
-      "prodTags": ["1.18.0", "1.18.1", "latest"],
-      "devTags": ["develop"],
-      "devTarget": "develop",
-      "lintTarget": "lint",
-      "architectures": ["linux/amd64", "linux/arm64"]
-    },
-    {
       "key": "remnux",
+      "enabled": false,
       "dockerfile": "images/remnux/Dockerfile",
       "repo": "squirrelworksllc/remnux",
       "prodTags": ["1.18.0", "1.18.1", "latest"],
@@ -31,17 +23,8 @@
       "architectures": ["linux/amd64"]
     },
     {
-      "key": "bitcurator5",
-      "dockerfile": "images/bitcurator5/Dockerfile",
-      "repo": "squirrelworksllc/bitcurator5",
-      "prodTags": ["1.18.0", "1.18.1", "latest"],
-      "devTags": ["develop"],
-      "devTarget": "develop",
-      "lintTarget": "lint",
-      "architectures": ["linux/amd64", "linux/arm64"]
-    },
-    {
       "key": "ubuntu-noble-core",
+      "enabled": true,
       "dockerfile": "images/ubuntu-noble-core/Dockerfile",
       "repo": "squirrelworksllc/ubuntu-noble-core",
       "prodTags": ["1.18.0", "1.18.1", "latest"],

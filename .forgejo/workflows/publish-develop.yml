@@ -1,4 +1,4 @@
-name: Publish (develop)
+name: Publish (develop) - Forgejo Automation
 
 on:
   push:
@@ -14,12 +14,14 @@ permissions:
 
 env:
   IMAGES_JSON: .vscode/images.json
+  HARBOR_REGISTRY: forge.konderla.org
+  HARBOR_PROJECT: squirrelworks
 
 jobs:
-  # Lints the core image (ubuntu-noble-core) to ensure it meets quality standards.
+  # Lints the core image (ubuntu-noble-core) if enabled.
   validate-core:
     name: Lint dev – ubuntu-noble-core
-    runs-on: ubuntu-latest
+    runs-on: kasm-builder
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,22 +31,24 @@ jobs:
         shell: bash
         run: |
           CORE_CONFIG=$(jq -r '.images[] | select(.key == "ubuntu-noble-core" and .enabled != false)' "$IMAGES_JSON")
+          if [ -z "$CORE_CONFIG" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
           echo "dockerfile=$(echo "$CORE_CONFIG" | jq -r '.dockerfile')" >> "$GITHUB_OUTPUT"
           echo "lintTarget=$(echo "$CORE_CONFIG" | jq -r '.lintTarget')" >> "$GITHUB_OUTPUT"
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to DockerHub
+      - name: Login to Local Harbor
+        if: steps.core-config.outputs.skip == 'false'
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ${{ env.HARBOR_REGISTRY }}
+          username: admin
+          password: KonderlaHarbor2026!
 
       - name: Lint – ubuntu-noble-core
+        if: steps.core-config.outputs.skip == 'false'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -52,12 +56,13 @@ jobs:
           target: ${{ steps.core-config.outputs.lintTarget }}
           push: false
 
-  # Generates a dynamic JSON matrix of all non-core images from the images.json file.
+  # Generates a dynamic JSON matrix of enabled non-core images.
   matrix-others:
     name: Build matrix (non-core)
-    runs-on: ubuntu-latest
+    runs-on: kasm-builder
     outputs:
       matrix: ${{ steps.set.outputs.matrix }}
+      has_entries: ${{ steps.set.outputs.has_entries }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -68,54 +73,58 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Get an array of JSON objects for non-core images
+          # Query objects that are enabled and not the core foundation layer
           mapfile -t IMAGES_ARRAY < <(jq -c '.images[] | select(.key != "ubuntu-noble-core" and .enabled != false)' "$IMAGES_JSON")
+
+          if [ ${#IMAGES_ARRAY[@]} -eq 0 ]; then
+            echo "matrix={\"include\":[]}" >> "$GITHUB_OUTPUT"
+            echo "has_entries=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
           JSON_ENTRIES=""
           for image_str in "${IMAGES_ARRAY[@]}"; do
-            # Extract fields. Use jq's -r for raw strings.
             key=$(jq -r '.key' <<< "$image_str")
             dockerfile=$(jq -r '.dockerfile' <<< "$image_str")
             devTarget=$(jq -r '.devTarget' <<< "$image_str")
             lintTarget=$(jq -r '.lintTarget' <<< "$image_str")
-            repo=$(jq -r '.repo' <<< "$image_str")
+            
+            # Re-map target repository path cleanly to your local Harbor namespace
+            local_repo="${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${key}"
+            archs=$(jq -r '(if .architectures then .architectures else ["linux/amd64"] end) | join(",")' <<< "$image_str")
 
-            # Build architectures string with a fallback
-            archs=$(jq -r '(if .architectures then .architectures else ["linux/amd64", "linux/arm64"] end) | join(",")' <<< "$image_str")
-
-            # Build tags string in bash
             tags_array=$(jq '.devTags' <<< "$image_str")
             tag_string=""
             if [[ "$tags_array" != "null" ]]; then
               mapfile -t tags < <(jq -r '.[]' <<< "$tags_array")
               for tag in "${tags[@]}"; do
                 if [[ -z "$tag_string" ]]; then
-                  tag_string="${repo}:${tag}"
+                  tag_string="${local_repo}:${tag}"
                 else
-                  tag_string+=$(printf '\n%s:%s' "$repo" "$tag")
+                  tag_string+=$(printf '\n%s:%s' "$local_repo" "$tag")
                 fi
               done
             fi
 
-            # Use jq to safely construct the JSON entry to handle escaping
             entry=$(jq -c -n \
               --arg key "$key" --arg dockerfile "$dockerfile" --arg devTarget "$devTarget" \
-              --arg lintTarget "$lintTarget" --arg repo "$repo" --arg tags "$tag_string" \
+              --arg lintTarget "$lintTarget" --arg repo "$local_repo" --arg tags "$tag_string" \
               --arg architectures "$archs" \
               '{key: $key, dockerfile: $dockerfile, devTarget: $devTarget, lintTarget: $lintTarget, repo: $repo, tags: $tags, architectures: $architectures}')
 
             JSON_ENTRIES+="${entry},"
           done
 
-          # Construct the final matrix JSON, removing the trailing comma
           MATRIX="{\"include\":[${JSON_ENTRIES%,}]}"
           echo "matrix=${MATRIX}" >> "$GITHUB_OUTPUT"
+          echo "has_entries=true" >> "$GITHUB_OUTPUT"
 
-  # Lints all non-core images in parallel using the matrix from the 'matrix-others' job.
+  # Lints all active non-core images in parallel on the host socket.
   validate-others:
     name: Lint dev – ${{ matrix.key }}
-    runs-on: ubuntu-latest
+    runs-on: kasm-builder
     needs: [matrix-others]
+    if: needs.matrix-others.outputs.has_entries == 'true'
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.matrix-others.outputs.matrix) }}
@@ -123,17 +132,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to DockerHub
+      - name: Login to Local Harbor
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ${{ env.HARBOR_REGISTRY }}
+          username: admin
+          password: KonderlaHarbor2026!
 
       - name: Lint – ${{ matrix.key }}
         uses: docker/build-push-action@v6
@@ -142,29 +146,26 @@ jobs:
           file: ${{ matrix.dockerfile }}
           target: ${{ matrix.lintTarget }}
           push: false
-          tags: ${{ matrix.repo }}:ci-lint
-          cache-from: type=gha,scope=pubdev-${{ matrix.key }}
-          cache-to: type=gha,mode=max,scope=pubdev-${{ matrix.key }}
 
-  # Acts as the primary status check for branch protection. It runs after all linting jobs and succeeds only if they all pass.
+  # Control barrier ensuring lints are stable.
   lint-gate:
     name: lint / gate
-    runs-on: ubuntu-latest
+    runs-on: kasm-builder
     needs: [validate-core, validate-others]
     if: always()
     steps:
       - name: Check linting results
         run: |
-          if [[ "${{ needs.validate-core.result }}" != "success" || "${{ needs.validate-others.result }}" != "success" ]]; then
-            echo "One or more lint checks failed. This will block the PR."
+          if [[ "${{ needs.validate-core.result }}" == "failure" || "${{ needs.validate-others.result }}" == "failure" ]]; then
+            echo "Linting gate failed. Blocking build process."
             exit 1
           fi
-          echo "All lint checks passed."
+          echo "All checks clear."
 
-  # Builds and publishes the multi-arch core image after all lint checks have passed.
+  # Builds and stages the multi-arch core foundation image into Harbor.
   publish-core:
     name: Publish dev – ubuntu-noble-core
-    runs-on: ubuntu-latest
+    runs-on: kasm-builder
     needs: lint-gate
     steps:
       - name: Checkout
@@ -174,21 +175,26 @@ jobs:
         id: core-config
         shell: bash
         run: |
-          CORE_CONFIG=$(jq -r '.images[] | select(.key == "ubuntu-noble-core")' "$IMAGES_JSON")
+          CORE_CONFIG=$(jq -r '.images[] | select(.key == "ubuntu-noble-core" and .enabled != false)' "$IMAGES_JSON")
+          if [ -z "$CORE_CONFIG" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
           echo "dockerfile=$(echo "$CORE_CONFIG" | jq -r '.dockerfile')" >> "$GITHUB_OUTPUT"
           echo "devTarget=$(echo "$CORE_CONFIG" | jq -r '.devTarget')" >> "$GITHUB_OUTPUT"
-          echo "architectures=$(echo "$CORE_CONFIG" | jq -r '(if .architectures then .architectures else ["linux/amd64", "linux/arm64"] end) | join(",")')" >> "$GITHUB_OUTPUT"
+          echo "architectures=$(echo "$CORE_CONFIG" | jq -r '(if .architectures then .architectures else ["linux/amd64"] end) | join(",")')" >> "$GITHUB_OUTPUT"
 
-          repo=$(echo "$CORE_CONFIG" | jq -r '.repo')
+          local_repo="${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/ubuntu-noble-core"
           tags_array=$(echo "$CORE_CONFIG" | jq '.devTags')
           tag_string=""
           if [[ "$tags_array" != "null" ]]; then
             mapfile -t tags < <(jq -r '.[]' <<< "$tags_array")
             for tag in "${tags[@]}"; do
               if [[ -z "$tag_string" ]]; then
-                tag_string="${repo}:${tag}"
+                tag_string="${local_repo}:${tag}"
               else
-                tag_string+=$(printf '\n%s:%s' "$repo" "$tag")
+                tag_string+=$(printf '\n%s:%s' "$local_repo" "$tag")
               fi
             done
           fi
@@ -199,19 +205,16 @@ jobs:
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to DockerHub
+      - name: Login to Local Harbor
+        if: steps.core-config.outputs.skip == 'false'
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ${{ env.HARBOR_REGISTRY }}
+          username: admin
+          password: KonderlaHarbor2026!
 
       - name: Build & push – ubuntu-noble-core
+        if: steps.core-config.outputs.skip == 'false'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -221,11 +224,12 @@ jobs:
           push: true
           tags: ${{ steps.core-config.outputs.tags }}
 
-  # Builds and publishes all non-core images in parallel. Individual build failures are allowed and will not stop the workflow.
+  # Compiles and pushes all subsequent matrix components natively to Harbor.
   publish-others:
     name: Publish dev – ${{ matrix.key }}
-    runs-on: ubuntu-latest
+    runs-on: kasm-builder
     needs: [publish-core, matrix-others]
+    if: needs.matrix-others.outputs.has_entries == 'true'
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.matrix-others.outputs.matrix) }}
@@ -233,17 +237,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to DockerHub
+      - name: Login to Local Harbor
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ${{ env.HARBOR_REGISTRY }}
+          username: admin
+          password: KonderlaHarbor2026!
 
       - name: Build & push – ${{ matrix.key }}
         id: push
@@ -256,26 +255,14 @@ jobs:
           platforms: ${{ matrix.architectures }}
           push: true
           tags: ${{ matrix.tags }}
-          cache-from: type=gha,scope=pubdev-${{ matrix.key }}
-          cache-to: type=gha,mode=max,scope=pubdev-${{ matrix.key }}
 
-      - name: Summary
-        if: always()
-        shell: bash
-        run: |
-          echo "Image: ${{ matrix.repo }}"
-          echo "Push outcome: ${{ steps.push.outcome || 'skipped' }}"
-
-      - name: Mark this image failed (but don't block others)
+      - name: Verification Summary
         if: always()
         shell: bash
         run: |
           set -euo pipefail
-          PUSH_OUTCOME="${{ steps.push.outcome }}"
-
-          if [ "$PUSH_OUTCOME" != "success" ]; then
-            echo "Build/push failed (or was skipped unexpectedly) for ${{ matrix.repo }} — marking this leg failed."
+          if [ "${{ steps.push.outcome }}" != "success" ]; then
+            echo "Compilation step failed for ${{ matrix.key }}"
             exit 1
           fi
-
-          echo "OK: ${{ matrix.repo }} published successfully."
+          echo "Successfully pushed target asset."
