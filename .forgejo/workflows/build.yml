@@ -1,0 +1,33 @@
+name: SquirrelWorks Workspace Engine
+run-name: Execution triggered by ${{ github.actor }} on develop
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  compile-core:
+    # Target our physical hardware node explicitly via the new host label
+    runs-on: kasm-builder
+    
+    steps:
+      - name: Ingest Source Trees
+        uses: actions/checkout@v4
+
+      - name: Authenticate Local Harbor Registry
+        run: |
+          # Binds cleanly into your forge.konderla.org storage engine
+          echo "KonderlaHarbor2026!" | docker login forge.konderla.org -u admin --password-stdin
+
+      - name: Compile Foundation Layer (ubuntu-noble-core)
+        run: |
+          cd images/ubuntu-noble-core
+          # Direct hardware execution leverage utilizing local host layer caches
+          docker build \
+            -t forge.konderla.org/squirrelworks/ubuntu-noble-core:develop \
+            -f Dockerfile .
+
+      - name: Stage Compiled Manifest to Harbor
+        run: |
+          docker push forge.konderla.org/squirrelworks/ubuntu-noble-core:develop
