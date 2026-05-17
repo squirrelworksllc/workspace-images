@@ -115,7 +115,7 @@ jobs:
             JSON_ENTRIES+="${entry},"
           done
 
-          # Fixed: Properly envelope into an object block matching standard runner specs
+          # ENVELOPE STRUCT: Re-wrapped into a single root matrix object template
           MATRIX="{\"include\":[${JSON_ENTRIES%,}]}"
           echo "matrix=${MATRIX}" >> "$GITHUB_OUTPUT"
           echo "has_entries=true" >> "$GITHUB_OUTPUT"
@@ -128,7 +128,7 @@ jobs:
     if: needs.matrix-others.outputs.has_entries == 'true'
     strategy:
       fail-fast: false
-      # Fixed: Passed the unmarshaled object to the top-level matrix block
+      # DIRECT ROOT EVALUATION: Satisfies case-sensitive act unmarshaling specs
       matrix: ${{ fromJSON(needs.matrix-others.outputs.matrix) }}
     steps:
       - name: Checkout
@@ -234,7 +234,7 @@ jobs:
     if: needs.matrix-others.outputs.has_entries == 'true'
     strategy:
       fail-fast: false
-      # Fixed: Passed the unmarshaled object to the top-level matrix block
+      # DIRECT ROOT EVALUATION: Satisfies case-sensitive act unmarshaling specs
       matrix: ${{ fromJSON(needs.matrix-others.outputs.matrix) }}
     steps:
       - name: Checkout
