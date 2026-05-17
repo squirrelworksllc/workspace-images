@@ -77,7 +77,7 @@ jobs:
           mapfile -t IMAGES_ARRAY < <(jq -c '.images[] | select(.key != "ubuntu-noble-core" and .enabled != false)' "$IMAGES_JSON")
 
           if [ ${#IMAGES_ARRAY[@]} -eq 0 ]; then
-            echo "matrix={\"include\":[]}" >> "$GITHUB_OUTPUT"
+            echo "matrix=[]" >> "$GITHUB_OUTPUT"
             echo "has_entries=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -115,7 +115,7 @@ jobs:
             JSON_ENTRIES+="${entry},"
           done
 
-          MATRIX="{\"include\":[${JSON_ENTRIES%,}]}"
+          MATRIX="[${JSON_ENTRIES%,}]"
           echo "matrix=${MATRIX}" >> "$GITHUB_OUTPUT"
           echo "has_entries=true" >> "$GITHUB_OUTPUT"
 
@@ -127,7 +127,8 @@ jobs:
     if: needs.matrix-others.outputs.has_entries == 'true'
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.matrix-others.outputs.matrix) }}
+      matrix:
+        include: ${{ fromJSON(needs.matrix-others.outputs.matrix) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -166,7 +167,7 @@ jobs:
   publish-core:
     name: Publish dev – ubuntu-noble-core
     runs-on: kasm-builder
-    needs: lint-gate
+    needs: [lint-gate]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -232,7 +233,8 @@ jobs:
     if: needs.matrix-others.outputs.has_entries == 'true'
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.matrix-others.outputs.matrix) }}
+      matrix:
+        include: ${{ fromJSON(needs.matrix-others.outputs.matrix) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4

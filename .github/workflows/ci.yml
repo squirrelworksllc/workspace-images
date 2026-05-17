@@ -19,31 +19,31 @@ jobs:
   validate-core:
     name: Lint – ubuntu-noble-core
     runs-on: ubuntu-latest
-    outputs:
-      skip: ${{ steps.core-config.outputs.skip }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Get core image config
+      - name: Enforce Core Configuration Presence
         id: core-config
         shell: bash
         run: |
+          set -euo pipefail
           CORE_CONFIG=$(jq -r '.images[] | select(.key == "ubuntu-noble-core" and .enabled != false)' "$IMAGES_JSON")
+          
+          # If the core configuration is missing or disabled, fail immediately
           if [ -z "$CORE_CONFIG" ]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "❌ CRITICAL ERROR: 'ubuntu-noble-core' is missing or disabled in images.json!" >&2
+            echo "The core foundation layer is a mandatory pipeline invariant." >&2
+            exit 1
           fi
-          echo "skip=false" >> "$GITHUB_OUTPUT"
+          
           echo "dockerfile=$(echo "$CORE_CONFIG" | jq -r '.dockerfile')" >> "$GITHUB_OUTPUT"
           echo "lintTarget=$(echo "$CORE_CONFIG" | jq -r '.lintTarget')" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
-        if: steps.core-config.outputs.skip == 'false'
         uses: docker/setup-buildx-action@v3
 
       - name: Lint – ubuntu-noble-core
-        if: steps.core-config.outputs.skip == 'false'
         uses: docker/build-push-action@v6
         with:
           context: .
