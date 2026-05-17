@@ -88,11 +88,11 @@ jobs:
             lintTarget=$(jq -r '.lintTarget' <<< "$image_str")
             
             echo "🔨 Starting lint check for asset: ${key}"
+            # FIXED: Removed --context flag and passed context path as trailing argument
             docker buildx build \
-              --context . \
               --file "$dockerfile" \
               --target "$lintTarget" \
-              --push false
+              --push=false .
           done
 
   # Control barrier ensuring lints are stable.
@@ -159,19 +159,17 @@ jobs:
       - name: Build & push – ubuntu-noble-core
         if: steps.core-config.outputs.skip == 'false'
         run: |
-          # Split tags into individual -t arguments natively
           TAG_ARGS=""
           for t in ${{ steps.core-config.outputs.tags }}; do
             TAG_ARGS+="-t $t "
           done
           
           docker buildx build \
-            --context . \
             --file "${{ steps.core-config.outputs.dockerfile }}" \
             --target "${{ steps.core-config.outputs.devTarget }}" \
             --platform "${{ steps.core-config.outputs.architectures }}" \
             $TAG_ARGS \
-            --push true
+            --push true .
 
   # Compiles and pushes all subsequent non-core images straight into Harbor via loop
   publish-others:
@@ -217,11 +215,11 @@ jobs:
             fi
 
             echo "🚀 Compiling and pushing asset to Harbor: ${key}"
+            # FIXED: Removed --context flag and passed context path as trailing argument
             docker buildx build \
-              --context . \
               --file "$dockerfile" \
               --target "$devTarget" \
               --platform "$archs" \
               $TAG_ARGS \
-              --push true
+              --push true .
           done
