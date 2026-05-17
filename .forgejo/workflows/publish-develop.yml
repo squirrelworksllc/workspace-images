@@ -88,7 +88,6 @@ jobs:
             lintTarget=$(jq -r '.lintTarget' <<< "$image_str")
             
             echo "🔨 Starting lint check for asset: ${key}"
-            # FIXED: Removed --context flag and passed context path as trailing argument
             docker buildx build \
               --file "$dockerfile" \
               --target "$lintTarget" \
@@ -164,12 +163,13 @@ jobs:
             TAG_ARGS+="-t $t "
           done
           
+          # FIXED: Swapped space-separated flag argument for an explicit standard flag value mapping
           docker buildx build \
             --file "${{ steps.core-config.outputs.dockerfile }}" \
             --target "${{ steps.core-config.outputs.devTarget }}" \
             --platform "${{ steps.core-config.outputs.architectures }}" \
             $TAG_ARGS \
-            --push true .
+            --push=true .
 
   # Compiles and pushes all subsequent non-core images straight into Harbor via loop
   publish-others:
@@ -215,11 +215,11 @@ jobs:
             fi
 
             echo "🚀 Compiling and pushing asset to Harbor: ${key}"
-            # FIXED: Removed --context flag and passed context path as trailing argument
+            # FIXED: Swapped space-separated flag argument for an explicit standard flag value mapping
             docker buildx build \
               --file "$dockerfile" \
               --target "$devTarget" \
               --platform "$archs" \
               $TAG_ARGS \
-              --push true .
+              --push=true .
           done
