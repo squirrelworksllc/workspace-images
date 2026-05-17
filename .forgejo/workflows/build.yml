@@ -22,11 +22,10 @@ jobs:
 
       - name: Compile Foundation Layer (ubuntu-noble-core)
         run: |
-          cd images/ubuntu-noble-core
-          # Direct hardware execution leverage utilizing local host layer caches
+          # FIXED: Keep build context at repo root so /src files are visible
           docker build \
             -t forge.konderla.org/squirrelworks/ubuntu-noble-core:develop \
-            -f Dockerfile .
+            -f images/ubuntu-noble-core/Dockerfile .
 
       - name: Stage Compiled Manifest to Harbor
         run: |

@@ -115,7 +115,7 @@ jobs:
             JSON_ENTRIES+="${entry},"
           done
 
-          # ENVELOPE STRUCT: Re-wrapped into a single root matrix object template
+          # Generates matching {"include": [...]} enveloped object schema
           MATRIX="{\"include\":[${JSON_ENTRIES%,}]}"
           echo "matrix=${MATRIX}" >> "$GITHUB_OUTPUT"
           echo "has_entries=true" >> "$GITHUB_OUTPUT"
@@ -128,7 +128,7 @@ jobs:
     if: needs.matrix-others.outputs.has_entries == 'true'
     strategy:
       fail-fast: false
-      # DIRECT ROOT EVALUATION: Satisfies case-sensitive act unmarshaling specs
+      # FIXED: Map expression to top-level matrix key to consume the include envelope properly
       matrix: ${{ fromJSON(needs.matrix-others.outputs.matrix) }}
     steps:
       - name: Checkout
@@ -234,11 +234,15 @@ jobs:
     if: needs.matrix-others.outputs.has_entries == 'true'
     strategy:
       fail-fast: false
-      # DIRECT ROOT EVALUATION: Satisfies case-sensitive act unmarshaling specs
+      # FIXED: Map expression to top-level matrix key to consume the include envelope properly
       matrix: ${{ fromJSON(needs.matrix-others.outputs.matrix) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Login to Local Harbor
+        uses: docker/logout-action@v3 # Clean execution session
+        continue-on-error: true
 
       - name: Login to Local Harbor
         uses: docker/login-action@v3
