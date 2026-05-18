@@ -45,22 +45,25 @@ jobs:
       - name: Checkout Source
         uses: actions/checkout@v4
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Login to local Harbor
         uses: docker/login-action@v3
         with:
           registry: ${{ env.HARBOR_REGISTRY }}
-          username: admin
-          password: KonderlaHarbor2026!
+          username: ${{ secrets.HARBOR_USERNAME }}
+          password: ${{ secrets.HARBOR_PASSWORD }}
 
       - name: Build & Push Foundation Image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: images/ubuntu-noble-core/Dockerfile
-          target: dev
+          target: develop  # FIXED: Matched to target stage from your core Dockerfile
           push: true
-          pull: true      # Forces download of latest upstream image to fix vulnerabilities
-          no-cache: true  # Prevents pinning old, unpatched system libraries
+          pull: true      
+          no-cache: true  
           tags: |
             ${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/ubuntu-noble-core:develop
 
@@ -70,7 +73,7 @@ jobs:
     runs-on: kasm-builder
     needs: [generate-matrix, publish-core]
     strategy:
-      fail-fast: false  # Don't cancel other builds if a single workspace fails to compile
+      fail-fast: false  
       matrix:
         image: ${{ fromJson(needs.generate-matrix.outputs.non_core_matrix) }}
     
@@ -78,37 +81,52 @@ jobs:
       - name: Checkout Source
         uses: actions/checkout@v4
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Login to local Harbor
         uses: docker/login-action@v3
         with:
           registry: ${{ env.HARBOR_REGISTRY }}
-          username: admin
-          password: KonderlaHarbor2026!
+          username: ${{ secrets.HARBOR_USERNAME }}
+          password: ${{ secrets.HARBOR_PASSWORD }}
 
-      - name: Parse Architectures and Tags
-        id: Image-metadata
+      - name: Parse Image Metadata
+        id: meta
         shell: bash
         run: |
-          ARCHS=$(echo '${{ toJSON(matrix.image.architectures) }}' | jq -r '(if . then . else ["linux/amd64"] end) | join(",")')
-          echo "architectures=${ARCHS}" >> "$GITHUB_OUTPUT"
+          # Safe fallback to standard arch if none provided
+          ARCHS=$(echo '${{ toJSON(matrix.image.architectures) }}' | jq -r '(if . and length > 0 then . else ["linux/amd64"] end) | join(",")')
+          echo "platforms=${ARCHS}" >> "$GITHUB_OUTPUT"
 
-          # Format developer tags dynamically for Buildx mapping
+          # Transform JSON arrays cleanly into a standard format for build-push-action
           LOCAL_REPO="${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ matrix.image.key }}"
-          TAG_ARGS=""
-          mapfile -t TAGS < <(echo '${{ toJSON(matrix.image.devTags) }}' | jq -r '.[]')
-          for tag in "${TAGS[@]}"; do
-            TAG_ARGS+="-t ${LOCAL_REPO}:${tag} "
-          done
-          echo "tags=${TAG_ARGS}" >> "$GITHUB_OUTPUT"
+          TAGS_JSON='${{ toJSON(matrix.image.devTags) }}'
+          
+          formatted_tags=""
+          if [ "$TAGS_JSON" != "null" ]; then
+            while read -r tag; do
+              if [ -n "$tag" ]; then
+                formatted_tags+="${LOCAL_REPO}:${tag}"$'\n'
+              fi
+            done < <(echo "$TAGS_JSON" | jq -r '.[]')
+          else
+            formatted_tags+="${LOCAL_REPO}:develop"$'\n'
+          fi
+          
+          # Secure delimiter block for complex multi-line strings
+          echo "tags<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$formatted_tags" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
 
       - name: Compile and Push Workspace
-        run: |
-          # Executes concurrently across multiple runners based on kasm-builder availability
-          docker buildx build \
-            --file "${{ matrix.image.dockerfile }}" \
-            --target "${{ matrix.image.devTarget }}" \
-            --platform "${{ steps.image-metadata.outputs.architectures }}" \
-            ${{ steps.image-metadata.outputs.tags }} \
-            --pull \
-            --no-cache \
-            --push=true .
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.image.dockerfile }}
+          target: ${{ matrix.image.devTarget }}
+          platforms: ${{ steps.meta.outputs.platforms }}
+          push: true
+          pull: true
+          no-cache: true
+          tags: ${{ steps.meta.outputs.tags }}
