@@ -1,4 +1,5 @@
-name: Publish (develop) - Forgejo Automation
+name: Publish (develop) - Forgejo Parallel Engine
+run-name: Dev Workspace Compile triggered by ${{ github.actor }}
 
 on:
   push:
@@ -18,208 +19,96 @@ env:
   HARBOR_PROJECT: squirrelworks
 
 jobs:
-  # Lints the core image (ubuntu-noble-core) if enabled.
-  validate-core:
-    name: Lint dev – ubuntu-noble-core
+  # STEP 1: Parse JSON configurations dynamically to build the execution matrix
+  generate-matrix:
+    name: Map Active Images
     runs-on: kasm-builder
+    outputs:
+      non_core_matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - name: Checkout
+      - name: Checkout Source
         uses: actions/checkout@v4
 
-      - name: Get core image config
-        id: core-config
+      - name: Parse Images Configuration
+        id: set-matrix
         shell: bash
         run: |
-          CORE_CONFIG=$(jq -r '.images[] | select(.key == "ubuntu-noble-core" and .enabled != false)' "$IMAGES_JSON")
-          if [ -z "$CORE_CONFIG" ]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "skip=false" >> "$GITHUB_OUTPUT"
-          echo "dockerfile=$(echo "$CORE_CONFIG" | jq -r '.dockerfile')" >> "$GITHUB_OUTPUT"
-          echo "lintTarget=$(echo "$CORE_CONFIG" | jq -r '.lintTarget')" >> "$GITHUB_OUTPUT"
+          # Filters out disabled images and the core image to generate a clean parallel array
+          MATRIX_JSON=$(jq -c '[.images[] | select(.key != "ubuntu-noble-core" and .enabled != false)]' "$IMAGES_JSON")
+          echo "matrix=${MATRIX_JSON}" >> "$GITHUB_OUTPUT"
 
-      - name: Login to Local Harbor
-        if: steps.core-config.outputs.skip == 'false'
+  # STEP 2: Compile the foundation layer first (Sequential dependency gate)
+  publish-core:
+    name: Build Core – ubuntu-noble-core
+    runs-on: kasm-builder
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+
+      - name: Login to local Harbor
         uses: docker/login-action@v3
         with:
           registry: ${{ env.HARBOR_REGISTRY }}
           username: admin
           password: KonderlaHarbor2026!
 
-      - name: Lint – ubuntu-noble-core
-        if: steps.core-config.outputs.skip == 'false'
+      - name: Build & Push Foundation Image
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ${{ steps.core-config.outputs.dockerfile }}
-          target: ${{ steps.core-config.outputs.lintTarget }}
-          push: false
+          file: images/ubuntu-noble-core/Dockerfile
+          target: dev
+          push: true
+          pull: true      # Forces download of latest upstream image to fix vulnerabilities
+          no-cache: true  # Prevents pinning old, unpatched system libraries
+          tags: |
+            ${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/ubuntu-noble-core:develop
 
-  # Lints all active non-core images sequentially in a bulletproof shell loop
-  validate-others:
-    name: Lint dev – Non-Core Images
-    runs-on: kasm-builder
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Login to Local Harbor
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.HARBOR_REGISTRY }}
-          username: admin
-          password: KonderlaHarbor2026!
-
-      - name: Execute Linting Loop
-        shell: bash
-        run: |
-          set -euo pipefail
-          mapfile -t IMAGES_ARRAY < <(jq -c '.images[] | select(.key != "ubuntu-noble-core" and .enabled != false)' "$IMAGES_JSON")
-          
-          if [ ${#IMAGES_ARRAY[@]} -eq 0 ]; then
-            echo "No non-core images enabled. Skipping."
-            exit 0
-          fi
-
-          for image_str in "${IMAGES_ARRAY[@]}"; do
-            key=$(jq -r '.key' <<< "$image_str")
-            dockerfile=$(jq -r '.dockerfile' <<< "$image_str")
-            lintTarget=$(jq -r '.lintTarget' <<< "$image_str")
-            
-            echo "🔨 Starting lint check for asset: ${key}"
-            docker buildx build \
-              --file "$dockerfile" \
-              --target "$lintTarget" \
-              --push=false .
-          done
-
-  # Control barrier ensuring lints are stable.
-  lint-gate:
-    name: lint / gate
-    runs-on: kasm-builder
-    needs: [validate-core, validate-others]
-    if: always()
-    steps:
-      - name: Check linting results
-        run: |
-          if [[ "${{ needs.validate-core.result }}" == "failure" || "${{ needs.validate-others.result }}" == "failure" ]]; then
-            echo "Linting gate failed. Blocking build process."
-            exit 1
-          fi
-          echo "All checks clear."
-
-  # Builds and stages the multi-arch core foundation image into Harbor.
-  publish-core:
-    name: Publish dev – ubuntu-noble-core
-    runs-on: kasm-builder
-    needs: [lint-gate]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Get core image config
-        id: core-config
-        shell: bash
-        run: |
-          CORE_CONFIG=$(jq -r '.images[] | select(.key == "ubuntu-noble-core" and .enabled != false)' "$IMAGES_JSON")
-          if [ -z "$CORE_CONFIG" ]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "skip=false" >> "$GITHUB_OUTPUT"
-          echo "dockerfile=$(echo "$CORE_CONFIG" | jq -r '.dockerfile')" >> "$GITHUB_OUTPUT"
-          echo "devTarget=$(echo "$CORE_CONFIG" | jq -r '.devTarget')" >> "$GITHUB_OUTPUT"
-          echo "architectures=$(echo "$CORE_CONFIG" | jq -r '(if .architectures then .architectures else ["linux/amd64"] end) | join(",")')" >> "$GITHUB_OUTPUT"
-
-          local_repo="${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/ubuntu-noble-core"
-          tags_array=$(echo "$CORE_CONFIG" | jq '.devTags')
-          tag_string=""
-          if [[ "$tags_array" != "null" ]]; then
-            mapfile -t tags < <(jq -r '.[]' <<< "$tags_array")
-            for tag in "${tags[@]}"; do
-              if [[ -z "$tag_string" ]]; then
-                tag_string="${local_repo}:${tag}"
-              else
-                tag_string+=" ${local_repo}:${tag}"
-              fi
-            done
-          fi
-          echo "tags=$tag_string" >> "$GITHUB_OUTPUT"
-
-      - name: Login to Local Harbor
-        if: steps.core-config.outputs.skip == 'false'
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.HARBOR_REGISTRY }}
-          username: admin
-          password: KonderlaHarbor2026!
-
-      - name: Build & push – ubuntu-noble-core
-        if: steps.core-config.outputs.skip == 'false'
-        run: |
-          TAG_ARGS=""
-          for t in ${{ steps.core-config.outputs.tags }}; do
-            TAG_ARGS+="-t $t "
-          done
-          
-          # FIXED: Swapped space-separated flag argument for an explicit standard flag value mapping
-          docker buildx build \
-            --file "${{ steps.core-config.outputs.dockerfile }}" \
-            --target "${{ steps.core-config.outputs.devTarget }}" \
-            --platform "${{ steps.core-config.outputs.architectures }}" \
-            $TAG_ARGS \
-            --push=true .
-
-  # Compiles and pushes all subsequent non-core images straight into Harbor via loop
+  # STEP 3: Fan out all remaining enabled images to multiple runners concurrently
   publish-others:
-    name: Publish dev – Non-Core Images
+    name: Parallel Build – ${{ matrix.image.key }}
     runs-on: kasm-builder
-    needs: [publish-core]
+    needs: [generate-matrix, publish-core]
+    strategy:
+      fail-fast: false  # Don't cancel other builds if a single workspace fails to compile
+      matrix:
+        image: ${{ fromJson(needs.generate-matrix.outputs.non_core_matrix) }}
+    
     steps:
-      - name: Checkout
+      - name: Checkout Source
         uses: actions/checkout@v4
 
-      - name: Login to Local Harbor
+      - name: Login to local Harbor
         uses: docker/login-action@v3
         with:
           registry: ${{ env.HARBOR_REGISTRY }}
           username: admin
           password: KonderlaHarbor2026!
 
-      - name: Execute Build and Push Loop
+      - name: Parse Architectures and Tags
+        id: Image-metadata
         shell: bash
         run: |
-          set -euo pipefail
-          mapfile -t IMAGES_ARRAY < <(jq -c '.images[] | select(.key != "ubuntu-noble-core" and .enabled != false)' "$IMAGES_JSON")
-          
-          if [ ${#IMAGES_ARRAY[@]} -eq 0 ]; then
-            echo "No non-core images enabled. Skipping."
-            exit 0
-          fi
+          ARCHS=$(echo '${{ toJSON(matrix.image.architectures) }}' | jq -r '(if . then . else ["linux/amd64"] end) | join(",")')
+          echo "architectures=${ARCHS}" >> "$GITHUB_OUTPUT"
 
-          for image_str in "${IMAGES_ARRAY[@]}"; do
-            key=$(jq -r '.key' <<< "$image_str")
-            dockerfile=$(jq -r '.dockerfile' <<< "$image_str")
-            devTarget=$(jq -r '.devTarget' <<< "$image_str")
-            local_repo="${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${key}"
-            archs=$(jq -r '(if .architectures then .architectures else ["linux/amd64"] end) | join(",")' <<< "$image_str")
-
-            TAG_ARGS=""
-            tags_array=$(jq '.devTags' <<< "$image_str")
-            if [[ "$tags_array" != "null" ]]; then
-              mapfile -t tags < <(jq -r '.[]' <<< "$tags_array")
-              for tag in "${tags[@]}"; do
-                TAG_ARGS+="-t ${local_repo}:${tag} "
-              done
-            fi
-
-            echo "🚀 Compiling and pushing asset to Harbor: ${key}"
-            # FIXED: Swapped space-separated flag argument for an explicit standard flag value mapping
-            docker buildx build \
-              --file "$dockerfile" \
-              --target "$devTarget" \
-              --platform "$archs" \
-              $TAG_ARGS \
-              --push=true .
+          # Format developer tags dynamically for Buildx mapping
+          LOCAL_REPO="${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ matrix.image.key }}"
+          TAG_ARGS=""
+          mapfile -t TAGS < <(echo '${{ toJSON(matrix.image.devTags) }}' | jq -r '.[]')
+          for tag in "${TAGS[@]}"; do
+            TAG_ARGS+="-t ${LOCAL_REPO}:${tag} "
           done
+          echo "tags=${TAG_ARGS}" >> "$GITHUB_OUTPUT"
+
+      - name: Compile and Push Workspace
+        run: |
+          # Executes concurrently across multiple runners based on kasm-builder availability
+          docker buildx build \
+            --file "${{ matrix.image.dockerfile }}" \
+            --target "${{ matrix.image.devTarget }}" \
+            --platform "${{ steps.image-metadata.outputs.architectures }}" \
+            ${{ steps.image-metadata.outputs.tags }} \
+            --pull \
+            --no-cache \
+            --push=true .

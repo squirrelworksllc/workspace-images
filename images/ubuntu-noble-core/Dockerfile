@@ -68,6 +68,8 @@ RUN set -eux; \
 # --- Baseline Execution ---
 RUN set -eux; \
     apt-get update; \
+    # SECURITY PATCH: Remediate base vulnerabilities immediately
+    apt-get dist-upgrade -y; \
     \
     # Intentionally tiny list for the Core image
     SCRIPTS=( \
@@ -80,6 +82,15 @@ RUN set -eux; \
       echo ">>> Executing Base Module: ${SCRIPT}"; \
       bash "${INST_DIR}${SCRIPT}" || { exit 1; }; \
     done; \
+    \
+    # AUTOMATED REMEDIATION PURGE: Strip leftover headers, caches, and dead dependencies
+    apt-get autoremove -y --purge; \
+    apt-get clean; \
+    rm -rf /var/lib/apt/lists/* \
+           /tmp/* \
+           /var/tmp/* \
+           /var/log/apt/* \
+           /var/log/dpkg.log; \
     \
     # --- Final Foundation Prep ---
     "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \

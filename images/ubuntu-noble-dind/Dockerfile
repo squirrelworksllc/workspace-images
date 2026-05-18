@@ -71,6 +71,8 @@ ARG APT_DEBUG=false
 
 RUN set -eux; \
     apt-get update; \
+    # SECURITY PATCH: Force-upgrade engine base libraries before layer execution
+    apt-get dist-upgrade -y; \
     \
     # =========================================================================
     # SQUIRRELWORKS MODULE REGISTRY (DinD Flavor)
@@ -111,6 +113,15 @@ RUN set -eux; \
         exit "$rc"; \
       }; \
     done; \
+    \
+    # AUTOMATED REMEDIATION PURGE: Strip build artifacts and cached workspace layers
+    apt-get autoremove -y --purge; \
+    apt-get clean; \
+    rm -rf /var/lib/apt/lists/* \
+           /tmp/* \
+           /var/tmp/* \
+           /var/log/apt/* \
+           /var/log/dpkg.log; \
     \
     # --- Final Session Preparation ---
     "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \
