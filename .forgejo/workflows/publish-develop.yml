@@ -14,29 +14,11 @@ permissions:
   contents: read
 
 env:
-  IMAGES_JSON: .vscode/images.json
   HARBOR_REGISTRY: forge.konderla.org
   HARBOR_PROJECT: squirrelworks
 
 jobs:
-  # STEP 1: Parse JSON configurations dynamically to build the execution matrix
-  generate-matrix:
-    name: Map Active Images
-    runs-on: kasm-builder
-    outputs:
-      non_core_matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - name: Checkout Source
-        uses: actions/checkout@v4
-
-      - name: Parse Images Configuration
-        id: set-matrix
-        shell: bash
-        run: |
-          MATRIX_JSON=$(jq -c '[.images[] | select(.key != "ubuntu-noble-core" and .enabled != false)]' "$IMAGES_JSON")
-          echo "matrix=${MATRIX_JSON}" >> "$GITHUB_OUTPUT"
-
-  # STEP 2: Compile the foundation layer first (Sequential dependency gate)
+  # STEP 1: Compile the foundation layer first (Sequential dependency gate)
   publish-core:
     name: Build Core – ubuntu-noble-core
     runs-on: kasm-builder
@@ -47,7 +29,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
-          # HOMELAB TLS BRIDGE: Bypasses isolated container driver x509 checks for internal CA certs
           config-inline: |
             [registry."forge.konderla.org"]
               insecure = true
@@ -71,15 +52,22 @@ jobs:
           tags: |
             ${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/ubuntu-noble-core:develop
 
-  # STEP 3: Fan out all remaining enabled images to multiple runners concurrently
+  # STEP 2: Fan out all child workspaces concurrently across available kasm-builder runners
   publish-others:
-    name: Parallel Build – ${{ matrix.image.key }}
+    name: Parallel Build – ubuntu-noble-${{ matrix.workspace.key }}
     runs-on: kasm-builder
-    needs: [generate-matrix, publish-core]
+    needs: [publish-core]
     strategy:
-      fail-fast: false  
+      fail-fast: false  # Don't kill other workspace builds if one fails
       matrix:
-        image: ${{ fromJson(needs.generate-matrix.outputs.non_core_matrix) }}
+        # HARDWARE SCALING ENGINE: Tightly defines the assets so Forgejo can distribute them instantly
+        workspace:
+          - key: "desktop"
+            dockerfile: "images/ubuntu-noble-desktop/Dockerfile"
+          - key: "dind"
+            dockerfile: "images/ubuntu-noble-dind/Dockerfile"
+          - key: "remnux"
+            dockerfile: "images/remnux/Dockerfile"
     
     steps:
       - name: Checkout Source
@@ -88,7 +76,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
-          # HOMELAB TLS BRIDGE: Bypasses isolated container driver x509 checks for internal CA certs
           config-inline: |
             [registry."forge.konderla.org"]
               insecure = true
@@ -100,40 +87,16 @@ jobs:
           username: ${{ secrets.HARBOR_USERNAME }}
           password: ${{ secrets.HARBOR_PASSWORD }}
 
-      - name: Parse Image Metadata
-        id: meta
-        shell: bash
-        run: |
-          ARCHS=$(echo '${{ toJSON(matrix.image.architectures) }}' | jq -r '(if . and length > 0 then . else ["linux/amd64"] end) | join(",")')
-          echo "platforms=${ARCHS}" >> "$GITHUB_OUTPUT"
-
-          LOCAL_REPO="${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ matrix.image.key }}"
-          TAGS_JSON='${{ toJSON(matrix.image.devTags) }}'
-          
-          formatted_tags=""
-          if [ "$TAGS_JSON" != "null" ]; then
-            while read -r tag; do
-              if [ -n "$tag" ]; then
-                formatted_tags+="${LOCAL_REPO}:${tag}"$'\n'
-              fi
-            done < <(echo "$TAGS_JSON" | jq -r '.[]')
-          else
-            formatted_tags+="${LOCAL_REPO}:develop"$'\n'
-          fi
-          
-          echo "tags<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$formatted_tags" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-
       - name: Compile and Push Workspace
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ${{ matrix.image.dockerfile }}
-          target: ${{ matrix.image.devTarget }}
-          platforms: ${{ steps.meta.outputs.platforms }}
+          file: ${{ matrix.workspace.dockerfile }}
+          target: develop
+          platforms: linux/amd64
           push: true
           pull: true
           no-cache: true
-          tags: ${{ steps.meta.outputs.tags }}
           sbom: true
+          tags: |
+            ${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/ubuntu-noble-${{ matrix.workspace.key }}:develop
