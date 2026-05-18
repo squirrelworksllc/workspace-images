@@ -65,8 +65,6 @@ ARG APT_DEBUG=false
 
 RUN set -eux; \
     apt-get update; \
-    # SECURITY PATCH WAVE 1: Harden base layer before prerequisite tools install
-    apt-get dist-upgrade -y; \
     \
     # =========================================================================
     # SQUIRRELWORKS MODULE REGISTRY (REMNux Prerequisites)
@@ -117,12 +115,8 @@ RUN set -eux; \
     # =========================================================================
     # STEP 6: POST-REMNUX REPAIR & CLEANUP
     # =========================================================================
-    # SECURITY PATCH WAVE 2: Force upgrade packages/dependencies dumped by Salt states
-    log "Remediating vulnerabilities introduced by SaltStack States..."; \
-    apt-get update && apt-get dist-upgrade -y; \
-    \
     log "Restoring Kasm-critical dependencies (PulseAudio)..."; \
-    apt-get install -y --no-install-recommends pulseaudio; \
+    apt-get update && apt-get install -y --no-install-recommends pulseaudio; \
     \
     log "Running Global SquirrelWorks Cleanup..."; \
     SKIP_CLEAN=false bash "${INST_DIR}/ubuntu/install/common/01_cleanup.sh"; \
@@ -141,21 +135,8 @@ RUN set -eux; \
     mkdir -p /home/kasm-user; \
     chown -R 1000:0 /home/kasm-user; \
     \
-    # AUTOMATED REMEDIATION PURGE: Strip Salt logs, state caches, and dead packages
-    log "Purging orphaned Salt dependencies and tracking indexes..."; \
-    apt-get autoremove -y --purge; \
-    apt-get clean; \
-    rm -rf /var/lib/apt/lists/* \
-           /tmp/* \
-           /var/tmp/* \
-           /var/log/apt/* \
-           /var/log/dpkg.log \
-           /var/cache/salt \
-           /root/.cache \
-           /root/.salt; \
-    \
     # Deep cleanup of temporary build assets
-    rm -rf "${INST_DIR}/ubuntu/install"
+    rm -rf "${INST_DIR}/ubuntu/install" /tmp/* /var/cache/salt
 
 # ----------------------------- FINALIZATION -----------------------------
 ENV HOME=/home/kasm-user
