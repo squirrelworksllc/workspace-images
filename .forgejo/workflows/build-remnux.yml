@@ -1,4 +1,4 @@
-name: Build Noble REMnux (develop)
+name: Build REMnux (develop)
 run-name: REMnux Workspace Compile triggered by ${{ github.actor }}
 
 on:
@@ -27,7 +27,7 @@ env:
 
 jobs:
   build-isolated-remnux:
-    name: Build Workspace – ubuntu-noble-remnux
+    name: Build Workspace – remnux
     runs-on: kasm-builder
     # Trigger execute gate: run directly on push OR if the upstream core build succeeded
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
@@ -75,4 +75,4 @@ jobs:
           no-cache: true
           sbom: true
           tags: |
-            ${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/ubuntu-noble-${{ env.IMAGE_KEY }}:develop
+            ${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ env.IMAGE_KEY }}:develop
