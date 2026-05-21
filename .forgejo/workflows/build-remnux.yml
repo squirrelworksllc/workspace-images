@@ -1,9 +1,14 @@
-name: Publish REMnux (develop) - Isolated Security Pipeline
-run-name: Develop-branch REMnux Compile triggered by ${{ github.actor }}
+name: Build Noble REMnux (develop)
+run-name: REMnux Workspace Compile triggered by ${{ github.actor }}
 
 on:
+  push:
+    branches:
+      - develop
+    paths:
+      - 'images/remnux/**'
   workflow_run:
-    workflows: ["Publish (develop) - In-House Forgejo Parallel Engine"]
+    workflows: ["Build Noble Core (develop)"]
     types:
       - completed
 
@@ -24,11 +29,25 @@ jobs:
   build-isolated-remnux:
     name: Build Workspace – ubuntu-noble-remnux
     runs-on: kasm-builder
-    # Guard rail: Only execute if the upstream pipeline completed with absolute success
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    # Trigger execute gate: run directly on push OR if the upstream core build succeeded
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    
     steps:
       - name: Checkout Source
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Git Diff Guard (Prevent Race Conditions)
+        if: ${{ github.event_name == 'push' }}
+        id: diff_check
+        run: |
+          echo "Analyzing commit changesets..."
+          if git diff --name-only HEAD~1 HEAD | grep -q 'images/ubuntu-noble-core/'; then
+            echo "::notice:: Core foundation files were modified in this same commit. Standing down to allow upstream Build Noble Core to finish first."
+            exit 1
+          fi
+          echo "No core changes detected. Proceeding with immediate standalone REMnux build."
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
