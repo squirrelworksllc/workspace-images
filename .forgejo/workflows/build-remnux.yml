@@ -30,6 +30,7 @@ jobs:
     name: Build Workspace – remnux
     runs-on: kasm-builder
     # Trigger execute gate: run directly on push OR if the upstream core build succeeded
+    timeout-minutes: 120  # <--- Gives the image up to 2 hours to compile and push
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     
     steps:
