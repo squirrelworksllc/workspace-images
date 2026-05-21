@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 ################################################################################
-# SquirrelWorks 1.1 - Ubuntu Noble REMNux (Forensic Edition)
+# SquirrelWorks 1.1 - Ubuntu Noble REMNux for Kasm Workspaces
 # 
 # ARCHITECTURE: Modular Registry + SaltStack Overlay
 # BUILD CONTEXT: Repo Root
