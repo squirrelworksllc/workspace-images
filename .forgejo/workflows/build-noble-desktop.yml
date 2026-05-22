@@ -8,9 +8,10 @@ on:
     paths:
       - 'images/ubuntu-noble-desktop/**'
   workflow_run:
-    workflows: ["Build Core (develop)"]
+    workflows: ["Build Noble Core (develop)"]
     types:
       - completed
+  workflow_dispatch:
 
 concurrency:
   group: build-desktop-develop

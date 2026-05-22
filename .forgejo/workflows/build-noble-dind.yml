@@ -11,6 +11,7 @@ on:
     workflows: ["Build Noble Core (develop)"]
     types:
       - completed
+  workflow_dispatch:
 
 concurrency:
   group: build-dind-develop

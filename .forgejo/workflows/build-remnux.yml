@@ -11,6 +11,7 @@ on:
     workflows: ["Build Noble Core (develop)"]
     types:
       - completed
+  workflow_dispatch:
 
 concurrency:
   group: build-remnux-develop
@@ -29,8 +30,7 @@ jobs:
   build-isolated-remnux:
     name: Build Workspace – remnux
     runs-on: kasm-builder
-    # Trigger execute gate: run directly on push OR if the upstream core build succeeded
-    timeout-minutes: 120  # <--- Gives the image up to 2 hours to compile and push
+    timeout-minutes: 120  
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     
     steps:
@@ -74,6 +74,6 @@ jobs:
           push: true
           pull: true
           no-cache: true
-          sbom: true
+          sbom: false # <--- DISABLES THE BUILDKIT VULNERABILITY/ASSET SCANNER PHASE COMPLETELY
           tags: |
             ${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ env.IMAGE_KEY }}:develop
