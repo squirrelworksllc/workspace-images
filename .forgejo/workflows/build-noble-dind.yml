@@ -64,6 +64,7 @@ jobs:
 
       - name: Compile and Push Workspace
         uses: docker/build-push-action@v6
+        timeout-minutes: 120
         with:
           context: .
           file: ${{ env.DOCKERFILE_PATH }}

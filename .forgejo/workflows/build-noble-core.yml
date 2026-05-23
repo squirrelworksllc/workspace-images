@@ -42,6 +42,7 @@ jobs:
 
       - name: Build & Push Foundation Image
         uses: docker/build-push-action@v6
+        timeout-minutes: 120
         with:
           context: .
           file: images/ubuntu-noble-core/Dockerfile
