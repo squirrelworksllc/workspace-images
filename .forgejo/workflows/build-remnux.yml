@@ -76,3 +76,9 @@ jobs:
           sbom: false # <--- DISABLES THE BUILDKIT VULNERABILITY/ASSET SCANNER PHASE COMPLETELY
           tags: |
             ${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ env.IMAGE_KEY }}:develop
+
+      - name: Post-Build Workspace Garbage Collection
+        run: |
+          docker builder prune -f
+          docker system prune -f
+        if: always()  # <--- CRITICAL: Guarantees cleanup runs on success OR failure

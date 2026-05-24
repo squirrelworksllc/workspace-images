@@ -77,3 +77,9 @@ jobs:
           sbom: true
           tags: |
             ${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/ubuntu-noble-${{ env.IMAGE_KEY }}:develop
+
+      - name: Post-Build Workspace Garbage Collection
+        run: |
+          docker builder prune -f
+          docker system prune -f
+        if: always()  # <--- CRITICAL: Guarantees cleanup runs on success OR failure
