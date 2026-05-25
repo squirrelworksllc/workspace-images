@@ -70,7 +70,7 @@ jobs:
           username: ${{ secrets.HARBOR_USERNAME }}
           password: ${{ secrets.HARBOR_PASSWORD }}
 
-      - name: Extract Tags from images.json
+      - name: Extract Build Config from images.json
         id: prep
         run: |
           ENV_SELECTION="${{ github.event.inputs.target_env || 'develop' }}"
@@ -78,21 +78,26 @@ jobs:
           
           if [ "$ENV_SELECTION" = "production" ]; then
             TAG_ARRAY="prodTags"
-            TARGET_STAGE="production"
+            TARGET_KEY="prodTarget"
           else
             TAG_ARRAY="devTags"
-            TARGET_STAGE="develop"
+            TARGET_KEY="devTarget"
           fi
           
-          RAW_TAGS=$(jq -r ".images[] | select(.key == \"${{ env.IMAGE_KEY }}\") | .${TAG_ARRAY}[]" images.json)
+          IMAGE_CONFIG=$(jq -c ".images[] | select(.key == \"${{ env.IMAGE_KEY }}\")" images.json)
+          
+          RAW_TAGS=$(echo $IMAGE_CONFIG | jq -r ".${TAG_ARRAY}[]")
+          REPO=$(echo $IMAGE_CONFIG | jq -r ".repo")
           
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "tags<<$EOF" >> "$GITHUB_OUTPUT"
           for TAG in $RAW_TAGS; do
-            echo "${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ env.IMAGE_KEY }}:${TAG}" >> "$GITHUB_OUTPUT"
+            echo "${{ env.HARBOR_REGISTRY }}/${REPO}:${TAG}" >> "$GITHUB_OUTPUT"
           done
           echo "$EOF" >> "$GITHUB_OUTPUT"
-          echo "target=$TARGET_STAGE" >> "$GITHUB_OUTPUT"
+          
+          BUILD_TARGET=$(echo $IMAGE_CONFIG | jq -r ".${TARGET_KEY}")
+          echo "target=$BUILD_TARGET" >> "$GITHUB_OUTPUT"
 
       - name: Compile and Push Workspace
         uses: docker/build-push-action@v6

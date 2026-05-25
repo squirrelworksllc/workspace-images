@@ -8,6 +8,7 @@
       "prodTags": ["1.18.0", "1.18.1", "latest"],
       "devTags": ["develop"],
       "devTarget": "develop",
+      "prodTarget": "production",
       "lintTarget": "lint",
       "architectures": ["linux/amd64", "linux/arm64"]
     },
@@ -19,6 +20,7 @@
       "prodTags": ["1.18.0", "1.18.1", "latest"],
       "devTags": ["develop"],
       "devTarget": "develop",
+      "prodTarget": "production",
       "lintTarget": "lint",
       "architectures": ["linux/amd64", "linux/arm64"]
     },
@@ -30,6 +32,7 @@
       "prodTags": ["1.18.0", "1.18.1", "latest"],
       "devTags": ["develop"],
       "devTarget": "develop",
+      "prodTarget": "production",
       "lintTarget": "lint",
       "architectures": ["linux/amd64", "linux/arm64"]
     },
@@ -41,6 +44,7 @@
       "prodTags": ["1.18.0", "1.18.1", "latest"],
       "devTags": ["develop"],
       "devTarget": "develop",
+      "prodTarget": "production",
       "lintTarget": "lint",
       "architectures": ["linux/amd64"]
     },
@@ -52,6 +56,7 @@
       "prodTags": ["1.18.0", "1.18.1", "latest"],
       "devTags": ["develop"],
       "devTarget": "develop",
+      "prodTarget": "production",
       "lintTarget": "lint",
       "architectures": ["linux/amd64"]
     }
