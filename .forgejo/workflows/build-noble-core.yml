@@ -23,7 +23,7 @@ env:
 jobs:
   publish-core:
     name: Build Core – ubuntu-noble-core
-    runs-on: kasm-builder
+    runs-on: [kasm-builder, repo-squirrelworks]
     steps:
       - name: Checkout Source
         uses: actions/checkout@v4

@@ -29,7 +29,7 @@ env:
 jobs:
   build-isolated-remnux:
     name: Build Workspace – remnux
-    runs-on: kasm-builder
+    runs-on: [kasm-builder, repo-remnux-kasm]
     timeout-minutes: 120  
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     

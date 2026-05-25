@@ -29,7 +29,7 @@ env:
 jobs:
   build-workspace:
     name: Build Workspace – ubuntu-noble-desktop
-    runs-on: kasm-builder
+    runs-on: [kasm-builder, repo-squirrelworks]
     # If triggered by workflow_run, only run if the upstream core build succeeded
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     
