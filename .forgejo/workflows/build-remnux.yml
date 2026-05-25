@@ -1,4 +1,4 @@
-name: Build REMnux (develop)
+name: Build REMnux
 run-name: REMnux Workspace Compile triggered by ${{ github.actor }}
 
 on:
@@ -8,13 +8,22 @@ on:
     paths:
       - 'images/remnux/**'
   workflow_run:
-    workflows: ["Build Noble Core (develop)"]
+    workflows: ["Build Noble Core"]
     types:
       - completed
   workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Build Target Environment'
+        required: true
+        default: 'develop'
+        type: choice
+        options:
+          - develop
+          - production
 
 concurrency:
-  group: build-remnux-develop
+  group: build-remnux-${{ github.event.inputs.target_env || 'develop' }}
   cancel-in-progress: true
 
 permissions:
@@ -28,7 +37,7 @@ env:
 
 jobs:
   build-isolated-remnux:
-    name: Build Workspace – remnux
+    name: Build Workspace
     runs-on: [kasm-builder, repo-remnux-kasm]
     timeout-minutes: 120  
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
@@ -62,23 +71,46 @@ jobs:
           username: ${{ secrets.HARBOR_USERNAME }}
           password: ${{ secrets.HARBOR_PASSWORD }}
 
+      - name: Extract Tags from images.json
+        id: prep
+        run: |
+          ENV_SELECTION="${{ github.event.inputs.target_env || 'develop' }}"
+          echo "Selected Environment: $ENV_SELECTION"
+          
+          if [ "$ENV_SELECTION" = "production" ]; then
+            TAG_ARRAY="prodTags"
+            TARGET_STAGE="production"
+          else
+            TAG_ARRAY="devTags"
+            TARGET_STAGE="develop"
+          fi
+          
+          RAW_TAGS=$(jq -r ".images[] | select(.key == \"${{ env.IMAGE_KEY }}\") | .${TAG_ARRAY}[]" images.json)
+          
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "tags<<$EOF" >> "$GITHUB_OUTPUT"
+          for TAG in $RAW_TAGS; do
+            echo "${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ env.IMAGE_KEY }}:${TAG}" >> "$GITHUB_OUTPUT"
+          done
+          echo "$EOF" >> "$GITHUB_OUTPUT"
+          echo "target=$TARGET_STAGE" >> "$GITHUB_OUTPUT"
+
       - name: Compile and Push Isolated Workspace
         uses: docker/build-push-action@v6
         timeout-minutes: 120
         with:
           context: .
           file: ${{ env.DOCKERFILE_PATH }}
-          target: develop
+          target: ${{ steps.prep.outputs.target }}
           platforms: linux/amd64
           push: true
           pull: true
           no-cache: true
           sbom: false # <--- DISABLES THE BUILDKIT VULNERABILITY/ASSET SCANNER PHASE COMPLETELY
-          tags: |
-            ${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ env.IMAGE_KEY }}:develop
+          tags: ${{ steps.prep.outputs.tags }}
 
       - name: Post-Build Workspace Garbage Collection
         run: |
           docker builder prune -f
           docker system prune -f
-        if: always()  # <--- CRITICAL: Guarantees cleanup runs on success OR failure
+        if: always()

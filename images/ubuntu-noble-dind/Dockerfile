@@ -71,8 +71,6 @@ ARG APT_DEBUG=false
 
 RUN set -eux; \
     apt-get update; \
-    # SECURITY PATCH: Force-upgrade engine base libraries before layer execution
-    apt-get dist-upgrade -y; \
     \
     # =========================================================================
     # SQUIRRELWORKS MODULE REGISTRY (DinD Flavor)
@@ -91,13 +89,14 @@ RUN set -eux; \
       SCRIPTS+=( "/ubuntu/install/chromium/install_chromium.sh" ); \
     fi; \
     \
-    # GROUP 3: Developer Productivity
+    # GROUP 3: Developer Productivity & Final Polish
     SCRIPTS+=( \
       "/ubuntu/install/vs_code/install_vs_code.sh" \
-      \
-      # GROUP 4: Branding & Final Polish
       "/ubuntu/install/desktop/install.sh" \
       "/ubuntu/install/common/01_cleanup.sh" \
+      \
+      # GROUP 4: Automated Remediation & Purge (MUST BE LAST)
+      "/ubuntu/install/common/02_remediation.sh" \
     ); \
     \
     # Execution Loop
@@ -113,15 +112,6 @@ RUN set -eux; \
         exit "$rc"; \
       }; \
     done; \
-    \
-    # AUTOMATED REMEDIATION PURGE: Strip build artifacts and cached workspace layers
-    apt-get autoremove -y --purge; \
-    apt-get clean; \
-    rm -rf /var/lib/apt/lists/* \
-           /tmp/* \
-           /var/tmp/* \
-           /var/log/apt/* \
-           /var/log/dpkg.log; \
     \
     # --- Final Session Preparation ---
     "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \

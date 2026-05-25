@@ -1,4 +1,4 @@
-name: Build Noble Core (develop)
+name: Build Noble Core
 run-name: Core Foundation Compile triggered by ${{ github.actor }}
 
 on:
@@ -8,9 +8,18 @@ on:
     paths:
       - 'images/ubuntu-noble-core/**'
   workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Build Target Environment'
+        required: true
+        default: 'develop'
+        type: choice
+        options:
+          - develop
+          - production
 
 concurrency:
-  group: build-core-develop
+  group: build-core-${{ github.event.inputs.target_env || 'develop' }}
   cancel-in-progress: true
 
 permissions:
@@ -19,10 +28,12 @@ permissions:
 env:
   HARBOR_REGISTRY: forge.konderla.org
   HARBOR_PROJECT: squirrelworks
+  IMAGE_KEY: ubuntu-noble-core
+  DOCKERFILE_PATH: images/ubuntu-noble-core/Dockerfile
 
 jobs:
   publish-core:
-    name: Build Core – ubuntu-noble-core
+    name: Build Core
     runs-on: [kasm-builder, repo-squirrelworks]
     steps:
       - name: Checkout Source
@@ -40,21 +51,49 @@ jobs:
           username: ${{ secrets.HARBOR_USERNAME }}
           password: ${{ secrets.HARBOR_PASSWORD }}
 
+      - name: Extract Tags from images.json
+        id: prep
+        run: |
+          # Default to develop if triggered by a branch push instead of UI dispatch
+          ENV_SELECTION="${{ github.event.inputs.target_env || 'develop' }}"
+          echo "Selected Environment: $ENV_SELECTION"
+          
+          if [ "$ENV_SELECTION" = "production" ]; then
+            TAG_ARRAY="prodTags"
+            TARGET_STAGE="production"
+          else
+            TAG_ARRAY="devTags"
+            TARGET_STAGE="develop"
+          fi
+          
+          # Parse the JSON file directly
+          RAW_TAGS=$(jq -r ".images[] | select(.key == \"${{ env.IMAGE_KEY }}\") | .${TAG_ARRAY}[]" images.json)
+          
+          # Write the tags to the GitHub Output context in a multiline format
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "tags<<$EOF" >> "$GITHUB_OUTPUT"
+          for TAG in $RAW_TAGS; do
+            echo "${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ env.IMAGE_KEY }}:${TAG}" >> "$GITHUB_OUTPUT"
+          done
+          echo "$EOF" >> "$GITHUB_OUTPUT"
+          
+          # Pass the target stage (develop/production) to the Dockerfile
+          echo "target=$TARGET_STAGE" >> "$GITHUB_OUTPUT"
+
       - name: Build & Push Foundation Image
         uses: docker/build-push-action@v6
         timeout-minutes: 120
         with:
           context: .
-          file: images/ubuntu-noble-core/Dockerfile
-          target: develop
+          file: ${{ env.DOCKERFILE_PATH }}
+          target: ${{ steps.prep.outputs.target }}
           push: true
           pull: true      
           no-cache: true  
-          tags: |
-            ${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/ubuntu-noble-core:develop
+          tags: ${{ steps.prep.outputs.tags }}
 
       - name: Post-Build Workspace Garbage Collection
         run: |
           docker builder prune -f
           docker system prune -f
-        if: always()  # <--- CRITICAL: Guarantees cleanup runs on success OR failure
+        if: always()

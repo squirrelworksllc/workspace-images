@@ -72,8 +72,6 @@ ARG APT_DEBUG=false
 
 RUN set -eux; \
     apt-get update; \
-    # SECURITY PATCH: Intercept and upgrade base child layer packages immediately
-    apt-get dist-upgrade -y; \
     \
     # =========================================================================
     # SQUIRRELWORKS MODULE REGISTRY
@@ -116,6 +114,9 @@ RUN set -eux; \
       # GROUP 6: Branding & Final Polish
       "/ubuntu/install/desktop/install.sh" \
       "/ubuntu/install/common/01_cleanup.sh" \
+      \
+      # GROUP 7: Automated Remediation & Purge (MUST BE LAST)
+      "/ubuntu/install/common/02_remediation.sh" \
     ); \
     \
     # Execution Loop
@@ -131,15 +132,6 @@ RUN set -eux; \
         exit "$rc"; \
       }; \
     done; \
-    \
-    # AUTOMATED REMEDIATION PURGE: Clean up massive post-app install caching
-    apt-get autoremove -y --purge; \
-    apt-get clean; \
-    rm -rf /var/lib/apt/lists/* \
-           /tmp/* \
-           /var/tmp/* \
-           /var/log/apt/* \
-           /var/log/dpkg.log; \
     \
     # --- Final Session Preparation ---
     "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \
