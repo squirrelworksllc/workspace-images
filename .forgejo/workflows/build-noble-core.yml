@@ -35,6 +35,9 @@ jobs:
   publish-core:
     name: Build Core
     runs-on: [kasm-builder, repo-squirrelworks]
+    # This environment isolation variable ensures all tools in this specific job share a unique session path
+    env:
+      DOCKER_CONFIG: ${{ runner.temp }}/docker_sh_${{ github.run_id }}
     steps:
       - name: Checkout Source
         uses: actions/checkout@v4
@@ -50,8 +53,6 @@ jobs:
           registry: ${{ env.HARBOR_REGISTRY }}
           username: ${{ secrets.HARBOR_USERNAME }}
           password: ${{ secrets.HARBOR_PASSWORD }}
-          # Isolates the config directly inside the active pipeline runtime workspace
-          config-file: ${{ gitea.workspace }}/.docker/config.json
 
       - name: Extract Tags from images.json
         id: prep
@@ -84,8 +85,6 @@ jobs:
       - name: Build & Push Foundation Image
         uses: docker/build-push-action@v6
         timeout-minutes: 120
-        env:
-          DOCKER_CONFIG: ${{ runner.temp }}/${{ github.run_id }}
         with:
           context: .
           file: ${{ env.DOCKERFILE_PATH }}

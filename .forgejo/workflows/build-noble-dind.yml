@@ -40,7 +40,8 @@ jobs:
     name: Build Workspace
     runs-on: [kasm-builder, repo-squirrelworks]
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
-    
+    env:
+      DOCKER_CONFIG: ${{ runner.temp }}/docker_sh_${{ github.run_id }}
     steps:
       - name: Checkout Source
         uses: actions/checkout@v4
@@ -69,8 +70,6 @@ jobs:
           registry: ${{ env.HARBOR_REGISTRY }}
           username: ${{ secrets.HARBOR_USERNAME }}
           password: ${{ secrets.HARBOR_PASSWORD }}
-          # Isolates the config directly inside the active pipeline runtime workspace
-          config-file: ${{ gitea.workspace }}/.docker/config.json
 
       - name: Extract Tags from images.json
         id: prep
@@ -103,8 +102,6 @@ jobs:
       - name: Compile and Push Workspace
         uses: docker/build-push-action@v6
         timeout-minutes: 120
-        env:
-          DOCKER_CONFIG: ${{ runner.temp }}/${{ github.run_id }}
         with:
           context: .
           file: ${{ env.DOCKERFILE_PATH }}
