@@ -27,7 +27,6 @@ permissions:
 
 env:
   HARBOR_REGISTRY: forge.konderla.org
-  HARBOR_PROJECT: squirrelworks
   IMAGE_KEY: ubuntu-noble-core
   DOCKERFILE_PATH: images/ubuntu-noble-core/Dockerfile
 
@@ -43,10 +42,9 @@ jobs:
         uses: docker/setup-buildx-action@v3
         with:
           driver: docker-container
-          # Tells the isolated container to trust your self-signed certificate authority
           config-inline: |
             [registry."forge.konderla.org"]
-              ca=["/etc/docker/certs.d/forge.konderla.org/ca.crt"]
+              ca=["/etc/ssl/certs/ca-certificates.crt"]
 
       - name: Login to local Harbor
         uses: docker/login-action@v3
