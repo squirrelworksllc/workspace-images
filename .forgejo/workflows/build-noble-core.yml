@@ -50,6 +50,8 @@ jobs:
           registry: ${{ env.HARBOR_REGISTRY }}
           username: ${{ secrets.HARBOR_USERNAME }}
           password: ${{ secrets.HARBOR_PASSWORD }}
+          # This creates a unique file for every single workflow execution
+          config-file: ${{ runner.temp }}/docker-config-${{ github.run_id }}.json
 
       - name: Extract Tags from images.json
         id: prep
