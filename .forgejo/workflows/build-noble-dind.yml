@@ -87,12 +87,12 @@ jobs:
           
           IMAGE_CONFIG=$(jq -c ".images[] | select(.key == \"${{ env.IMAGE_KEY }}\")" "$JSON_FILE")
           RAW_TAGS=$(echo "$IMAGE_CONFIG" | jq -r ".${TAG_ARRAY}[]")
-          REPO=$(echo "$IMAGE_CONFIG" | jq -r ".repo")
+          REPO_FORGE=$(echo "$IMAGE_CONFIG" | jq -r ".repo_forge")
           
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "tags<<$EOF" >> "$GITHUB_OUTPUT"
           for TAG in $RAW_TAGS; do
-            echo "${{ env.HARBOR_REGISTRY }}/${REPO}:${TAG}" >> "$GITHUB_OUTPUT"
+            echo "${{ env.HARBOR_REGISTRY }}/${REPO_FORGE}:${TAG}" >> "$GITHUB_OUTPUT"
           done
           echo "$EOF" >> "$GITHUB_OUTPUT"
           
