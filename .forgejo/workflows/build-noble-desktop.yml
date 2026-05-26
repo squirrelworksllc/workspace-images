@@ -70,11 +70,13 @@ jobs:
           username: ${{ secrets.HARBOR_USERNAME }}
           password: ${{ secrets.HARBOR_PASSWORD }}
 
-      - name: Extract Build Config from images.json
+      - name: Extract Tags from images.json
         id: prep
         run: |
+          # Use $GITHUB_WORKSPACE to ensure we always find the file at the repo root
+          JSON_FILE="$GITHUB_WORKSPACE/images.json"
+          
           ENV_SELECTION="${{ github.event.inputs.target_env || 'develop' }}"
-          echo "Selected Environment: $ENV_SELECTION"
           
           if [ "$ENV_SELECTION" = "production" ]; then
             TAG_ARRAY="prodTags"
@@ -84,10 +86,11 @@ jobs:
             TARGET_KEY="devTarget"
           fi
           
-          IMAGE_CONFIG=$(jq -c ".images[] | select(.key == \"${{ env.IMAGE_KEY }}\")" images.json)
+          # Pass the path to the jq command
+          IMAGE_CONFIG=$(jq -c ".images[] | select(.key == \"${{ env.IMAGE_KEY }}\")" "$JSON_FILE")
           
-          RAW_TAGS=$(echo $IMAGE_CONFIG | jq -r ".${TAG_ARRAY}[]")
-          REPO=$(echo $IMAGE_CONFIG | jq -r ".repo")
+          RAW_TAGS=$(echo "$IMAGE_CONFIG" | jq -r ".${TAG_ARRAY}[]")
+          REPO=$(echo "$IMAGE_CONFIG" | jq -r ".repo")
           
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "tags<<$EOF" >> "$GITHUB_OUTPUT"
