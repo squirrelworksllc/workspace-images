@@ -69,7 +69,8 @@ jobs:
           registry: ${{ env.HARBOR_REGISTRY }}
           username: ${{ secrets.HARBOR_USERNAME }}
           password: ${{ secrets.HARBOR_PASSWORD }}
-          config-file: ${{ runner.temp }}/${{ github.run_id }}/config.json
+          # Isolates the config directly inside the active pipeline runtime workspace
+          config-file: ${{ gitea.workspace }}/.docker/config.json
 
       - name: Extract Tags from images.json
         id: prep
