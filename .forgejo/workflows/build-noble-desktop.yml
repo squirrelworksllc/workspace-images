@@ -117,43 +117,6 @@ jobs:
           sbom: true
           tags: ${{ steps.prep.outputs.tags }}
 
-      - name: Install VEX Toolchain Engine
-        run: |
-          wget https://github.com/openvex/vexctl/releases/latest/download/vexctl-linux-amd64
-          mv vexctl-linux-amd64 /usr/local/bin/vexctl
-          chmod +x /usr/local/bin/vexctl
-
-      - name: Decoupled OpenVEX Attestation
-        run: |
-          COMMON_VEX="images/vex_ubuntu_common.json"
-          IMAGE_DIR=$(dirname "${{ env.DOCKERFILE_PATH }}")
-          LOCAL_VEX="${IMAGE_DIR}/vex.json"
-          
-          VEX_FILES=""
-          if [ -f "$COMMON_VEX" ]; then
-            echo "==== [VEX] Ingesting common baseline rules: $COMMON_VEX ===="
-            VEX_FILES="$COMMON_VEX"
-          fi
-          
-          if [ -f "$LOCAL_VEX" ]; then
-            echo "==== [VEX] Ingesting localized exceptions profile: $LOCAL_VEX ===="
-            VEX_FILES="$VEX_FILES $LOCAL_VEX"
-          fi
-          
-          if [ -n "$VEX_FILES" ]; then
-            # Reverting to the tag array because vexctl explicitly requires a tag reference to generate the .att signature
-            CLEAN_TAGS=$(echo "${{ steps.prep.outputs.tags }}" | sed '/^[A-Za-z0-9+/=]\{20,\}$/d')
-            
-            for TARGET_IMAGE in $CLEAN_TAGS; do
-              echo "[VEX] Committing layered profiles to image tag: $TARGET_IMAGE"
-              vexctl attest --attach $VEX_FILES "$TARGET_IMAGE"
-            done
-            
-            echo "==== [VEX] Multi-stage profile composition completed successfully ===="
-          else
-            echo "==== [VEX] No common or localized profile documents located. Skipping. ===="
-          fi
-
       - name: Post-Build Workspace Garbage Collection
         run: |
           docker builder prune -f

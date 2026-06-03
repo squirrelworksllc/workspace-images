@@ -143,6 +143,13 @@ RUN set -eux; \
     # Cleanup only the ephemeral build scripts, keeping the shared common tools
     rm -rf "${INST_DIR}/ubuntu/install"
 
+# ############################################################################
+# -------------------------- SECURITY METADATA LAYER ----------------------- #
+# ############################################################################
+# Create the standard OpenVEX directory and embed the unified exception profile
+RUN mkdir -p /opt/vex
+COPY images/vex_ubuntu_common.json /opt/vex/vex.json
+
 # ----------------------------- FINALIZATION -----------------------------
 ENV HOME=/home/kasm-user
 WORKDIR ${HOME}

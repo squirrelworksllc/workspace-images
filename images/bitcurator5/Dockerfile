@@ -82,6 +82,16 @@ RUN set -eux; \
     chown -R 1000:0 /home/kasm-user; \
     rm -rf "${INST_DIR}"
 
+# ############################################################################
+# -------------------------- SECURITY METADATA LAYER ----------------------- #
+# ############################################################################
+# Create the standard OpenVEX directory and embed the unified exception profile
+RUN mkdir -p /opt/vex
+COPY images/vex_ubuntu_common.json /opt/vex/vex.json
+
+# ############################################################################
+# ------------------------------ FINALIZATION ------------------------------ #
+# ############################################################################
 ENV HOME=/home/kasm-user
 WORKDIR ${HOME}
 USER 1000
