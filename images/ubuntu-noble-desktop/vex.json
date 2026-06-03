@@ -2,15 +2,15 @@
   "$schema": "https://openvex.dev/ns/v1/index.json",
   "id": "openvex:konderla-org-core-hardened-baseline",
   "author": "James (konderla.org)",
-  "timestamp": "2026-06-02T21:13:00Z",
-  "version": 4,
+  "timestamp": "2026-06-02T21:20:00Z",
+  "version": 5,
   "statements": [
     {
       "vulnerability": { "name": "*" },
       "products": [{ "id": "pkg:deb/ubuntu/linux-libc-dev" }],
       "status": "not_affected",
       "justification": "vulnerable_code_not_present",
-      "impact_statement": "The package contains only static C header files and source text definitions. It presents zero executable binaries or runtime exploit vectors."
+      "impact_statement": "Package contains only static C header files and source text definitions. It presents zero executable binaries or runtime exploit vectors."
     },
     {
       "vulnerability": { "name": "CVE-2026-6238" },
@@ -38,36 +38,31 @@
       "vulnerability": { "name": "CVE-2025-14932" },
       "products": [{ "id": "pkg:deb/ubuntu/libnetcdf19t64" }],
       "status": "not_affected",
-      "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "Scientific NetCDF file parsing vectors sit entirely passive and unused within the standard runtime execution environment."
+      "justification": "vulnerable_code_not_in_execute_path"
     },
     {
       "vulnerability": { "name": "CVE-2025-14933" },
       "products": [{ "id": "pkg:deb/ubuntu/libnetcdf19t64" }],
       "status": "not_affected",
-      "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "Scientific NetCDF file parsing vectors sit entirely passive and unused within the standard runtime execution environment."
+      "justification": "vulnerable_code_not_in_execute_path"
     },
     {
       "vulnerability": { "name": "CVE-2025-14934" },
       "products": [{ "id": "pkg:deb/ubuntu/libnetcdf19t64" }],
       "status": "not_affected",
-      "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "Scientific NetCDF file parsing vectors sit entirely passive and unused within the standard runtime execution environment."
+      "justification": "vulnerable_code_not_in_execute_path"
     },
     {
       "vulnerability": { "name": "CVE-2025-14935" },
       "products": [{ "id": "pkg:deb/ubuntu/libnetcdf19t64" }],
       "status": "not_affected",
-      "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "Scientific NetCDF file parsing vectors sit entirely passive and unused within the standard runtime execution environment."
+      "justification": "vulnerable_code_not_in_execute_path"
     },
     {
       "vulnerability": { "name": "CVE-2025-14936" },
       "products": [{ "id": "pkg:deb/ubuntu/libnetcdf19t64" }],
       "status": "not_affected",
-      "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "Scientific NetCDF file parsing vectors sit entirely passive and unused within the standard runtime execution environment."
+      "justification": "vulnerable_code_not_in_execute_path"
     },
     {
       "vulnerability": { "name": "CVE-2025-14523" },
@@ -85,8 +80,7 @@
       "vulnerability": { "name": "CVE-2025-14505" },
       "products": [{ "id": "pkg:npm/elliptic" }],
       "status": "not_affected",
-      "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "Isolated client node extension dependency. No identity or cryptographic token validations utilize this algorithm path within the execution boundary."
+      "justification": "vulnerable_code_not_in_execute_path"
     },
     {
       "vulnerability": { "name": "CVE-2025-1376" },
@@ -95,8 +89,7 @@
         { "id": "pkg:deb/ubuntu/libdw1t64" }
       ],
       "status": "not_affected",
-      "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "Localized elfutils eu-strip application denial of service toolchain flaw. Component sits passive on disk."
+      "justification": "vulnerable_code_not_in_execute_path"
     },
     {
       "vulnerability": { "name": "CVE-2025-1352" },
@@ -105,8 +98,7 @@
         { "id": "pkg:deb/ubuntu/libdw1t64" }
       ],
       "status": "not_affected",
-      "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "Localized elfutils memory buffer overflow vulnerability within the eu-readelf helper package. Component sits passive on disk."
+      "justification": "vulnerable_code_not_in_execute_path"
     },
     {
       "vulnerability": { "name": "CVE-2025-13462" },
@@ -125,7 +117,7 @@
       "impact_statement": "Environment executes verified updated Python states. Workspaces do not consume or extract untrusted GNU long-name tarball archives via the native tarfile API."
     },
     {
-      "vulnerability": { "name": ["CVE-2025-0518", "CVE-2025-10256", "CVE-2025-1594"] },
+      "vulnerability": { "name": "CVE-2025-0518" },
       "products": [
         { "id": "pkg:deb/ubuntu/ffmpeg" },
         { "id": "pkg:deb/ubuntu/libavcodec60" },
@@ -139,7 +131,39 @@
       ],
       "status": "not_affected",
       "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "Browser routines run secure, official, auto-patched Chromium multimedia codec stacks. Underlying system libraries remain passive and uncalled."
+      "impact_statement": "Browser routines run secure, official, auto-patched Chromium multimedia codec stacks. Underlying system libraries remain passive."
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-10256" },
+      "products": [
+        { "id": "pkg:deb/ubuntu/ffmpeg" },
+        { "id": "pkg:deb/ubuntu/libavcodec60" },
+        { "id": "pkg:deb/ubuntu/libavformat60" },
+        { "id": "pkg:deb/ubuntu/libavutil58" },
+        { "id": "pkg:deb/ubuntu/libavfilter9" },
+        { "id": "pkg:deb/ubuntu/libavdevice60" },
+        { "id": "pkg:deb/ubuntu/libpostproc57" },
+        { "id": "pkg:deb/ubuntu/libswscale7" },
+        { "id": "pkg:deb/ubuntu/libswresample4" }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-1594" },
+      "products": [
+        { "id": "pkg:deb/ubuntu/ffmpeg" },
+        { "id": "pkg:deb/ubuntu/libavcodec60" },
+        { "id": "pkg:deb/ubuntu/libavformat60" },
+        { "id": "pkg:deb/ubuntu/libavutil58" },
+        { "id": "pkg:deb/ubuntu/libavfilter9" },
+        { "id": "pkg:deb/ubuntu/libavdevice60" },
+        { "id": "pkg:deb/ubuntu/libpostproc57" },
+        { "id": "pkg:deb/ubuntu/libswscale7" },
+        { "id": "pkg:deb/ubuntu/libswresample4" }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
     },
     {
       "vulnerability": { "name": "CVE-2025-1152" },
@@ -162,14 +186,13 @@
       "products": [{ "id": "pkg:golang/github.com/docker/cli" }],
       "status": "fixed",
       "justification": "vulnerable_code_not_present",
-      "impact_statement": "Vulnerability remediation successfully completed via local system updates. Runtimes execute upgraded, secure iterations of the Docker CLI engine."
+      "impact_statement": "Remediation completed via local system updates. Runtimes execute upgraded, secure iterations of the Docker CLI engine."
     },
     {
       "vulnerability": { "name": "CVE-2025-12495" },
       "products": [{ "id": "pkg:deb/ubuntu/libopenexr-3-1-30" }],
       "status": "not_affected",
-      "justification": "vulnerable_code_not_present",
-      "impact_statement": "Environment pulls the latest verified OpenEXR libraries via automated maintenance patches. Active runtimes do not execute unmitigated binary objects."
+      "justification": "vulnerable_code_not_present"
     },
     {
       "vulnerability": { "name": "CVE-2025-2153" },
@@ -178,8 +201,7 @@
         { "id": "pkg:deb/ubuntu/libhdf5-103-1t64" }
       ],
       "status": "not_affected",
-      "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "The HDF5 mathematical and scientific array data library package sits entirely passive and uncalled on the container disk storage layers."
+      "justification": "vulnerable_code_not_in_execute_path"
     },
     {
       "vulnerability": { "name": "CVE-2025-12385" },
@@ -192,29 +214,25 @@
         { "id": "pkg:deb/ubuntu/libqt6qml6" }
       ],
       "status": "not_affected",
-      "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "The shared graphical Qt5/Qt6 development library packages are passive components. No remote QML UI data parsing is invoked within the container."
+      "justification": "vulnerable_code_not_in_execute_path"
     },
     {
       "vulnerability": { "name": "CVE-2025-11266" },
       "products": [{ "id": "pkg:deb/ubuntu/libgdcm3.0t64" }],
       "status": "not_affected",
-      "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "Medical DICOM asset processing libraries sit passive on the disk image; zero active data pathways route unauthenticated healthcare file schemas to this library."
+      "justification": "vulnerable_code_not_in_execute_path"
     },
     {
       "vulnerability": { "name": "CVE-2025-10911" },
       "products": [{ "id": "pkg:deb/ubuntu/libxslt1.1" }],
       "status": "not_affected",
-      "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "No untrusted remote XSL Transformations or XML data inputs are executed by this base system wrapper layer."
+      "justification": "vulnerable_code_not_in_execute_path"
     },
     {
       "vulnerability": { "name": "CVE-2025-0913" },
       "products": [{ "id": "pkg:golang/stdlib@v1.20.7" }],
       "status": "not_affected",
-      "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "Static Go compilation artifact library metadata tracking. Isolated container processes do not deploy network daemon sockets built against this legacy branch."
+      "justification": "vulnerable_code_not_in_execute_path"
     }
   ]
 }
