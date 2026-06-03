@@ -145,6 +145,10 @@ RUN set -eux; \
 RUN mkdir -p /opt/vex
 COPY images/vex_ubuntu_common.json /opt/vex/vex.json
 
+# Copy the centralized Trivy ignore file into standard system scanner paths
+COPY images/trivy_common.ignore /.trivyignore
+COPY images/trivy_common.ignore /app/.trivyignore
+
 # ############################################################################
 # ------------------------------ FINALIZATION ------------------------------ #
 # ############################################################################
