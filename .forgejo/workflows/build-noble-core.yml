@@ -106,12 +106,25 @@ jobs:
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b ${{ github.workspace }}/bin
           ${{ github.workspace }}/bin/trivy --version
 
-      - name: Run Native Trivy Scan
+      - name: Run Native Trivy Scan & Generate HTML
         env:
           TRIVY_USERNAME: ${{ secrets.HARBOR_USERNAME }}
           TRIVY_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
         run: |
-          echo "Initiating shift-left vulnerability scan on image digest..."
+          echo "Downloading Trivy HTML Template..."
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl -o ${{ github.workspace }}/html.tpl
+          
+          echo "Generating HTML Report..."
+          ${{ github.workspace }}/bin/trivy image \
+            --ignorefile images/trivy_ubuntu_common.ignore \
+            --format template \
+            --template "@${{ github.workspace }}/html.tpl" \
+            --output ${{ github.workspace }}/trivy-report.html \
+            --ignore-unfixed \
+            --severity CRITICAL,HIGH \
+            "${{ steps.prep.outputs.repo_path }}@${{ steps.build_image.outputs.digest }}"
+
+          echo "Enforcing Pipeline Policy (Failing on unmitigated CRITICAL/HIGH)..."
           ${{ github.workspace }}/bin/trivy image \
             --ignorefile images/trivy_ubuntu_common.ignore \
             --format table \
@@ -119,6 +132,13 @@ jobs:
             --ignore-unfixed \
             --severity CRITICAL,HIGH \
             "${{ steps.prep.outputs.repo_path }}@${{ steps.build_image.outputs.digest }}"
+
+      - name: Archive HTML Vulnerability Report
+        uses: actions/upload-artifact@v4
+        if: always()  # This ensures the report uploads even if the previous scan step fails the pipeline!
+        with:
+          name: Trivy-Vulnerability-Report
+          path: ${{ github.workspace }}/trivy-report.html
 
       - name: Post-Build Workspace Garbage Collection
         run: |
