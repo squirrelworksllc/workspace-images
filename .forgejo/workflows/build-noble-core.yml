@@ -103,26 +103,35 @@ jobs:
 
       - name: Decoupled OpenVEX Attestation
         run: |
-          # Dynamically track the companion folder where the Dockerfile resides
+          COMMON_VEX="images/vex_ubuntu_common.json"
           IMAGE_DIR=$(dirname "${{ env.DOCKERFILE_PATH }}")
-          TARGET_VEX="${IMAGE_DIR}/vex.json"
+          LOCAL_VEX="${IMAGE_DIR}/vex.json"
           
-          if [ -f "$TARGET_VEX" ]; then
-            echo "==== [VEX] Local profile detected at $TARGET_VEX ===="
-            
-            # Extract individual image tags cleanly out of the multi-line prep output
-            # strips structural output markers to get clean string loops
+          # Initialize the vexctl source profile string array
+          VEX_FILES=""
+          if [ -f "$COMMON_VEX" ]; then
+            echo "==== [VEX] Ingesting common baseline rules: $COMMON_VEX ===="
+            VEX_FILES="$COMMON_VEX"
+          fi
+          
+          if [ -f "$LOCAL_VEX" ]; then
+            echo "==== [VEX] Ingesting localized exceptions profile: $LOCAL_VEX ===="
+            VEX_FILES="$VEX_FILES $LOCAL_VEX"
+          fi
+          
+          if [ -n "$VEX_FILES" ]; then
+            # Format clean multiline tag arrays out of output hooks
             CLEAN_TAGS=$(echo "${{ steps.prep.outputs.tags }}" | sed '/^[A-Za-z0-9+/=]\{20,\}$/d')
             
             for TARGET_IMAGE in $CLEAN_TAGS; do
-              echo "[VEX] Attesting exceptions to target image manifest: $TARGET_IMAGE"
+              echo "[VEX] Committing layered profiles to image manifest: $TARGET_IMAGE"
               
-              vexctl attest --attach "$TARGET_VEX" "$TARGET_IMAGE"
+              # Pass the multi-file collection string directly to the engine
+              vexctl attest --attach $VEX_FILES "$TARGET_IMAGE"
             done
-            
-            echo "==== [VEX] Finished applying localized exceptions successfully ===="
+            echo "==== [VEX] Multi-stage profile composition completed successfully ===="
           else
-            echo "==== [VEX] No profile found at $TARGET_VEX. Skipping pipeline step. ===="
+            echo "==== [VEX] No common or localized profile documents located. Skipping. ===="
           fi
 
       - name: Post-Build Workspace Garbage Collection

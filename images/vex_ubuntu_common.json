@@ -1,7 +1,7 @@
 {
   "$schema": "https://openvex.dev/ns/v1/index.json",
-  "id": "openvex:konderla-org-core-hardened-baseline",
-  "author": "James (konderla.org)",
+  "id": "openvex:squirrelworksllc-ubuntu-common",
+  "author": "James Konderla (SquirrelWorks LLC)",
   "timestamp": "2026-06-02T21:20:00Z",
   "version": 5,
   "statements": [
