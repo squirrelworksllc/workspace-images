@@ -117,6 +117,19 @@ jobs:
           sbom: true
           tags: ${{ steps.prep.outputs.tags }}
 
+      - name: Run Trivy Vulnerability Scanner
+        uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_USERNAME: ${{ secrets.HARBOR_USERNAME }}
+          TRIVY_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
+        with:
+          image-ref: '${{ steps.prep.outputs.repo_path }}@${{ steps.build_image.outputs.digest }}'
+          trivyignores: 'images/trivy_ubuntu_common.ignore'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+
       - name: Post-Build Workspace Garbage Collection
         run: |
           docker builder prune -f
