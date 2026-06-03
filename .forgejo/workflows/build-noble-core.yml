@@ -73,6 +73,9 @@ jobs:
           # Read your new harbor mapping variable from the JSON config natively
           REPO_FORGE=$(echo "$IMAGE_CONFIG" | jq -r ".repo_forge")
           
+          # Export the base repository path for the VEX digest attestation
+          echo "repo_path=${{ env.HARBOR_REGISTRY }}/${REPO_FORGE}" >> "$GITHUB_OUTPUT"
+          
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "tags<<$EOF" >> "$GITHUB_OUTPUT"
           for TAG in $RAW_TAGS; do
@@ -84,6 +87,7 @@ jobs:
           echo "target=$BUILD_TARGET" >> "$GITHUB_OUTPUT"
 
       - name: Build & Push Foundation Image
+        id: build_image
         uses: docker/build-push-action@v6
         timeout-minutes: 120
         with:
@@ -107,7 +111,6 @@ jobs:
           IMAGE_DIR=$(dirname "${{ env.DOCKERFILE_PATH }}")
           LOCAL_VEX="${IMAGE_DIR}/vex.json"
           
-          # Initialize the vexctl source profile string array
           VEX_FILES=""
           if [ -f "$COMMON_VEX" ]; then
             echo "==== [VEX] Ingesting common baseline rules: $COMMON_VEX ===="
@@ -120,15 +123,12 @@ jobs:
           fi
           
           if [ -n "$VEX_FILES" ]; then
-            # Format clean multiline tag arrays out of output hooks
-            CLEAN_TAGS=$(echo "${{ steps.prep.outputs.tags }}" | sed '/^[A-Za-z0-9+/=]\{20,\}$/d')
+            # Construct the absolute digest path directly from the upstream build step
+            TARGET_DIGEST="${{ steps.prep.outputs.repo_path }}@${{ steps.build_image.outputs.digest }}"
             
-            for TARGET_IMAGE in $CLEAN_TAGS; do
-              echo "[VEX] Committing layered profiles to image manifest: $TARGET_IMAGE"
-              
-              # Pass the multi-file collection string directly to the engine
-              vexctl attest --attach $VEX_FILES "$TARGET_IMAGE"
-            done
+            echo "[VEX] Committing layered profiles to image digest: $TARGET_DIGEST"
+            vexctl attest --attach $VEX_FILES "$TARGET_DIGEST"
+            
             echo "==== [VEX] Multi-stage profile composition completed successfully ===="
           else
             echo "==== [VEX] No common or localized profile documents located. Skipping. ===="

@@ -89,6 +89,9 @@ jobs:
           RAW_TAGS=$(echo "$IMAGE_CONFIG" | jq -r ".${TAG_ARRAY}[]")
           REPO_FORGE=$(echo "$IMAGE_CONFIG" | jq -r ".repo_forge")
           
+          # Export the base repository path for the VEX digest attestation
+          echo "repo_path=${{ env.HARBOR_REGISTRY }}/${REPO_FORGE}" >> "$GITHUB_OUTPUT"
+          
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "tags<<$EOF" >> "$GITHUB_OUTPUT"
           for TAG in $RAW_TAGS; do
@@ -100,6 +103,7 @@ jobs:
           echo "target=$BUILD_TARGET" >> "$GITHUB_OUTPUT"
 
       - name: Compile and Push Workspace
+        id: build_image
         uses: docker/build-push-action@v6
         timeout-minutes: 120
         with:
@@ -137,12 +141,11 @@ jobs:
           fi
           
           if [ -n "$VEX_FILES" ]; then
-            CLEAN_TAGS=$(echo "${{ steps.prep.outputs.tags }}" | sed '/^[A-Za-z0-9+/=]\{20,\}$/d')
+            TARGET_DIGEST="${{ steps.prep.outputs.repo_path }}@${{ steps.build_image.outputs.digest }}"
             
-            for TARGET_IMAGE in $CLEAN_TAGS; do
-              echo "[VEX] Committing layered profiles to DinD manifest: $TARGET_IMAGE"
-              vexctl attest --attach $VEX_FILES "$TARGET_IMAGE"
-            done
+            echo "[VEX] Committing layered profiles to DinD digest: $TARGET_DIGEST"
+            vexctl attest --attach $VEX_FILES "$TARGET_DIGEST"
+            
             echo "==== [VEX] Multi-stage profile composition completed successfully ===="
           else
             echo "==== [VEX] No common or localized profile documents located. Skipping. ===="
