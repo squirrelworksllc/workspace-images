@@ -95,6 +95,36 @@ jobs:
           no-cache: true  
           tags: ${{ steps.prep.outputs.tags }}
 
+      - name: Install VEX Toolchain Engine
+        run: |
+          wget https://github.com/openvex/vexctl/releases/latest/download/vexctl-linux-amd64
+          mv vexctl-linux-amd64 /usr/local/bin/vexctl
+          chmod +x /usr/local/bin/vexctl
+
+      - name: Decoupled OpenVEX Attestation
+        run: |
+          # Dynamically track the companion folder where the Dockerfile resides
+          IMAGE_DIR=$(dirname "${{ env.DOCKERFILE_PATH }}")
+          TARGET_VEX="${IMAGE_DIR}/vex.json"
+          
+          if [ -f "$TARGET_VEX" ]; then
+            echo "==== [VEX] Local profile detected at $TARGET_VEX ===="
+            
+            # Extract individual image tags cleanly out of the multi-line prep output
+            # strips structural output markers to get clean string loops
+            CLEAN_TAGS=$(echo "${{ steps.prep.outputs.tags }}" | sed '/^[A-Za-z0-9+/=]\{20,\}$/d')
+            
+            for TARGET_IMAGE in $CLEAN_TAGS; do
+              echo "[VEX] Attesting exceptions to target image manifest: $TARGET_IMAGE"
+              
+              vexctl attest --attach "$TARGET_VEX" "$TARGET_IMAGE"
+            done
+            
+            echo "==== [VEX] Finished applying localized exceptions successfully ===="
+          else
+            echo "==== [VEX] No profile found at $TARGET_VEX. Skipping pipeline step. ===="
+          fi
+
       - name: Post-Build Workspace Garbage Collection
         run: |
           docker builder prune -f
