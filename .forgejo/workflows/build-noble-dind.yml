@@ -152,7 +152,7 @@ jobs:
             "${{ steps.prep.outputs.repo_path }}@${{ steps.build_image.outputs.digest }}"
 
       - name: Archive HTML Vulnerability Report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         if: always()  # This ensures the report uploads even if the previous scan step fails the pipeline!
         with:
           name: Trivy-Vulnerability-Report
