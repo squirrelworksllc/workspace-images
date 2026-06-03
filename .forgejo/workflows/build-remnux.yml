@@ -117,18 +117,26 @@ jobs:
           sbom: false
           tags: ${{ steps.prep.outputs.tags }}
 
-      - name: Run Trivy Vulnerability Scanner
-        uses: aquasecurity/trivy-action@master
+      - name: Install Trivy Scanner (User-Space)
+        run: |
+          echo "Fetching latest Trivy binary for the specific runner hardware..."
+          mkdir -p ${{ github.workspace }}/bin
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b ${{ github.workspace }}/bin
+          ${{ github.workspace }}/bin/trivy --version
+
+      - name: Run Native Trivy Scan
         env:
           TRIVY_USERNAME: ${{ secrets.HARBOR_USERNAME }}
           TRIVY_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
-        with:
-          image-ref: '${{ steps.prep.outputs.repo_path }}@${{ steps.build_image.outputs.digest }}'
-          trivyignores: 'images/trivy_ubuntu_common.ignore'
-          format: 'table'
-          exit-code: '1'
-          ignore-unfixed: true
-          severity: 'CRITICAL,HIGH'
+        run: |
+          echo "Initiating shift-left vulnerability scan on image digest..."
+          ${{ github.workspace }}/bin/trivy image \
+            --ignorefile images/trivy_ubuntu_common.ignore \
+            --format table \
+            --exit-code 1 \
+            --ignore-unfixed \
+            --severity CRITICAL,HIGH \
+            "${{ steps.prep.outputs.repo_path }}@${{ steps.build_image.outputs.digest }}"
 
       - name: Post-Build Workspace Garbage Collection
         run: |
