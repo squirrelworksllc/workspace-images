@@ -1,5 +1,5 @@
 {
-  "@context": "https://openvex.dev/ns/v1",
+  "@context": "https://openvex.dev/ns/v0.2.0",
   "@id": "https://forge.konderla.org/vex/squirrelworksllc-ubuntu-common",
   "author": "James Konderla (SquirrelWorks LLC)",
   "timestamp": "2026-06-02T21:20:00Z",
