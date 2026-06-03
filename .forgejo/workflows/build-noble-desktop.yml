@@ -141,10 +141,13 @@ jobs:
           fi
           
           if [ -n "$VEX_FILES" ]; then
-            TARGET_DIGEST="${{ steps.prep.outputs.repo_path }}@${{ steps.build_image.outputs.digest }}"
+            # Reverting to the tag array because vexctl explicitly requires a tag reference to generate the .att signature
+            CLEAN_TAGS=$(echo "${{ steps.prep.outputs.tags }}" | sed '/^[A-Za-z0-9+/=]\{20,\}$/d')
             
-            echo "[VEX] Committing layered profiles to workspace digest: $TARGET_DIGEST"
-            vexctl attest --attach $VEX_FILES "$TARGET_DIGEST"
+            for TARGET_IMAGE in $CLEAN_TAGS; do
+              echo "[VEX] Committing layered profiles to image tag: $TARGET_IMAGE"
+              vexctl attest --attach $VEX_FILES "$TARGET_IMAGE"
+            done
             
             echo "==== [VEX] Multi-stage profile composition completed successfully ===="
           else
