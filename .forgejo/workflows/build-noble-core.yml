@@ -99,6 +99,7 @@ jobs:
           context: .
           file: ${{ env.DOCKERFILE_PATH }}
           target: ${{ steps.prep.outputs.target }}
+          platforms: linux/amd64          # <-- Add this line
           push: true
           pull: true      
           no-cache: true  

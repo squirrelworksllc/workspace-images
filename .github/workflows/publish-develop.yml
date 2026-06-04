@@ -39,10 +39,6 @@ jobs:
           echo "dockerfile=$(echo "$CORE_CONFIG" | jq -r '.dockerfile')" >> "$GITHUB_OUTPUT"
           echo "lintTarget=$(echo "$CORE_CONFIG" | jq -r '.lintTarget')" >> "$GITHUB_OUTPUT"
 
-      - name: Set up QEMU
-        if: steps.core-config.outputs.skip == 'false'
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         if: steps.core-config.outputs.skip == 'false'
         uses: docker/setup-buildx-action@v3
@@ -94,7 +90,7 @@ jobs:
             devTarget=$(jq -r '.devTarget' <<< "$image_str")
             lintTarget=$(jq -r '.lintTarget' <<< "$image_str")
             repo=$(jq -r '.repo' <<< "$image_str")
-            archs=$(jq -r '(if .architectures then .architectures else ["linux/amd64", "linux/arm64"] end) | join(",")' <<< "$image_str")
+            archs=$(jq -r '(if .architectures then .architectures else ["linux/amd64"] end) | join(",")' <<< "$image_str")
 
             tags_array=$(jq '.devTags' <<< "$image_str")
             tag_string=""
@@ -134,9 +130,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -154,8 +147,6 @@ jobs:
           target: ${{ matrix.lintTarget }}
           push: false
           tags: ${{ matrix.repo }}:ci-lint
-          cache-from: type=gha,scope=pubdev-${{ matrix.key }}
-          cache-to: type=gha,mode=max,scope=pubdev-${{ matrix.key }}
 
   lint-gate:
     name: lint / gate
@@ -181,7 +172,6 @@ jobs:
       - id: eval
         name: Gate Check (Friday or Manual)
         run: |
-          # Use Central Time to match your local timezone
           DAY_OF_WEEK=$(TZ="America/Chicago" date +%u) 
           
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
@@ -218,7 +208,7 @@ jobs:
           echo "skip=false" >> "$GITHUB_OUTPUT"
           echo "dockerfile=$(echo "$CORE_CONFIG" | jq -r '.dockerfile')" >> "$GITHUB_OUTPUT"
           echo "devTarget=$(echo "$CORE_CONFIG" | jq -r '.devTarget')" >> "$GITHUB_OUTPUT"
-          echo "architectures=$(echo "$CORE_CONFIG" | jq -r '(if .architectures then .architectures else ["linux/amd64", "linux/arm64"] end) | join(",")')" >> "$GITHUB_OUTPUT"
+          echo "architectures=$(echo "$CORE_CONFIG" | jq -r '(if .architectures then .architectures else ["linux/amd64"] end) | join(",")')" >> "$GITHUB_OUTPUT"
 
           repo=$(echo "$CORE_CONFIG" | jq -r '.repo')
           tags_array=$(echo "$CORE_CONFIG" | jq '.devTags')
@@ -239,10 +229,6 @@ jobs:
             echo "$tag_string"
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
-
-      - name: Set up QEMU
-        if: steps.core-config.outputs.skip == 'false'
-        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         if: steps.core-config.outputs.skip == 'false'
@@ -278,9 +264,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -297,17 +280,14 @@ jobs:
         with:
           context: .
           file: ${{ matrix.dockerfile }}
-          target: ${{ matrix.prodTarget }}
+          target: ${{ matrix.devTarget }}
           platforms: ${{ matrix.architectures }}
           push: true
           tags: ${{ matrix.tags }}
-          # Attach the VEX data inside an officially supported attestation format:
           provenance: true
           sbom: true
           attests: |
             type=sbom,generator=docker/buildkit-syft-scanner,vulnerability-vulnerabilities=@images/vex_ubuntu_common.json
-          cache-from: type=gha,scope=pubprod-${{ matrix.key }}
-          cache-to: type=gha,mode=max,scope=pubprod-${{ matrix.key }}
 
       - name: Summary
         if: always()

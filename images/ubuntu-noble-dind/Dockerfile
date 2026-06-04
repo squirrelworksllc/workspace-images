@@ -15,7 +15,7 @@ ARG BASE_TAG="1.18.0"
 # ############################################################################
 # ------------------------------ BASE STAGE -------------------------------- #
 # ############################################################################
-FROM --platform=$BUILDPLATFORM ${BASE_IMAGE}:${BASE_TAG} AS base
+FROM ${BASE_IMAGE}:${BASE_TAG} AS base
 
 USER root
 
@@ -36,7 +36,7 @@ WORKDIR ${HOME}
 # ############################################################################
 # ------------------------------ LINT TARGET ------------------------------- #
 # ############################################################################
-FROM --platform=$BUILDPLATFORM base AS lint
+FROM base AS lint
 
 WORKDIR /src
 COPY . /src
@@ -50,7 +50,7 @@ USER 1000
 # ############################################################################
 # -------------------------- COMMON BUILD TARGET --------------------------- #
 # ############################################################################
-FROM --platform=$BUILDPLATFORM base AS build
+FROM base AS build
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # --- Context Guard ---
@@ -69,58 +69,44 @@ RUN chmod 0755 /dockerstartup/tools/runtime_validation.sh
 # --- Global Build Orchestration ---
 ARG APT_DEBUG=false
 
+# --- Layer: Core System Tools ---
 RUN set -eux; \
     apt-get update; \
-    \
-    # =========================================================================
-    # SQUIRRELWORKS MODULE REGISTRY (DinD Flavor)
-    # =========================================================================
-    SCRIPTS=( \
-      # GROUP 1: Core System Tools & Helpers
-      "/ubuntu/install/tools/install_tools.sh" \
-      "/ubuntu/install/common/00_apt_helper.sh" \
-      \
-      # GROUP 2: Virtualization & Containerization
-      "/ubuntu/install/dind/install_dind.sh" \
-    ); \
-    \
-    # Conditional Group: Browser selection
+    apt-get dist-upgrade -y; \
+    bash ${INST_DIR}/ubuntu/install/tools/install_tools.sh; \
+    bash ${INST_DIR}/ubuntu/install/common/00_apt_helper.sh; \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# --- Layer: Virtualization (DinD) ---
+RUN set -eux; \
+    apt-get update; \
+    bash ${INST_DIR}/ubuntu/install/dind/install_dind.sh; \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# --- Layer: Browser ---
+RUN set -eux; \
     if [ "${SKIP_CHROMIUM}" != "true" ]; then \
-      SCRIPTS+=( "/ubuntu/install/chromium/install_chromium.sh" ); \
-    fi; \
-    \
-    # GROUP 3: Developer Productivity & Final Polish
-    SCRIPTS+=( \
-      "/ubuntu/install/vs_code/install_vs_code.sh" \
-      "/ubuntu/install/desktop/install.sh" \
-      "/ubuntu/install/common/01_cleanup.sh" \
-      \
-      # GROUP 4: Automated Remediation & Purge (MUST BE LAST)
-      "/ubuntu/install/common/02_remediation.sh" \
-    ); \
-    \
-    # Execution Loop
-    for SCRIPT in "${SCRIPTS[@]}"; do \
-      echo ">>> Executing Module: ${SCRIPT}"; \
-      if [[ "${SCRIPT}" == *"desktop/install.sh" ]]; then \
-        bash "${INST_DIR}${SCRIPT}" noble; \
-      else \
-        bash "${INST_DIR}${SCRIPT}"; \
-      fi || { \
-        rc=$?; echo "FAILED: ${SCRIPT} (rc=$rc)"; \
-        [ "${APT_DEBUG}" = "true" ] && tail -n 100 /var/log/apt/term.log || true; \
-        exit "$rc"; \
-      }; \
-    done; \
-    \
-    # --- Final Session Preparation ---
+        apt-get update; \
+        bash ${INST_DIR}/ubuntu/install/chromium/install_chromium.sh; \
+        apt-get clean && rm -rf /var/lib/apt/lists/*; \
+    fi
+
+# --- Layer: Developer Tools (VS Code) ---
+RUN set -eux; \
+    apt-get update; \
+    bash ${INST_DIR}/ubuntu/install/vs_code/install_vs_code.sh; \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# --- Layer: Final Polish & Baseline Cleanup ---
+RUN set -eux; \
+    bash ${INST_DIR}/ubuntu/install/desktop/install.sh; \
+    bash ${INST_DIR}/ubuntu/install/common/01_cleanup.sh; \
+    apt-get autoremove -y --purge; \
+    rm -rf /tmp/* /var/tmp/* /var/log/apt/* /var/log/dpkg.log; \
     "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \
     rm -f /etc/X11/xinit/Xclients; \
     chown 1000:0 "${HOME}"; \
-    mkdir -p /home/kasm-user; \
-    chown -R 1000:0 /home/kasm-user; \
-    \
-    # Cleanup ephemeral build scripts
+    mkdir -p /home/kasm-user && chown -R 1000:0 /home/kasm-user; \
     rm -rf "${INST_DIR}/ubuntu/install"
 
 # ############################################################################
@@ -148,11 +134,11 @@ CMD ["--tail-log"]
 # ############################################################################
 # ------------------------------- DEVELOP IMAGE ---------------------------- #
 # ############################################################################
-FROM --platform=$BUILDPLATFORM build AS develop
+FROM build AS develop
 ENV DEBUG=true
 
 # ############################################################################
 # ----------------------------- PRODUCTION IMAGE --------------------------- #
 # ############################################################################
-FROM --platform=$BUILDPLATFORM build AS production
+FROM build AS production
 ENV DEBUG=false
