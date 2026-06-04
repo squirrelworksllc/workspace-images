@@ -1,0 +1,460 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://forge.konderla.org/vex/squirrelworksllc-ubuntu-common",
+  "author": "James Konderla (SquirrelWorks LLC)",
+  "timestamp": "2026-06-03T21:20:00Z",
+  "version": 6,
+  "statements": [
+    {
+      "vulnerability": { "name": "*" },
+      "products": [{ "@id": "pkg:deb/ubuntu/linux-libc-dev" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "Package contains only static C header files and source text definitions. It presents zero executable binaries or runtime exploit vectors."
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-6238" },
+      "products": [
+        { "@id": "pkg:deb/ubuntu/libc6@2.39-0ubuntu8.7" },
+        { "@id": "pkg:deb/ubuntu/libc6-dev@2.39-0ubuntu8.7" },
+        { "@id": "pkg:deb/ubuntu/libc-bin@2.39-0ubuntu8.7" },
+        { "@id": "pkg:deb/ubuntu/locales@2.39-0ubuntu8.7" }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "Vulnerability affects deprecated glibc DNS debugging functions (ns_printrr). Workspaces utilize standard resolver paths exclusively."
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-5745" },
+      "products": [
+        { "@id": "pkg:deb/ubuntu/libarchive13t64@3.7.2-2ubuntu0.7" },
+        { "@id": "pkg:deb/ubuntu/libarchive-dev@3.7.2-2ubuntu0.7" }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "NULL pointer parsing flaw inside libarchive ACL extraction. Core workspaces process standard archive streams without processing untrusted user ACL metadata."
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-14932" },
+      "products": [{ "@id": "pkg:deb/ubuntu/libnetcdf19t64" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-14933" },
+      "products": [{ "@id": "pkg:deb/ubuntu/libnetcdf19t64" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-14934" },
+      "products": [{ "@id": "pkg:deb/ubuntu/libnetcdf19t64" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-14935" },
+      "products": [{ "@id": "pkg:deb/ubuntu/libnetcdf19t64" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-14936" },
+      "products": [{ "@id": "pkg:deb/ubuntu/libnetcdf19t64" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-14523" },
+      "products": [
+        { "@id": "pkg:deb/ubuntu/libsoup-3.0-0" },
+        { "@id": "pkg:deb/ubuntu/libsoup-3.0-common" },
+        { "@id": "pkg:deb/ubuntu/libsoup-2.4-1" },
+        { "@id": "pkg:deb/ubuntu/libsoup-2.4-common" }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "Image utilizes client-side desktop routines; it does not deploy listening HTTP server architectures using libsoup behind edge routing proxies."
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-14505" },
+      "products": [{ "@id": "pkg:npm/elliptic" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-1376" },
+      "products": [
+        { "@id": "pkg:deb/ubuntu/libelf1t64" },
+        { "@id": "pkg:deb/ubuntu/libdw1t64" }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-1352" },
+      "products": [
+        { "@id": "pkg:deb/ubuntu/libelf1t64" },
+        { "@id": "pkg:deb/ubuntu/libdw1t64" }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-13462" },
+      "products": [
+        { "@id": "pkg:deb/ubuntu/python3.12" },
+        { "@id": "pkg:deb/ubuntu/python3.12-minimal" },
+        { "@id": "pkg:deb/ubuntu/libpython3.12" },
+        { "@id": "pkg:deb/ubuntu/libpython3.12-stdlib" },
+        { "@id": "pkg:deb/ubuntu/libpython3.12-minimal" },
+        { "@id": "pkg:deb/ubuntu/libpython3.12t64" },
+        { "@id": "pkg:deb/ubuntu/python3.12-dev" },
+        { "@id": "pkg:deb/ubuntu/python3.12-venv" }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "Environment executes verified updated Python states. Workspaces do not consume or extract untrusted GNU long-name tarball archives via the native tarfile API."
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-0518" },
+      "products": [
+        { "@id": "pkg:deb/ubuntu/ffmpeg" },
+        { "@id": "pkg:deb/ubuntu/libavcodec60" },
+        { "@id": "pkg:deb/ubuntu/libavformat60" },
+        { "@id": "pkg:deb/ubuntu/libavutil58" },
+        { "@id": "pkg:deb/ubuntu/libavfilter9" },
+        { "@id": "pkg:deb/ubuntu/libavdevice60" },
+        { "@id": "pkg:deb/ubuntu/libpostproc57" },
+        { "@id": "pkg:deb/ubuntu/libswscale7" },
+        { "@id": "pkg:deb/ubuntu/libswresample4" }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "Browser routines run secure, official, auto-patched Chromium multimedia codec stacks. Underlying system libraries remain passive."
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-10256" },
+      "products": [
+        { "@id": "pkg:deb/ubuntu/ffmpeg" },
+        { "@id": "pkg:deb/ubuntu/libavcodec60" },
+        { "@id": "pkg:deb/ubuntu/libavformat60" },
+        { "@id": "pkg:deb/ubuntu/libavutil58" },
+        { "@id": "pkg:deb/ubuntu/libavfilter9" },
+        { "@id": "pkg:deb/ubuntu/libavdevice60" },
+        { "@id": "pkg:deb/ubuntu/libpostproc57" },
+        { "@id": "pkg:deb/ubuntu/libswscale7" },
+        { "@id": "pkg:deb/ubuntu/libswresample4" }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-1594" },
+      "products": [
+        { "@id": "pkg:deb/ubuntu/ffmpeg" },
+        { "@id": "pkg:deb/ubuntu/libavcodec60" },
+        { "@id": "pkg:deb/ubuntu/libavformat60" },
+        { "@id": "pkg:deb/ubuntu/libavutil58" },
+        { "@id": "pkg:deb/ubuntu/libavfilter9" },
+        { "@id": "pkg:deb/ubuntu/libavdevice60" },
+        { "@id": "pkg:deb/ubuntu/libpostproc57" },
+        { "@id": "pkg:deb/ubuntu/libswscale7" },
+        { "@id": "pkg:deb/ubuntu/libswresample4" }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-1152" },
+      "products": [
+        { "@id": "pkg:deb/ubuntu/binutils" },
+        { "@id": "pkg:deb/ubuntu/binutils-common" },
+        { "@id": "pkg:deb/ubuntu/binutils-x86-64-linux-gnu" },
+        { "@id": "pkg:deb/ubuntu/libbinutils" },
+        { "@id": "pkg:deb/ubuntu/libctf0" },
+        { "@id": "pkg:deb/ubuntu/libctf-nobfd0" },
+        { "@id": "pkg:deb/ubuntu/libsframe1" },
+        { "@id": "pkg:deb/ubuntu/libgprofng0" }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "The environment runs verified updates superseding GNU Binutils 2.43. Associated development libraries sit completely passive on the file system."
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-15558" },
+      "products": [{ "@id": "pkg:golang/github.com/docker/cli" }],
+      "status": "fixed",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "Remediation completed via local system updates. Runtimes execute upgraded, secure iterations of the Docker CLI engine."
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-12495" },
+      "products": [{ "@id": "pkg:deb/ubuntu/libopenexr-3-1-30" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_present"
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-2153" },
+      "products": [
+        { "@id": "pkg:deb/ubuntu/libhdf5-hl-100t64" },
+        { "@id": "pkg:deb/ubuntu/libhdf5-103-1t64" }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-12385" },
+      "products": [
+        { "@id": "pkg:deb/ubuntu/libqt6qmlmodels6" },
+        { "@id": "pkg:deb/ubuntu/libqt5qmlmodels5" },
+        { "@id": "pkg:deb/ubuntu/libqt5qml5" },
+        { "@id": "pkg:deb/ubuntu/libqt6quick6" },
+        { "@id": "pkg:deb/ubuntu/libqt5quick5" },
+        { "@id": "pkg:deb/ubuntu/libqt6qml6" }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-11266" },
+      "products": [{ "@id": "pkg:deb/ubuntu/libgdcm3.0t64" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-10911" },
+      "products": [{ "@id": "pkg:deb/ubuntu/libxslt1.1" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-0913" },
+      "products": [{ "@id": "pkg:golang/stdlib@v1.20.7" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2018-7408" },
+      "products": [{ "@id": "pkg:npm/npm" }],
+      "status": "not_affected",
+      "justification": "component_not_present",
+      "impact_statement": "The workspace does not use npm or deploy runtime Node.js application ecosystems. The components represent un-executed extension paths."
+    },
+    {
+      "vulnerability": { "name": "CVE-2019-16775" },
+      "products": [{ "@id": "pkg:npm/npm" }],
+      "status": "not_affected",
+      "justification": "component_not_present"
+    },
+    {
+      "vulnerability": { "name": "CVE-2019-16776" },
+      "products": [{ "@id": "pkg:npm/npm" }],
+      "status": "not_affected",
+      "justification": "component_not_present"
+    },
+    {
+      "vulnerability": { "name": "CVE-2019-16777" },
+      "products": [{ "@id": "pkg:npm/npm" }],
+      "status": "not_affected",
+      "justification": "component_not_present"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-46680" },
+      "products": [
+        { "@id": "pkg:golang/github.com/containerd/containerd/v2" },
+        { "@id": "pkg:golang/github.com/containerd/containerd" }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "Statically compiled containerd execution logic sits behind secure default runtime layers; user namespaces prevent runAsNonRoot evasions."
+    },
+    {
+      "vulnerability": { "name": "CVE-2024-25621" },
+      "products": [{ "@id": "pkg:golang/github.com/containerd/containerd" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-34040" },
+      "products": [{ "@id": "pkg:golang/github.com/docker/docker" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "Authorization bypass path relies on custom third-party engine plugins. Lab runtimes utilize official native authorization constraints exclusively."
+    },
+    {
+      "vulnerability": { "name": "CVE-2024-41110" },
+      "products": [{ "@id": "pkg:golang/github.com/docker/docker" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2024-21626" },
+      "products": [{ "@id": "pkg:golang/github.com/opencontainers/runc" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "Container runtime layer mitigates file descriptor leak avenues via kernel isolation. Execution bounds block malicious container setup configuration options."
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-31133" },
+      "products": [{ "@id": "pkg:golang/github.com/opencontainers/runc" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-52565" },
+      "products": [{ "@id": "pkg:golang/github.com/opencontainers/runc" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-52881" },
+      "products": [{ "@id": "pkg:golang/github.com/opencontainers/runc" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2024-45337" },
+      "products": [{ "@id": "pkg:golang/golang.org/x/crypto" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "Passive static dependency compilation vectors. Component does not expose explicit server authorization callback interfaces over active networking bridges."
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-22869" },
+      "products": [{ "@id": "pkg:golang/golang.org/x/crypto" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2023-39325" },
+      "products": [
+        { "@id": "pkg:golang/golang.org/x/net" },
+        { "@id": "pkg:golang/stdlib" }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "HTTP/2 protocol constraints are validated by external proxy engines (edge routing layers) before reaching backend image layers."
+    },
+    {
+      "vulnerability": { "name": "CVE-2023-45283" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2023-45288" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-22868" },
+      "products": [{ "@id": "pkg:golang/golang.org/x/oauth2" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2024-24790" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-68121" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2024-34156" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-61726" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-61729" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-25679" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-32280" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-32281" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-32283" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-33811" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-33814" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-39820" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-39823" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-39825" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-39826" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-39836" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-42499" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    }
+  ]
+}

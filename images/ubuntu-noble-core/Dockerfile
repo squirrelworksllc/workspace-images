@@ -1,34 +1,35 @@
 # syntax=docker/dockerfile:1.7
 
 ################################################################################
-# SquirrelWorks 1.1 - Ubuntu Noble Core
+# SquirrelWorks 1.1 - Ubuntu Noble DinD (Docker-in-Docker)
 # 
-# ARCHITECTURE: Base Layer / Modular Parent
+# ARCHITECTURE: Modular Registry
 # BUILD CONTEXT: Repo Root
-# PURPOSE: 
-#   The lean foundation for all SquirrelWorks Noble images. 
-#   Provides the shared 'apt_helper', 'cleanup', and 'tools' modules.
+# SPECIALTY: High-privilege container for dev/ops and orchestration
 ################################################################################
 
 # ----------------------------- BASE IMAGE -----------------------------
-ARG BASE_TAG="1.18.0-rolling-weekly"
-ARG BASE_IMAGE="core-ubuntu-noble"
+ARG BASE_IMAGE="squirrelworksllc/ubuntu-noble-core"
+ARG BASE_TAG="1.18.0"
 
 # ############################################################################
 # ------------------------------ BASE STAGE -------------------------------- #
 # ############################################################################
-FROM --platform=$BUILDPLATFORM kasmweb/${BASE_IMAGE}:${BASE_TAG} AS base
+FROM --platform=$BUILDPLATFORM ${BASE_IMAGE}:${BASE_TAG} AS base
 
 USER root
 
-# Shared Global Environment Variables
+# Shared Environment Variables
 ENV HOME=/home/kasm-default-profile \
     STARTUPDIR=/dockerstartup \
     DEBIAN_FRONTEND=noninteractive \
     SKIP_CLEAN=true \
     KASM_RX_HOME=/dockerstartup/kasmrx \
     DONT_PROMPT_WSL_INSTALL="No_Prompt_please" \
-    INST_DIR=/dockerstartup/install
+    INST_DIR=/dockerstartup/install \
+    INSTALL_CHROME=false \
+    SKIP_CHROMIUM=false \
+    DEBUG=false
 
 WORKDIR ${HOME}
 
@@ -36,12 +37,12 @@ WORKDIR ${HOME}
 # ------------------------------ LINT TARGET ------------------------------- #
 # ############################################################################
 FROM --platform=$BUILDPLATFORM base AS lint
+
 WORKDIR /src
 COPY . /src
 
-# Validates the foundation before anything else builds
 RUN bash /src/tools/ci/lint_installers.sh
-RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/ubuntu-noble-core/Dockerfile
+RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/ubuntu-noble-dind/Dockerfile
 RUN bash /src/tools/ci/lint-shell.sh
 
 USER 1000
@@ -56,57 +57,112 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 COPY ./src/ubuntu/install/ ./__context_check__/ubuntu_install/
 RUN rm -rf ./__context_check__
 
-# --- Stage Installer Framework ---
-# We copy the entire ubuntu/ tree so children have access to helpers,
-# but we only execute the absolute minimum baseline here.
+# --- Stage Resources ---
 COPY ./src/ubuntu/ ${INST_DIR}/ubuntu/
+RUN find "${INST_DIR}/ubuntu/install" -maxdepth 4 -type f -name '*.sh' -exec chmod +x {} \;
 
-# Make baseline scripts executable
-RUN set -eux; \
-    find "${INST_DIR}/ubuntu/install" -maxdepth 5 -type f -name '*.sh' -exec chmod +x {} \;
+# --- Runtime Validation Tools ---
+RUN mkdir -p /dockerstartup/tools
+COPY ./src/tools/runtime/runtime_validation.sh /dockerstartup/tools/runtime_validation.sh
+RUN chmod 0755 /dockerstartup/tools/runtime_validation.sh
 
-# --- Baseline Execution ---
+# --- Global Build Orchestration ---
+ARG APT_DEBUG=false
+
 RUN set -eux; \
     apt-get update; \
+    # SECURITY PATCH: Force-upgrade engine base libraries before layer execution
+    apt-get dist-upgrade -y; \
     \
-    # Intentionally tiny list for the Core image
+    # =========================================================================
+    # SQUIRRELWORKS MODULE REGISTRY (DinD Flavor)
+    # =========================================================================
     SCRIPTS=( \
+      # GROUP 1: Core System Tools & Helpers
       "/ubuntu/install/tools/install_tools.sh" \
       "/ubuntu/install/common/00_apt_helper.sh" \
+      \
+      # GROUP 2: Virtualization & Containerization
+      "/ubuntu/install/dind/install_dind.sh" \
+    ); \
+    \
+    # Conditional Group: Browser selection
+    if [ "${SKIP_CHROMIUM}" != "true" ]; then \
+      SCRIPTS+=( "/ubuntu/install/chromium/install_chromium.sh" ); \
+    fi; \
+    \
+    # GROUP 3: Developer Productivity
+    SCRIPTS+=( \
+      "/ubuntu/install/vs_code/install_vs_code.sh" \
+      \
+      # GROUP 4: Branding & Final Polish
+      "/ubuntu/install/desktop/install.sh" \
       "/ubuntu/install/common/01_cleanup.sh" \
     ); \
     \
+    # Execution Loop
     for SCRIPT in "${SCRIPTS[@]}"; do \
-      echo ">>> Executing Base Module: ${SCRIPT}"; \
-      bash "${INST_DIR}${SCRIPT}" || { exit 1; }; \
+      echo ">>> Executing Module: ${SCRIPT}"; \
+      if [[ "${SCRIPT}" == *"desktop/install.sh" ]]; then \
+        bash "${INST_DIR}${SCRIPT}" noble; \
+      else \
+        bash "${INST_DIR}${SCRIPT}"; \
+      fi || { \
+        rc=$?; echo "FAILED: ${SCRIPT} (rc=$rc)"; \
+        [ "${APT_DEBUG}" = "true" ] && tail -n 100 /var/log/apt/term.log || true; \
+        exit "$rc"; \
+      }; \
     done; \
     \
-    # --- Final Foundation Prep ---
+    # AUTOMATED REMEDIATION PURGE: Strip build artifacts and cached workspace layers
+    apt-get autoremove -y --purge; \
+    apt-get clean; \
+    rm -rf /var/lib/apt/lists/* \
+           /tmp/* \
+           /var/tmp/* \
+           /var/log/apt/* \
+           /var/log/dpkg.log; \
+    \
+    # --- Final Session Preparation ---
     "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \
+    rm -f /etc/X11/xinit/Xclients; \
     chown 1000:0 "${HOME}"; \
     mkdir -p /home/kasm-user; \
     chown -R 1000:0 /home/kasm-user; \
     \
-    # We leave the common/ directory intact in the Core image 
-    # so child images (Desktop, REMNux, etc.) can source apt_helper.sh
+    # Cleanup ephemeral build scripts
     rm -rf "${INST_DIR}/ubuntu/install"
 
-# ----------------------------- FINALIZATION -----------------------------
+# ############################################################################
+# -------------------------- SECURITY METADATA LAYER ----------------------- #
+# ############################################################################
+# Create the standard OpenVEX directory and embed the unified exception profile
+RUN mkdir -p /opt/vex
+COPY images/vex_ubuntu_common.json /opt/vex/vex.json
+
+# Copy the centralized Trivy ignore file into standard system scanner paths
+COPY images/trivy_ubuntu_common.ignore /.trivyignore
+COPY images/trivy_ubuntu_common.ignore /app/.trivyignore
+ENV TRIVY_IGNOREFILE=/.trivyignore
+
+# ############################################################################
+# ------------------------------ FINALIZATION ------------------------------ #
+# ############################################################################
 ENV HOME=/home/kasm-user
 WORKDIR ${HOME}
 USER 1000
 
-# Standard Kasm Entrypoint
+# Entrypoint for Kasm Workspaces
 CMD ["--tail-log"]
 
 # ############################################################################
-# ------------------------------- DEVELOP --------------------------------- #
+# ------------------------------- DEVELOP IMAGE ---------------------------- #
 # ############################################################################
 FROM --platform=$BUILDPLATFORM build AS develop
 ENV DEBUG=true
 
 # ############################################################################
-# ----------------------------- PRODUCTION -------------------------------- #
+# ----------------------------- PRODUCTION IMAGE --------------------------- #
 # ############################################################################
 FROM --platform=$BUILDPLATFORM build AS production
 ENV DEBUG=false

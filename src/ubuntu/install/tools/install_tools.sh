@@ -42,4 +42,5 @@ apt_install \
   xz-utils \
   gpgv \
   software-properties-common \
-  jq
+  jq \
+  tree

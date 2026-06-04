@@ -1,0 +1,172 @@
+name: Build Noble DinD
+run-name: DinD Workspace Compile triggered by ${{ github.actor }}
+
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - 'images/ubuntu-noble-dind/**'
+  workflow_run:
+    workflows: ["Build Noble Core"]
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Build Target Environment'
+        required: true
+        default: 'develop'
+        type: choice
+        options:
+          - develop
+          - production
+      skip_scan:
+        description: 'Bypass Trivy Vulnerability Scan'
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: build-dind-${{ github.event.inputs.target_env || 'develop' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  HARBOR_REGISTRY: forge.konderla.org
+  IMAGE_KEY: ubuntu-noble-dind
+  DOCKERFILE_PATH: images/ubuntu-noble-dind/Dockerfile
+
+jobs:
+  build-workspace:
+    name: Build Workspace
+    runs-on: [kasm-builder, repo-squirrelworks]
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Git Diff Guard (Prevent Race Conditions)
+        if: ${{ github.event_name == 'push' }}
+        id: diff_check
+        run: |
+          echo "Analyzing commit changesets..."
+          if git diff --name-only HEAD~1 HEAD | grep -q 'images/ubuntu-noble-core/'; then
+            echo "::notice:: Core foundation files were modified in this same commit. Standing down to allow the upstream Build Noble Core workflow to finish first."
+            exit 1
+          fi
+          echo "No core changes detected. Proceeding with immediate standalone workspace build."
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker-container
+          config-inline: |
+            [registry."forge.konderla.org"]
+              ca=["/etc/ssl/certs/ca-certificates.crt"]
+
+      - name: Login to local Harbor
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.HARBOR_REGISTRY }}
+          username: ${{ secrets.HARBOR_USERNAME }}
+          password: ${{ secrets.HARBOR_PASSWORD }}
+
+      - name: Extract Tags from images.json
+        id: prep
+        run: |
+          JSON_FILE="$GITHUB_WORKSPACE/images.json"
+          ENV_SELECTION="${{ github.event.inputs.target_env || 'develop' }}"
+          
+          if [ "$ENV_SELECTION" = "production" ]; then
+            TAG_ARRAY="prodTags"
+            TARGET_KEY="prodTarget"
+          else
+            TAG_ARRAY="devTags"
+            TARGET_KEY="devTarget"
+          fi
+          
+          IMAGE_CONFIG=$(jq -c ".images[] | select(.key == \"${{ env.IMAGE_KEY }}\")" "$JSON_FILE")
+          RAW_TAGS=$(echo "$IMAGE_CONFIG" | jq -r ".${TAG_ARRAY}[]")
+          REPO_FORGE=$(echo "$IMAGE_CONFIG" | jq -r ".repo_forge")
+          
+          # Export the base repository path for the VEX digest attestation
+          echo "repo_path=${{ env.HARBOR_REGISTRY }}/${REPO_FORGE}" >> "$GITHUB_OUTPUT"
+          
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "tags<<$EOF" >> "$GITHUB_OUTPUT"
+          for TAG in $RAW_TAGS; do
+            echo "${{ env.HARBOR_REGISTRY }}/${REPO_FORGE}:${TAG}" >> "$GITHUB_OUTPUT"
+          done
+          echo "$EOF" >> "$GITHUB_OUTPUT"
+          
+          BUILD_TARGET=$(echo $IMAGE_CONFIG | jq -r ".${TARGET_KEY}")
+          echo "target=$BUILD_TARGET" >> "$GITHUB_OUTPUT"
+
+      - name: Compile and Push Workspace
+        id: build_image
+        uses: docker/build-push-action@v6
+        timeout-minutes: 120
+        with:
+          context: .
+          file: ${{ env.DOCKERFILE_PATH }}
+          target: ${{ steps.prep.outputs.target }}
+          platforms: linux/amd64
+          push: true
+          pull: true
+          no-cache: true
+          sbom: true
+          tags: ${{ steps.prep.outputs.tags }}
+
+      - name: Install Trivy Scanner (User-Space)
+        if: ${{ github.event.inputs.skip_scan != 'true' }}
+        run: |
+          echo "Fetching latest Trivy binary for the specific runner hardware..."
+          mkdir -p ${{ github.workspace }}/bin
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b ${{ github.workspace }}/bin
+          ${{ github.workspace }}/bin/trivy --version
+
+      - name: Run Native Trivy Scan & Generate HTML
+        if: ${{ github.event.inputs.skip_scan != 'true' }}
+        env:
+          TRIVY_USERNAME: ${{ secrets.HARBOR_USERNAME }}
+          TRIVY_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
+        run: |
+          echo "Downloading Trivy HTML Template..."
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl -o ${{ github.workspace }}/html.tpl
+          
+          echo "Generating HTML Report..."
+          ${{ github.workspace }}/bin/trivy image \
+            --ignorefile images/trivy_ubuntu_common.ignore \
+            --format template \
+            --template "@${{ github.workspace }}/html.tpl" \
+            --output ${{ github.workspace }}/trivy-report.html \
+            --ignore-unfixed \
+            --severity CRITICAL,HIGH \
+            "${{ steps.prep.outputs.repo_path }}@${{ steps.build_image.outputs.digest }}"
+
+          echo "Enforcing Pipeline Policy (Failing on unmitigated CRITICAL/HIGH)..."
+          ${{ github.workspace }}/bin/trivy image \
+            --ignorefile images/trivy_ubuntu_common.ignore \
+            --format table \
+            --exit-code 1 \
+            --ignore-unfixed \
+            --severity CRITICAL,HIGH \
+            "${{ steps.prep.outputs.repo_path }}@${{ steps.build_image.outputs.digest }}"
+
+      - name: Archive HTML Vulnerability Report
+        uses: actions/upload-artifact@v3
+        if: ${{ always() && github.event.inputs.skip_scan != 'true' }}
+        with:
+          name: Trivy-Vulnerability-Report
+          path: ${{ github.workspace }}/trivy-report.html
+
+      - name: Post-Build Workspace Garbage Collection
+        run: |
+          docker builder prune -f
+          docker system prune -f
+        if: always()

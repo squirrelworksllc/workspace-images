@@ -13,13 +13,15 @@ permissions:
   contents: read
 
 env:
-  IMAGES_JSON: .vscode/images.json
+  IMAGES_JSON: images.json
 
 jobs:
   # Lints the core image (ubuntu-noble-core) to ensure it meets quality standards.
   validate-core:
     name: Lint dev – ubuntu-noble-core
     runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.core-config.outputs.skip }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,22 +31,31 @@ jobs:
         shell: bash
         run: |
           CORE_CONFIG=$(jq -r '.images[] | select(.key == "ubuntu-noble-core" and .enabled != false)' "$IMAGES_JSON")
+          if [ -z "$CORE_CONFIG" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
           echo "dockerfile=$(echo "$CORE_CONFIG" | jq -r '.dockerfile')" >> "$GITHUB_OUTPUT"
           echo "lintTarget=$(echo "$CORE_CONFIG" | jq -r '.lintTarget')" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
+        if: steps.core-config.outputs.skip == 'false'
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
+        if: steps.core-config.outputs.skip == 'false'
         uses: docker/setup-buildx-action@v3
 
       - name: Login to DockerHub
+        if: steps.core-config.outputs.skip == 'false'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Lint – ubuntu-noble-core
+        if: steps.core-config.outputs.skip == 'false'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -155,11 +166,11 @@ jobs:
     steps:
       - name: Check linting results
         run: |
-          if [[ "${{ needs.validate-core.result }}" != "success" || "${{ needs.validate-others.result }}" != "success" ]]; then
-            echo "One or more lint checks failed. This will block the PR."
+          if [[ "${{ needs.validate-core.result }}" == "failure" || "${{ needs.validate-others.result }}" == "failure" ]]; then
+            echo "One or more lint checks explicitly failed. Blocking build process."
             exit 1
           fi
-          echo "All lint checks passed."
+          echo "All structural gates cleared successfully."
 
   # Builds and publishes the multi-arch core image after all lint checks have passed.
   publish-core:

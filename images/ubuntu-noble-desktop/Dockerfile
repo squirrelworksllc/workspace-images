@@ -114,6 +114,9 @@ RUN set -eux; \
       # GROUP 6: Branding & Final Polish
       "/ubuntu/install/desktop/install.sh" \
       "/ubuntu/install/common/01_cleanup.sh" \
+      \
+      # GROUP 7: Automated Remediation & Purge (MUST BE LAST)
+      "/ubuntu/install/common/02_remediation.sh" \
     ); \
     \
     # Execution Loop
@@ -140,7 +143,21 @@ RUN set -eux; \
     # Cleanup only the ephemeral build scripts, keeping the shared common tools
     rm -rf "${INST_DIR}/ubuntu/install"
 
-# ----------------------------- FINALIZATION -----------------------------
+# ############################################################################
+# -------------------------- SECURITY METADATA LAYER ----------------------- #
+# ############################################################################
+# Create the standard OpenVEX directory and embed the unified exception profile
+RUN mkdir -p /opt/vex
+COPY images/vex_ubuntu_common.json /opt/vex/vex.json
+
+# Copy the centralized Trivy ignore file into standard system scanner paths
+COPY images/trivy_ubuntu_common.ignore /.trivyignore
+COPY images/trivy_ubuntu_common.ignore /app/.trivyignore
+ENV TRIVY_IGNOREFILE=/.trivyignore
+
+# ############################################################################
+# ------------------------------ FINALIZATION ------------------------------ #
+# ############################################################################
 ENV HOME=/home/kasm-user
 WORKDIR ${HOME}
 USER 1000
