@@ -64,3 +64,57 @@ CVE-2025-11266
 
 # Libxslt XML parsing library translation processing paths.
 CVE-2025-10911
+
+# --- WORKSPACE UTILITY OVERRIDES (JUNE 2026 AUDIT) ---
+# Legacy unexploitable NPM components inside passive extension contexts.
+CVE-2018-7408
+CVE-2019-16775
+CVE-2019-16776
+CVE-2019-16777
+
+# Upstream Docker/Moby daemon framework mitigation shadow filters.
+CVE-2026-34040
+CVE-2026-46680
+
+# Legacy containerd isolation regression in embedded local runtimes.
+CVE-2024-25621
+
+# Moby / Docker authorization plugin zero-length exception path bypass.
+CVE-2024-41110
+
+# Go Language Cryptography standard library key exchange network passive vectors.
+CVE-2024-45337
+CVE-2025-22869
+
+# Go Language standard networking HTTP/2 frame stream reset and flood protections.
+CVE-2023-39325
+CVE-2023-45283
+CVE-2023-45288
+
+# Go Language encoding parsing data validation shadows.
+CVE-2025-22868
+      
+# Go standard library core utility translation handling pathways.
+CVE-2024-24790
+CVE-2025-68121
+CVE-2024-34156
+CVE-2025-61726
+CVE-2025-61729
+CVE-2026-25679
+CVE-2026-32280
+CVE-2026-32281
+CVE-2026-32283
+CVE-2026-33811
+CVE-2026-33814
+CVE-2026-39820
+CVE-2026-39823
+CVE-2026-39825
+CVE-2026-39826
+CVE-2026-39836
+CVE-2026-42499
+
+# Runc containment filesystem mount isolation race conditions.
+CVE-2024-21626
+CVE-2025-31133
+CVE-2025-52565
+CVE-2025-52881

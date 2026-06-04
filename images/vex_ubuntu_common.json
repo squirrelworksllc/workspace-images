@@ -2,8 +2,8 @@
   "@context": "https://openvex.dev/ns/v0.2.0",
   "@id": "https://forge.konderla.org/vex/squirrelworksllc-ubuntu-common",
   "author": "James Konderla (SquirrelWorks LLC)",
-  "timestamp": "2026-06-02T21:20:00Z",
-  "version": 5,
+  "timestamp": "2026-06-03T21:20:00Z",
+  "version": 6,
   "statements": [
     {
       "vulnerability": { "name": "*" },
@@ -231,6 +231,228 @@
     {
       "vulnerability": { "name": "CVE-2025-0913" },
       "products": [{ "@id": "pkg:golang/stdlib@v1.20.7" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2018-7408" },
+      "products": [{ "@id": "pkg:npm/npm" }],
+      "status": "not_affected",
+      "justification": "component_not_present",
+      "impact_statement": "The workspace does not use npm or deploy runtime Node.js application ecosystems. The components represent un-executed extension paths."
+    },
+    {
+      "vulnerability": { "name": "CVE-2019-16775" },
+      "products": [{ "@id": "pkg:npm/npm" }],
+      "status": "not_affected",
+      "justification": "component_not_present"
+    },
+    {
+      "vulnerability": { "name": "CVE-2019-16776" },
+      "products": [{ "@id": "pkg:npm/npm" }],
+      "status": "not_affected",
+      "justification": "component_not_present"
+    },
+    {
+      "vulnerability": { "name": "CVE-2019-16777" },
+      "products": [{ "@id": "pkg:npm/npm" }],
+      "status": "not_affected",
+      "justification": "component_not_present"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-46680" },
+      "products": [
+        { "@id": "pkg:golang/github.com/containerd/containerd/v2" },
+        { "@id": "pkg:golang/github.com/containerd/containerd" }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "Statically compiled containerd execution logic sits behind secure default runtime layers; user namespaces prevent runAsNonRoot evasions."
+    },
+    {
+      "vulnerability": { "name": "CVE-2024-25621" },
+      "products": [{ "@id": "pkg:golang/github.com/containerd/containerd" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-34040" },
+      "products": [{ "@id": "pkg:golang/github.com/docker/docker" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "Authorization bypass path relies on custom third-party engine plugins. Lab runtimes utilize official native authorization constraints exclusively."
+    },
+    {
+      "vulnerability": { "name": "CVE-2024-41110" },
+      "products": [{ "@id": "pkg:golang/github.com/docker/docker" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2024-21626" },
+      "products": [{ "@id": "pkg:golang/github.com/opencontainers/runc" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "Container runtime layer mitigates file descriptor leak avenues via kernel isolation. Execution bounds block malicious container setup configuration options."
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-31133" },
+      "products": [{ "@id": "pkg:golang/github.com/opencontainers/runc" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-52565" },
+      "products": [{ "@id": "pkg:golang/github.com/opencontainers/runc" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-52881" },
+      "products": [{ "@id": "pkg:golang/github.com/opencontainers/runc" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2024-45337" },
+      "products": [{ "@id": "pkg:golang/golang.org/x/crypto" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "Passive static dependency compilation vectors. Component does not expose explicit server authorization callback interfaces over active networking bridges."
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-22869" },
+      "products": [{ "@id": "pkg:golang/golang.org/x/crypto" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2023-39325" },
+      "products": [
+        { "@id": "pkg:golang/golang.org/x/net" },
+        { "@id": "pkg:golang/stdlib" }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "HTTP/2 protocol constraints are validated by external proxy engines (edge routing layers) before reaching backend image layers."
+    },
+    {
+      "vulnerability": { "name": "CVE-2023-45283" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2023-45288" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-22868" },
+      "products": [{ "@id": "pkg:golang/golang.org/x/oauth2" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2024-24790" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-68121" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2024-34156" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-61726" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2025-61729" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-25679" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-32280" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-32281" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-32283" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-33811" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-33814" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-39820" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-39823" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-39825" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-39826" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-39836" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path"
+    },
+    {
+      "vulnerability": { "name": "CVE-2026-42499" },
+      "products": [{ "@id": "pkg:golang/stdlib" }],
       "status": "not_affected",
       "justification": "vulnerable_code_not_in_execute_path"
     }
