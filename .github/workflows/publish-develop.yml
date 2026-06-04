@@ -301,6 +301,7 @@ jobs:
           platforms: ${{ matrix.architectures }}
           push: true
           tags: ${{ matrix.tags }}
+          attests: type=vex,src=images/vex_ubuntu_common.json
           cache-from: type=gha,scope=pubdev-${{ matrix.key }}
           cache-to: type=gha,mode=max,scope=pubdev-${{ matrix.key }}
 
