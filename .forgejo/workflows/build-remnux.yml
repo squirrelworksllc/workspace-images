@@ -21,6 +21,11 @@ on:
         options:
           - develop
           - production
+      skip_scan:
+        description: 'Bypass Trivy Vulnerability Scan'
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: build-remnux-${{ github.event.inputs.target_env || 'develop' }}
@@ -118,6 +123,7 @@ jobs:
           tags: ${{ steps.prep.outputs.tags }}
 
       - name: Install Trivy Scanner (User-Space)
+        if: ${{ github.event.inputs.skip_scan != 'true' }}
         run: |
           echo "Fetching latest Trivy binary for the specific runner hardware..."
           mkdir -p ${{ github.workspace }}/bin
@@ -125,6 +131,7 @@ jobs:
           ${{ github.workspace }}/bin/trivy --version
 
       - name: Run Native Trivy Scan & Generate HTML
+        if: ${{ github.event.inputs.skip_scan != 'true' }}
         env:
           TRIVY_USERNAME: ${{ secrets.HARBOR_USERNAME }}
           TRIVY_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
@@ -153,7 +160,7 @@ jobs:
 
       - name: Archive HTML Vulnerability Report
         uses: actions/upload-artifact@v3
-        if: always()  # This ensures the report uploads even if the previous scan step fails the pipeline!
+        if: ${{ always() && github.event.inputs.skip_scan != 'true' }}
         with:
           name: Trivy-Vulnerability-Report
           path: ${{ github.workspace }}/trivy-report.html
