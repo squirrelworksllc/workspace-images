@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 env:
-  IMAGES_JSON: /images.json
+  IMAGES_JSON: images.json
 
 jobs:
   validate-core:
