@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 concurrency:
   group: publish-production
@@ -91,6 +92,7 @@ jobs:
             key=$(jq -r '.key' <<< "$image_str")
             dockerfile=$(jq -r '.dockerfile' <<< "$image_str")
             lintTarget=$(jq -r '.lintTarget' <<< "$image_str")
+            prodTarget=$(jq -r '.prodTarget' <<< "$image_str")
             repo=$(jq -r '.repo' <<< "$image_str")
             archs=$(jq -r '(if .architectures then .architectures else ["linux/amd64", "linux/arm64"] end) | join(",")' <<< "$image_str")
 
@@ -109,8 +111,9 @@ jobs:
 
             entry=$(jq -c -n \
               --arg key "$key" --arg dockerfile "$dockerfile" --arg lintTarget "$lintTarget" \
+              --arg prodTarget "$prodTarget" \
               --arg repo "$repo" --arg tags "$tag_string" --arg architectures "$archs" \
-              '{key: $key, dockerfile: $dockerfile, lintTarget: $lintTarget, repo: $repo, tags: $tags, architectures: $architectures}')
+              '{key: $key, dockerfile: $dockerfile, lintTarget: $lintTarget, prodTarget: $prodTarget, repo: $repo, tags: $tags, architectures: $architectures}')
 
             JSON_ENTRIES+="${entry},"
           done
@@ -189,6 +192,7 @@ jobs:
           fi
           echo "skip=false" >> "$GITHUB_OUTPUT"
           echo "dockerfile=$(echo "$CORE_CONFIG" | jq -r '.dockerfile')" >> "$GITHUB_OUTPUT"
+          echo "prodTarget=$(echo "$CORE_CONFIG" | jq -r '.prodTarget')" >> "$GITHUB_OUTPUT"
           echo "architectures=$(echo "$CORE_CONFIG" | jq -r '(if .architectures then .architectures else ["linux/amd64", "linux/arm64"] end) | join(",")')" >> "$GITHUB_OUTPUT"
 
           repo=$(echo "$CORE_CONFIG" | jq -r '.repo')
@@ -232,6 +236,7 @@ jobs:
         with:
           context: .
           file: ${{ steps.core-config.outputs.dockerfile }}
+          target: ${{ steps.core-config.outputs.prodTarget }}
           platforms: ${{ steps.core-config.outputs.architectures }}
           push: true
           tags: ${{ steps.core-config.outputs.tags }}
@@ -267,6 +272,7 @@ jobs:
         with:
           context: .
           file: ${{ matrix.dockerfile }}
+          target: ${{ matrix.prodTarget }}
           platforms: ${{ matrix.architectures }}
           push: true
           tags: ${{ matrix.tags }}

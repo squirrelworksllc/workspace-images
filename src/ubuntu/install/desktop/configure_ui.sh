@@ -11,6 +11,7 @@ mkdir -p "$KASM_HOME/.config/xfce4/xfconf/xfce-perchannel-xml"
 
 log "Creating a dedicated 'Documentation' category in the Applications menu..."
 # 1. Create the Directory definition
+mkdir -p /usr/share/desktop-directories
 cat <<EOF > /usr/share/desktop-directories/xfce-documentation.directory
 [Desktop Entry]
 Type=Directory
@@ -35,7 +36,7 @@ cat <<EOF > /etc/xdg/menus/applications-merged/documentation.menu
 </Menu>
 EOF
 
-# This XML blob tells XFCE exactly which file to use for the backdrop
+# 3. Apply Wallpaper XML
 cat <<EOF > "$KASM_HOME/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.xml"
 <?xml version="1.0" encoding="UTF-8"?>
 <channel name="xfce4-desktop" version="1.0">
@@ -50,4 +51,22 @@ cat <<EOF > "$KASM_HOME/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.x
 </channel>
 EOF
 
+# 4. Panel Cleanups (Fix PulseAudio, Workspace Switcher, and Missing 'X' Icon)
+log "Cleaning up XFCE Panel elements (PulseAudio, Workspaces, and Icon)..."
+PANEL_CONF="$KASM_HOME/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml"
+if [ -f "$PANEL_CONF" ]; then
+    # Remove the pulseaudio plugin from the panel memory
+    sed -i '/value="pulseaudio"/d' "$PANEL_CONF"
+    
+    # Remove the multi-desktop workspace switcher (pager plugin)
+    sed -i '/value="pager"/d' "$PANEL_CONF"
+fi
+
+# Locate the Whisker Menu config and swap the broken 'X' for the standard Ubuntu Logo
+WHISKER_CONF=$(find "$KASM_HOME/.config/xfce4/panel" -name "whiskermenu-*.rc" 2>/dev/null | head -n 1 || true)
+if [ -n "$WHISKER_CONF" ] && [ -f "$WHISKER_CONF" ]; then
+    sed -i 's/^button-icon=.*/button-icon=distributor-logo-ubuntu/g' "$WHISKER_CONF"
+fi
+
 chown -R 1000:1000 "$KASM_HOME/.config/xfce4"
+log "UI Configuration Complete."
