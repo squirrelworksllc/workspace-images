@@ -12,6 +12,9 @@ concurrency:
 
 permissions:
   contents: read
+  packages: write
+  attestations: write  # <-- Required for buildx v6 attestation handling
+  id-token: write      # <-- Required for OIDC signing of the VEX statement
 
 env:
   IMAGES_JSON: images.json
