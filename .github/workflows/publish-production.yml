@@ -12,6 +12,9 @@ concurrency:
 
 permissions:
   contents: read
+  packages: write
+  attestations: write  # <-- Required for buildx v6 attestation handling
+  id-token: write      # <-- Required for OIDC signing of the VEX statement
 
 env:
   IMAGES_JSON: images.json
@@ -276,7 +279,11 @@ jobs:
           platforms: ${{ matrix.architectures }}
           push: true
           tags: ${{ matrix.tags }}
-          attests: type=vex,src=images/vex_ubuntu_common.json
+          # Attach the VEX data inside an officially supported attestation format:
+          provenance: true
+          sbom: true
+          attests: |
+            type=sbom,generator=docker/buildkit-syft-scanner,vulnerability-vulnerabilities=@images/vex_ubuntu_common.json
           cache-from: type=gha,scope=pubprod-${{ matrix.key }}
           cache-to: type=gha,mode=max,scope=pubprod-${{ matrix.key }}
 
