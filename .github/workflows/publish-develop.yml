@@ -1,13 +1,12 @@
-name: Publish (develop)
+name: Publish Develop
 
 on:
   push:
     branches:
       - develop
-  workflow_dispatch:
 
 concurrency:
-  group: publish-develop
+  group: publish-dev-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -18,18 +17,15 @@ env:
 
 jobs:
   validate-core:
-    name: Lint dev – ubuntu-noble-core
+    name: Lint – ubuntu-noble-core
     runs-on: ubuntu-latest
-    outputs:
-      skip: ${{ steps.core-config.outputs.skip }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Get core image config
+      - uses: actions/checkout@v4
+      - name: Enforce Core Configuration
         id: core-config
         shell: bash
         run: |
+          set -euo pipefail
           CORE_CONFIG=$(jq -r '.images[] | select(.key == "ubuntu-noble-core" and .enabled != false)' "$IMAGES_JSON")
           if [ -z "$CORE_CONFIG" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
@@ -38,18 +34,8 @@ jobs:
           echo "skip=false" >> "$GITHUB_OUTPUT"
           echo "dockerfile=$(echo "$CORE_CONFIG" | jq -r '.dockerfile')" >> "$GITHUB_OUTPUT"
           echo "lintTarget=$(echo "$CORE_CONFIG" | jq -r '.lintTarget')" >> "$GITHUB_OUTPUT"
-
-      - name: Set up Docker Buildx
-        if: steps.core-config.outputs.skip == 'false'
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to DockerHub
-        if: steps.core-config.outputs.skip == 'false'
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
+      
+      - uses: docker/setup-buildx-action@v3
       - name: Lint – ubuntu-noble-core
         if: steps.core-config.outputs.skip == 'false'
         uses: docker/build-push-action@v6
@@ -59,143 +45,14 @@ jobs:
           target: ${{ steps.core-config.outputs.lintTarget }}
           push: false
 
-  matrix-others:
-    name: Build matrix (non-core)
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set.outputs.matrix }}
-      has_entries: ${{ steps.set.outputs.has_entries }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Generate matrix from images.json
-        id: set
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          mapfile -t IMAGES_ARRAY < <(jq -c '.images[] | select(.key != "ubuntu-noble-core" and .enabled != false)' "$IMAGES_JSON")
-
-          if [ ${#IMAGES_ARRAY[@]} -eq 0 ]; then
-            echo "matrix={\"include\":[]}" >> "$GITHUB_OUTPUT"
-            echo "has_entries=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          JSON_ENTRIES=""
-          for image_str in "${IMAGES_ARRAY[@]}"; do
-            key=$(jq -r '.key' <<< "$image_str")
-            dockerfile=$(jq -r '.dockerfile' <<< "$image_str")
-            devTarget=$(jq -r '.devTarget' <<< "$image_str")
-            lintTarget=$(jq -r '.lintTarget' <<< "$image_str")
-            repo=$(jq -r '.repo' <<< "$image_str")
-            archs=$(jq -r '(if .architectures then .architectures else ["linux/amd64"] end) | join(",")' <<< "$image_str")
-
-            tags_array=$(jq '.devTags' <<< "$image_str")
-            tag_string=""
-            if [[ "$tags_array" != "null" ]]; then
-              mapfile -t tags < <(jq -r '.[]' <<< "$tags_array")
-              for tag in "${tags[@]}"; do
-                if [[ -z "$tag_string" ]]; then
-                  tag_string="${repo}:${tag}"
-                else
-                  tag_string+=$(printf '\n%s:%s' "$repo" "$tag")
-                fi
-              done
-            fi
-
-            entry=$(jq -c -n \
-              --arg key "$key" --arg dockerfile "$dockerfile" --arg devTarget "$devTarget" \
-              --arg lintTarget "$lintTarget" --arg repo "$repo" --arg tags "$tag_string" \
-              --arg architectures "$archs" \
-              '{key: $key, dockerfile: $dockerfile, devTarget: $devTarget, lintTarget: $lintTarget, repo: $repo, tags: $tags, architectures: $architectures}')
-
-            JSON_ENTRIES+="${entry},"
-          done
-
-          MATRIX="{\"include\":[${JSON_ENTRIES%,}]}"
-          echo "matrix=${MATRIX}" >> "$GITHUB_OUTPUT"
-          echo "has_entries=true" >> "$GITHUB_OUTPUT"
-
-  validate-others:
-    name: Lint dev – ${{ matrix.key }}
-    runs-on: ubuntu-latest
-    needs: [matrix-others]
-    if: needs.matrix-others.outputs.has_entries == 'true'
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.matrix-others.outputs.matrix) }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to DockerHub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Lint – ${{ matrix.key }}
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ${{ matrix.dockerfile }}
-          target: ${{ matrix.lintTarget }}
-          push: false
-          tags: ${{ matrix.repo }}:ci-lint
-
-  lint-gate:
-    name: lint / gate
-    runs-on: ubuntu-latest
-    needs: [validate-core, validate-others]
-    if: always()
-    steps:
-      - name: Check linting results
-        run: |
-          if [[ "${{ needs.validate-core.result }}" == "failure" || "${{ needs.validate-others.result }}" == "failure" ]]; then
-            echo "One or more lint checks explicitly failed. Blocking build process."
-            exit 1
-          fi
-          echo "All structural gates cleared successfully."
-
-  evaluate-push:
-    name: Evaluate Publish Conditions
-    runs-on: ubuntu-latest
-    needs: lint-gate
-    outputs:
-      should_publish: ${{ steps.eval.outputs.should_publish }}
-    steps:
-      - id: eval
-        name: Gate Check (Friday or Manual)
-        run: |
-          DAY_OF_WEEK=$(TZ="America/Chicago" date +%u) 
-          
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "Manual trigger detected. Proceeding to publish."
-            echo "should_publish=true" >> "$GITHUB_OUTPUT"
-          elif [ "$DAY_OF_WEEK" -eq 5 ]; then
-            echo "Today is Friday (CDT). Proceeding to publish."
-            echo "should_publish=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "Today is NOT Friday. Skipping publish (Lint checks only)."
-            echo "should_publish=false" >> "$GITHUB_OUTPUT"
-          fi
-
   publish-core:
-    name: Publish dev – ubuntu-noble-core
+    name: Publish – ubuntu-noble-core
     runs-on: ubuntu-latest
-    needs: [evaluate-push]
-    if: needs.evaluate-push.outputs.should_publish == 'true'
-    outputs:
-      skip: ${{ steps.core-config.outputs.skip }}
+    # DEPENDENCY CHANGE: Core only waits for its own lint
+    needs: [validate-core]
+    if: always() && needs.validate-core.result == 'success'
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
       - name: Get core image config
         id: core-config
         shell: bash
@@ -208,104 +65,160 @@ jobs:
           echo "skip=false" >> "$GITHUB_OUTPUT"
           echo "dockerfile=$(echo "$CORE_CONFIG" | jq -r '.dockerfile')" >> "$GITHUB_OUTPUT"
           echo "devTarget=$(echo "$CORE_CONFIG" | jq -r '.devTarget')" >> "$GITHUB_OUTPUT"
-          echo "architectures=$(echo "$CORE_CONFIG" | jq -r '(if .architectures then .architectures else ["linux/amd64"] end) | join(",")')" >> "$GITHUB_OUTPUT"
+          
+          # NEW: Export the repo string for the size calculator
+          REPO=$(echo "$CORE_CONFIG" | jq -r '.repo')
+          echo "repo=$REPO" >> "$GITHUB_OUTPUT"
+          
+          # Extract tags (assuming devTags for develop branch)
+          TAGS=$(echo "$CORE_CONFIG" | jq -r '.devTags[]')
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "tags<<$EOF" >> "$GITHUB_OUTPUT"
+          for TAG in $TAGS; do echo "${REPO}:${TAG}" >> "$GITHUB_OUTPUT"; done
+          echo "$EOF" >> "$GITHUB_OUTPUT"
 
-          repo=$(echo "$CORE_CONFIG" | jq -r '.repo')
-          tags_array=$(echo "$CORE_CONFIG" | jq '.devTags')
-          tag_string=""
-          if [[ "$tags_array" != "null" ]]; then
-            mapfile -t tags < <(jq -r '.[]' <<< "$tags_array")
-            for tag in "${tags[@]}"; do
-              if [[ -z "$tag_string" ]]; then
-                tag_string="${repo}:${tag}"
-              else
-                tag_string+=$(printf '\n%s:%s' "$repo" "$tag")
-              fi
-            done
-          fi
-
-          {
-            echo 'tags<<EOF'
-            echo "$tag_string"
-            echo 'EOF'
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Set up Docker Buildx
-        if: steps.core-config.outputs.skip == 'false'
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to DockerHub
-        if: steps.core-config.outputs.skip == 'false'
-        uses: docker/login-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build & push – ubuntu-noble-core
+        id: build_core
         if: steps.core-config.outputs.skip == 'false'
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ${{ steps.core-config.outputs.dockerfile }}
           target: ${{ steps.core-config.outputs.devTarget }}
-          platforms: ${{ steps.core-config.outputs.architectures }}
           push: true
           tags: ${{ steps.core-config.outputs.tags }}
 
-  publish-others:
-    name: Publish dev – ${{ matrix.key }}
+      - name: Calculate and Report Uncompressed Image Size
+        id: calculate_size
+        if: steps.core-config.outputs.skip == 'false' && steps.build_core.outcome == 'success'
+        shell: bash
+        run: |
+          echo "======= Inspecting Remote Image Manifest Size ======="
+          TARGET_IMAGE="${{ steps.core-config.outputs.repo }}@${{ steps.build_core.outputs.digest }}"
+          
+          RAW_MANIFEST=$(docker buildx imagetools inspect "$TARGET_IMAGE" --format json)
+          SIZE_BYTES=$(echo "$RAW_MANIFEST" | jq '[.manifest.layers[].size] | add')
+          SIZE_MB=$(echo "$SIZE_BYTES" | awk '{printf "%.2f", $1 / 1024 / 1024}')
+          
+          echo "uncompressed_size_mb=${SIZE_MB}" >> "$GITHUB_OUTPUT"
+          
+          echo "### 📊 Kasm 1.1 Image Size Analysis: ubuntu-noble-core" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Target Key** | \`ubuntu-noble-core\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Digest** | \`${{ steps.build_core.outputs.digest }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Uncompressed Size** | **${SIZE_MB} MB** |" >> $GITHUB_STEP_SUMMARY
+
+  matrix-others:
+    name: Build matrix (non-core)
     runs-on: ubuntu-latest
-    needs: [publish-core, matrix-others, evaluate-push]
-    if: needs.evaluate-push.outputs.should_publish == 'true' && needs.matrix-others.outputs.has_entries == 'true'
+    outputs:
+      matrix: ${{ steps.set.outputs.matrix }}
+      has_entries: ${{ steps.set.outputs.has_entries }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate matrix from images.json
+        id: set
+        shell: bash
+        run: |
+          set -euo pipefail
+          VALID_ENTRIES=$(jq -c '[.images[] | select(.key != "ubuntu-noble-core" and .enabled != false)]' "$IMAGES_JSON")
+          if [ "$VALID_ENTRIES" == "[]" ] || [ -z "$VALID_ENTRIES" ]; then
+            echo "has_entries=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          MATRIX="$(jq -c '{include: [.images[] | select(.key != "ubuntu-noble-core" and .enabled != false) | {
+            key: .key, dockerfile: .dockerfile, repo: .repo, lintTarget: .lintTarget, devTarget: .devTarget, devTags: .devTags
+          }]}' "$IMAGES_JSON")"
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          echo "has_entries=true" >> "$GITHUB_OUTPUT"
+
+  validate-others:
+    name: Lint – ${{ matrix.key }}
+    runs-on: ubuntu-latest
+    needs: [matrix-others]
+    if: needs.matrix-others.outputs.has_entries == 'true'
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.matrix-others.outputs.matrix) }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Lint – ${{ matrix.key }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          target: ${{ matrix.lintTarget }}
+          push: false
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+  publish-others:
+    name: Publish – ${{ matrix.key }}
+    runs-on: ubuntu-latest
+    # DEPENDENCY CHANGE: Waits for matrix generation, its own linting, AND the core image publication
+    needs: [matrix-others, validate-others, publish-core]
+    if: |
+      always() && 
+      needs.matrix-others.outputs.has_entries == 'true' &&
+      (needs.validate-others.result == 'success' || needs.validate-others.result == 'skipped') &&
+      (needs.publish-core.result == 'success' || needs.publish-core.result == 'skipped')
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.matrix-others.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Format Tags
+        id: tags
+        shell: bash
+        run: |
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "list<<$EOF" >> "$GITHUB_OUTPUT"
+          # Convert JSON array of devTags into Docker image tags
+          echo '${{ toJson(matrix.devTags) }}' | jq -r '.[]' | while read TAG; do
+            echo "${{ matrix.repo }}:${TAG}" >> "$GITHUB_OUTPUT"
+          done
+          echo "$EOF" >> "$GITHUB_OUTPUT"
 
-      - name: Login to DockerHub
-        uses: docker/login-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build & push – ${{ matrix.key }}
         id: push
-        continue-on-error: true
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ${{ matrix.dockerfile }}
           target: ${{ matrix.devTarget }}
-          platforms: ${{ matrix.architectures }}
           push: true
-          tags: ${{ matrix.tags }}
-          provenance: true
-          sbom: true
-          attests: |
-            type=sbom,generator=docker/buildkit-syft-scanner,vulnerability-vulnerabilities=@images/vex_ubuntu_common.json
+          tags: ${{ steps.tags.outputs.list }}
 
-      - name: Summary
-        if: always()
+      - name: Calculate and Report Uncompressed Image Size
+        id: calculate_size
+        if: steps.push.outcome == 'success'
         shell: bash
         run: |
-          echo "Image: ${{ matrix.repo }}"
-          echo "Push outcome: ${{ steps.push.outcome || 'skipped' }}"
-
-      - name: Mark this image failed (but don't block others)
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          PUSH_OUTCOME="${{ steps.push.outcome }}"
-
-          if [ "$PUSH_OUTCOME" != "success" ]; then
-            echo "Build/push failed (or was skipped unexpectedly) for ${{ matrix.repo }} — marking this leg failed."
-            exit 1
-          fi
-
-          echo "OK: ${{ matrix.repo }} published successfully."
+          echo "======= Inspecting Remote Image Manifest Size ======="
+          TARGET_IMAGE="${{ matrix.repo }}@${{ steps.push.outputs.digest }}"
+          
+          RAW_MANIFEST=$(docker buildx imagetools inspect "$TARGET_IMAGE" --format json)
+          SIZE_BYTES=$(echo "$RAW_MANIFEST" | jq '[.manifest.layers[].size] | add')
+          SIZE_MB=$(echo "$SIZE_BYTES" | awk '{printf "%.2f", $1 / 1024 / 1024}')
+          
+          echo "uncompressed_size_mb=${SIZE_MB}" >> "$GITHUB_OUTPUT"
+          
+          echo "### 📊 Kasm 1.1 Image Size Analysis: ${{ matrix.key }}" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Target Key** | \`${{ matrix.key }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Digest** | \`${{ steps.push.outputs.digest }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Uncompressed Size** | **${SIZE_MB} MB** |" >> $GITHUB_STEP_SUMMARY

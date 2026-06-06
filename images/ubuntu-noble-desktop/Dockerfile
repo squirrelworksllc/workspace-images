@@ -102,6 +102,7 @@ RUN set -eux; \
       "/ubuntu/install/torsocks/install_torsocks.sh" \
       "/ubuntu/install/recoll/install_recoll.sh" \
       "/ubuntu/install/qbittorrent/install_qbittorrent.sh" \
+      "/ubuntu/install/origamindee/install_origamindee.sh" \
       \
       # GROUP 5: Communication (Autostart Suppressed)
       "/ubuntu/install/signal/install_signal.sh" \
