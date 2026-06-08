@@ -165,26 +165,26 @@ jobs:
           name: Trivy-Vulnerability-Report
           path: ${{ github.workspace }}/trivy-report.html
 
-      - name: Calculate and Report Uncompressed Image Size
+      - name: Calculate and Report True Uncompressed Image Size
         id: calculate_size
         if: success()
         run: |
-          echo "======= Inspecting Remote Image Manifest Size ======="
+          echo "======= Calculating True Uncompressed Image Size ======="
           
           # Target the image digest pushed in the earlier build step
           TARGET_IMAGE="${{ steps.prep.outputs.repo_path }}@${{ steps.build_image.outputs.digest }}"
           
-          # Use buildx imagetools to get the raw JSON configuration manifest
-          # This contains the uncompressed size of every single layer
-          RAW_MANIFEST=$(docker buildx imagetools inspect "$TARGET_IMAGE" --format json)
+          # 1. Pull the image to the local Docker daemon
+          echo "Pulling $TARGET_IMAGE to runner..."
+          docker pull "$TARGET_IMAGE"
           
-          # Sum up the sizes of all layers (returned in bytes)
-          SIZE_BYTES=$(echo "$RAW_MANIFEST" | jq '[.manifest.layers[].size] | add')
+          # 2. Inspect the local image footprint (outputs exact bytes)
+          SIZE_BYTES=$(docker image inspect "$TARGET_IMAGE" --format='{{.Size}}')
           
-          # Convert bytes to Megabytes (1024 * 1024)
+          # 3. Convert bytes to Megabytes (1024 * 1024)
           SIZE_MB=$(echo "$SIZE_BYTES" | awk '{printf "%.2f", $1 / 1024 / 1024}')
           
-          echo "Calculated Uncompressed Size: ${SIZE_MB} MB"
+          echo "Calculated True Uncompressed Size: ${SIZE_MB} MB"
           echo "uncompressed_size_mb=${SIZE_MB}" >> "$GITHUB_OUTPUT"
           
           # Append a clean report to the Forgejo Workflow UI Summary
@@ -193,10 +193,10 @@ jobs:
           echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
           echo "| **Target Key** | \`${{ env.IMAGE_KEY }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Digest** | \`${{ steps.build_image.outputs.digest }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Uncompressed Size** | **${SIZE_MB} MB** |" >> $GITHUB_STEP_SUMMARY
+          echo "| **True Uncompressed Size** | **${SIZE_MB} MB** |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "> 💡 **Kasm 1.1 Registry Tip:** Ensure the \`uncompressed_size_mb\` field in your \`workspace.json\` closely matches this value to optimize downstream Kasm deployment extractions." >> $GITHUB_STEP_SUMMARY
-
+          
       - name: Post-Build Workspace Garbage Collection
         run: |
           docker builder prune -f
