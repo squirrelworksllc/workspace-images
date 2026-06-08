@@ -17,6 +17,7 @@ ARG BASE_TAG="1.18.0"
 # ############################################################################
 FROM ${BASE_IMAGE}:${BASE_TAG} AS base
 
+# hadolint ignore=DL3002
 USER root
 
 # Shared Environment Variables
@@ -41,9 +42,9 @@ FROM base AS lint
 WORKDIR /src
 COPY . /src
 
-RUN bash /src/tools/ci/lint_installers.sh
-RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/ubuntu-noble-dind/Dockerfile
-RUN bash /src/tools/ci/lint-shell.sh
+RUN bash /src/tools/ci/lint_installers.sh && \
+    bash /src/tools/ci/lint-dockerfile.sh /src/images/ubuntu-noble-dind/Dockerfile && \
+    bash /src/tools/ci/lint-shell.sh
 
 USER 1000
 
@@ -72,35 +73,34 @@ ARG APT_DEBUG=false
 # --- Layer: Core System Tools ---
 RUN set -eux; \
     apt-get update; \
-    apt-get dist-upgrade -y; \
-    bash ${INST_DIR}/ubuntu/install/tools/install_tools.sh; \
-    bash ${INST_DIR}/ubuntu/install/common/00_apt_helper.sh; \
+    bash "${INST_DIR}/ubuntu/install/tools/install_tools.sh"; \
+    bash "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"; \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # --- Layer: Virtualization (DinD) ---
 RUN set -eux; \
     apt-get update; \
-    bash ${INST_DIR}/ubuntu/install/dind/install_dind.sh; \
+    bash "${INST_DIR}/ubuntu/install/dind/install_dind.sh"; \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # --- Layer: Browser ---
 RUN set -eux; \
     if [ "${SKIP_CHROMIUM}" != "true" ]; then \
         apt-get update; \
-        bash ${INST_DIR}/ubuntu/install/chromium/install_chromium.sh; \
+        bash "${INST_DIR}/ubuntu/install/chromium/install_chromium.sh"; \
         apt-get clean && rm -rf /var/lib/apt/lists/*; \
     fi
 
 # --- Layer: Developer Tools (VS Code) ---
 RUN set -eux; \
     apt-get update; \
-    bash ${INST_DIR}/ubuntu/install/vs_code/install_vs_code.sh; \
+    bash "${INST_DIR}/ubuntu/install/vs_code/install_vs_code.sh"; \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # --- Layer: Final Polish & Baseline Cleanup ---
 RUN set -eux; \
-    bash ${INST_DIR}/ubuntu/install/desktop/install.sh; \
-    bash ${INST_DIR}/ubuntu/install/common/01_cleanup.sh; \
+    bash "${INST_DIR}/ubuntu/install/desktop/install.sh"; \
+    bash "${INST_DIR}/ubuntu/install/common/01_cleanup.sh"; \
     apt-get autoremove -y --purge; \
     rm -rf /tmp/* /var/tmp/* /var/log/apt/* /var/log/dpkg.log; \
     "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \

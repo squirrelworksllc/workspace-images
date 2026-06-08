@@ -94,26 +94,33 @@ jobs:
           push: true
           tags: ${{ steps.core-config.outputs.tags }}
 
-      - name: Calculate and Report Uncompressed Image Size
+      - name: Calculate and Report True Uncompressed Size
         id: calculate_size
         if: steps.core-config.outputs.skip == 'false' && steps.build_core.outcome == 'success'
         shell: bash
         run: |
-          echo "======= Inspecting Remote Image Manifest Size ======="
+          echo "======= Calculating True Uncompressed Image Size ======="
           TARGET_IMAGE="${{ steps.core-config.outputs.repo }}@${{ steps.build_core.outputs.digest }}"
           
-          RAW_MANIFEST=$(docker buildx imagetools inspect "$TARGET_IMAGE" --format json)
-          SIZE_BYTES=$(echo "$RAW_MANIFEST" | jq '[.manifest.layers[].size] | add')
+          # 1. Pull the image to the GitHub Runner's local Docker daemon
+          echo "Pulling $TARGET_IMAGE to runner..."
+          docker pull "$TARGET_IMAGE"
+          
+          # 2. Inspect the local image footprint (outputs exact bytes)
+          SIZE_BYTES=$(docker image inspect "$TARGET_IMAGE" --format='{{.Size}}')
+          
+          # 3. Convert bytes to Megabytes using awk
           SIZE_MB=$(echo "$SIZE_BYTES" | awk '{printf "%.2f", $1 / 1024 / 1024}')
           
           echo "uncompressed_size_mb=${SIZE_MB}" >> "$GITHUB_OUTPUT"
           
+          # 4. Report to Workflow Summary
           echo "### 📊 Kasm 1.1 Image Size Analysis: ubuntu-noble-core" >> $GITHUB_STEP_SUMMARY
           echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
           echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
           echo "| **Target Key** | \`ubuntu-noble-core\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Digest** | \`${{ steps.build_core.outputs.digest }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Uncompressed Size** | **${SIZE_MB} MB** |" >> $GITHUB_STEP_SUMMARY
+          echo "| **True Uncompressed Size** | **${SIZE_MB} MB** |" >> $GITHUB_STEP_SUMMARY
 
   matrix-others:
     name: Build matrix (non-core)
@@ -202,23 +209,30 @@ jobs:
           push: true
           tags: ${{ steps.tags.outputs.list }}
 
-      - name: Calculate and Report Uncompressed Image Size
+      - name: Calculate and Report True Uncompressed Size
         id: calculate_size
         if: steps.push.outcome == 'success'
         shell: bash
         run: |
-          echo "======= Inspecting Remote Image Manifest Size ======="
+          echo "======= Calculating True Uncompressed Image Size ======="
           TARGET_IMAGE="${{ matrix.repo }}@${{ steps.push.outputs.digest }}"
           
-          RAW_MANIFEST=$(docker buildx imagetools inspect "$TARGET_IMAGE" --format json)
-          SIZE_BYTES=$(echo "$RAW_MANIFEST" | jq '[.manifest.layers[].size] | add')
+          # 1. Pull the image to the GitHub Runner's local Docker daemon
+          echo "Pulling $TARGET_IMAGE to runner..."
+          docker pull "$TARGET_IMAGE"
+          
+          # 2. Inspect the local image footprint (outputs exact bytes)
+          SIZE_BYTES=$(docker image inspect "$TARGET_IMAGE" --format='{{.Size}}')
+          
+          # 3. Convert bytes to Megabytes using awk
           SIZE_MB=$(echo "$SIZE_BYTES" | awk '{printf "%.2f", $1 / 1024 / 1024}')
           
           echo "uncompressed_size_mb=${SIZE_MB}" >> "$GITHUB_OUTPUT"
           
+          # 4. Report to Workflow Summary
           echo "### 📊 Kasm 1.1 Image Size Analysis: ${{ matrix.key }}" >> $GITHUB_STEP_SUMMARY
           echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
           echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
           echo "| **Target Key** | \`${{ matrix.key }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Digest** | \`${{ steps.push.outputs.digest }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Uncompressed Size** | **${SIZE_MB} MB** |" >> $GITHUB_STEP_SUMMARY
+          echo "| **True Uncompressed Size** | **${SIZE_MB} MB** |" >> $GITHUB_STEP_SUMMARY
