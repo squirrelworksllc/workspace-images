@@ -60,6 +60,7 @@ RUN rm -rf ./__context_check__
 
 # --- Stage Resources ---
 COPY ./src/ubuntu/ ${INST_DIR}/ubuntu/
+COPY ./images/ubuntu-noble-desktop/README.md /src/README.md
 RUN find "${INST_DIR}/ubuntu/install" -maxdepth 4 -type f -name '*.sh' -exec chmod +x {} \;
 
 # --- Runtime Validation Tools ---

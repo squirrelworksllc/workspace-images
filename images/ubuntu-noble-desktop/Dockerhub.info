@@ -7,7 +7,7 @@ A lightweight Ubuntu Noble 24.04 desktop environment built on top of `squirrelwo
 * **Browsers:** Chrome, Firefox, Chromium, Tor Browser (with TorSocks)
 * **Developer & Productivity:** VSCode, Ansible, LibreOffice, Remmina, Gimp, Obsidian, Filezilla
 * **Communication:** Signal, Slack, Discord, Teams, Telegram, Thunderbird
-* **InfoSec & Analysis:** Yara 4.5.5 (with Python Tools & VSCode integration), Recoll, Tesseract OCR, Gimagereader, QBittorrent, Origamindee (Origami + pdfwalker, pdfcop, pdfdecompress)
+* **InfoSec & Analysis:** Yara 4.5.5 (with Python Tools & VSCode integration), Recoll, Tesseract OCR, Gimagereader, QBittorrent, Origamindee (Origami, pdfcop, pdfdecompress)
 
 ## 🎯 Purpose
 

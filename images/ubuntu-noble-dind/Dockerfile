@@ -56,6 +56,7 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # --- Context Guard ---
 COPY ./src/ubuntu/install/ ./__context_check__/ubuntu_install/
+COPY ./images/ubuntu-noble-dind/README.md /src/README.md
 RUN rm -rf ./__context_check__
 
 # --- Stage Resources ---

@@ -4,18 +4,18 @@ This directory contains the workspace configuration, installation assets, and do
 
 ## 🛠️ Complete Technical Tool Manifest
 
-Below is the comprehensive listing of all software and containerization runtimes pre-baked into this workspace image.
+Below is the comprehensive listing of all software and containerization runtimes pre-baked into this workspace image. Click any tool name to visit its official project documentation.
 
 ### 🐳 Containerization Runtime (Docker in Docker)
-* **Docker Engine** – Full community edition daemon setup optimized for nested containerization inside unprivileged or semi-privileged container pods.
-* **Docker Compose** – Multi-container orchestration CLI plugin for local application stacking.
+* **[Docker Engine](https://docs.docker.com/engine/)** – Full community edition daemon setup optimized for nested containerization inside unprivileged or semi-privileged container pods.
+* **[Docker Compose](https://docs.docker.com/compose/)** – Multi-container orchestration CLI plugin for local application stacking.
 * **Storage Driver Context** – Configured to leverage performance-optimized storage drivers (such as `overlay2`) compatible with the host kernel namespace layers.
 
 ### 🌐 Web Browsers
-* **Google Chrome** – Enterprise-stable release pre-configured with flags to bypass sandboxing restrictions typically encountered within containerized environments (`--no-sandbox` wrapper integration).
+* **[Google Chrome](https://chromeenterprise.google/)** – Enterprise-stable release pre-configured with flags to bypass sandboxing restrictions typically encountered within containerized environments (`--no-sandbox` wrapper integration).
 
 ### 💼 Developer Suite
-* **Visual Studio Code (VSCode)** – Integrated development environment with workspace-level permissions optimized for the `kasm_user` context (UID 1000). Pre-wired to support extension environments such as Docker and Dev Containers.
+* **[Visual Studio Code (VSCode)](https://code.visualstudio.com/)** – Integrated development environment with workspace-level permissions optimized for the `kasm_user` context (UID 1000). Pre-wired to support extension environments such as Docker and Dev Containers.
 
 ---
 

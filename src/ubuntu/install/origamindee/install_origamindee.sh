@@ -3,6 +3,7 @@
 # install_origamindee.sh
 # Purpose: Installs Origamindee (Ruby PDF library) into the Ubuntu workspace.
 #          Project documentation: https://github.com/mindee/origamindee
+# Note: pdfwalker is explicitly excluded due to GTK2/Ruby 3.2 incompatibility.
 ###############################################################################
 set -euo pipefail
 : "${INST_DIR:=/dockerstartup/install}"
@@ -20,19 +21,11 @@ main() {
     log "Installing Ruby and build dependencies..."
     apt_install ruby-full build-essential
 
-    # 3. Pull the gem globally
+    # 3. Pull the gem globally (CLI tools: pdfcop, pdfdecompress)
     log "Installing origamindee gem..."
     gem install origamindee
-    gem install pdfwalker
 
-    # 4. Post-install configurations (Ephemerality/Persistence handling)
-    log "Step 2: Triggering Advanced UI and Policy configuration..."
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    if [ -f "${SCRIPT_DIR}/configure_ui.sh" ]; then
-        bash "${SCRIPT_DIR}/configure_ui.sh"
-    fi
-
-    log "Origamindee installation complete."
+    log "Origamindee CLI tools installed successfully."
 }
 
 main "$@"
