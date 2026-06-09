@@ -2,6 +2,7 @@
 ###############################################################################
 # install_dind.sh
 # Purpose: Installs Docker, k3d, and kubectl for SquirrelWorks 1.1
+#          Script is designed to fetch latest "Go" ON PURPOSE.
 ###############################################################################
 set -euo pipefail
 : "${INST_DIR:=/dockerstartup/install}"
@@ -13,6 +14,15 @@ main() {
     log "======= Installing Docker-In-Docker (DinD) ======="
 
     ARCH="$(dpkg --print-architecture)"
+    # Translate architecture for GitHub release URLs
+    if [ "$ARCH" = "amd64" ]; then
+        COMPOSE_ARCH="x86_64"
+    elif [ "$ARCH" = "arm64" ]; then
+        COMPOSE_ARCH="aarch64"
+    else
+        COMPOSE_ARCH="$ARCH"
+    fi
+
     . /etc/os-release
     apt_update_if_needed
 
@@ -26,9 +36,26 @@ main() {
 
     apt_refresh_after_repo_change
 
-    log "Step 2: Installing Docker Engine and Core Dependencies..."
-    apt_install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin \
+    log "Step 2: Installing Docker Engine Core (Skipping CLI Plugins for Dynamic Fetch)..."
+    apt_install docker-ce docker-ce-cli containerd.io \
                 fuse-overlayfs iptables kmod uidmap sudo supervisor
+
+    log "Step 2.5: Dynamically Fetching Latest Go-Compiled Docker CLI Plugins (Trivy Vuln Remediation)..."
+    mkdir -p /usr/libexec/docker/cli-plugins
+
+    # Dynamically fetch and install the latest Docker Compose plugin
+    LATEST_COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep '"tag_name":' | awk -F '"' '{print $4}')
+    log "Installing Docker Compose version: ${LATEST_COMPOSE_VERSION}"
+    curl -fsSL "https://github.com/docker/compose/releases/download/${LATEST_COMPOSE_VERSION}/docker-compose-linux-${COMPOSE_ARCH}" \
+         -o /usr/libexec/docker/cli-plugins/docker-compose
+    chmod +x /usr/libexec/docker/cli-plugins/docker-compose
+
+    # Dynamically fetch and install the latest Docker Buildx plugin
+    LATEST_BUILDX_VERSION=$(curl -s https://api.github.com/repos/docker/buildx/releases/latest | grep '"tag_name":' | awk -F '"' '{print $4}')
+    log "Installing Docker Buildx version: ${LATEST_BUILDX_VERSION}"
+    curl -fsSL "https://github.com/docker/buildx/releases/download/${LATEST_BUILDX_VERSION}/buildx-${LATEST_BUILDX_VERSION}.linux-${ARCH}" \
+         -o /usr/libexec/docker/cli-plugins/docker-buildx
+    chmod +x /usr/libexec/docker/cli-plugins/docker-buildx
 
     log "Step 3: Fetching Moby DinD Hack and Entrypoints..."
     curl -fsSL -o /usr/local/bin/dind https://raw.githubusercontent.com/moby/moby/master/hack/dind
