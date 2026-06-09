@@ -21,17 +21,26 @@ main() {
     
     echo "deb [signed-by=/etc/apt/keyrings/mozilla.gpg] https://packages.mozilla.org/apt mozilla main" > /etc/apt/sources.list.d/mozilla.firefox.list
 
-    # Prioritize Mozilla repo over Ubuntu's empty snap-wrapper
+    # Priority 1001 allows APT to cleanly overwrite Ubuntu's snap stub 
     cat > /etc/apt/preferences.d/mozilla-firefox <<EOF
+Package: *
+Pin: release o=LP-PPA-mozillateam
+Pin-Priority: 1001
+
 Package: firefox*
 Pin: origin packages.mozilla.org
-Pin-Priority: 1000
+Pin-Priority: 1001
 EOF
 
     apt_refresh_after_repo_change
+    
+    log "Step 2: Installing and locking the Firefox package..."
     apt_install firefox
+    
+    # Lock the package so 02_remediation.sh ignores it during dist-upgrade
+    apt-mark hold firefox
 
-    log "Step 2: Triggering Hardening and UI configuration..."
+    log "Step 3: Triggering Hardening and UI configuration..."
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     if [ -f "${SCRIPT_DIR}/configure_ui.sh" ]; then
         bash "${SCRIPT_DIR}/configure_ui.sh"
