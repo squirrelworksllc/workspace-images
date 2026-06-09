@@ -1,0 +1,19 @@
+# 🐧 REMnux Malware Analysis & Forensics Workstation (Kasm-Enhanced)
+
+An advanced malware analysis and reverse-engineering environment built on top of `squirrelworksllc/ubuntu-noble-core`. This image seamlessly pairs the full REMnux SaltStack software catalog with the lightweight, high-performance runtime performance of modern Kasm Workspaces.
+
+## ✔️ Included Tool Ecosystem
+
+*   **Reverse Engineering & Disassembly:** Ghidra, Radare2, Cutter, ltrace, strace
+*   **Behavioral Analysis:** Wireshark, INetSim, fakenet-ng scripts, network logging hooks
+*   **Code & Script Analysis:** Visual Studio Code (pre-configured), Python3 toolkit, Oletools, YARA, Volatility 3
+*   **Document & PE Forensics:** PDFiD, PDF-Parser, Pecheck, PyMMC, Wine binary compatibility layer
+*   **Web Browsing:** Enterprise-stable Mozilla Firefox and Google Chrome sandboxed profiles
+
+## 🎯 Purpose
+
+This workstation provides a standardized, immutable, and completely isolated sandbox environment designed specifically for malware analysts, security incident responders, and forensic researchers. It is tailored for:
+
+*   Executing interactive behavioral analysis on untrusted samples safely inside container boundaries.
+*   Conducting static code dissection and automated unpacking workflows.
+*   Serving as a reproducible remote forensics workstation within the Kasm 1.18 platform architecture.

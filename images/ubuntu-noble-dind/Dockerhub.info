@@ -1,0 +1,17 @@
+# 🐧 Ubuntu Noble 24.04 Desktop "Docker in Docker" (Kasm-Enhanced)
+
+A lightweight Ubuntu Noble 24.04 desktop environment built on top of our immutable foundation `squirrelworksllc/ubuntu-noble-core`. This image provides an isolated, nested Docker containerization environment directly inside a Kasm Workspace.
+
+## ✔️ Included Tools
+
+* **Core Containerization:** Docker Engine, Docker Compose, CLI Plugins
+* **Web Browsers:** Google Chrome (Enterprise-stable, container-optimized)
+* **Developer Suite:** Visual Studio Code (VSCode) with optimized host-mount permissions
+
+## 🎯 Purpose
+
+This image provides a powerful, container-ready workspace workspace for developers, DevOps engineers, and security researchers who require an isolated environment to run Docker containers safely. It is ideal for:
+
+* Running inside Kasm Workspaces with privileged/nested virtualization access
+* Local testing of Docker builds, Kubernetes contexts, or CI runner pipelines
+* Serving as a foundation for advanced DevOps and security labs

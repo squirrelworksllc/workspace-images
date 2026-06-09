@@ -1,0 +1,22 @@
+# 🐿️ Ubuntu Noble Core (Kasm Base Image)
+
+A minimal, Kasm-compatible Ubuntu Noble (24.04) base image designed for clean extension and predictable runtime behavior. This image provides the foundational components required to run reliably inside Kasm while intentionally avoiding bundled applications or opinionated tooling.
+
+## 🔧 What This Image Provides
+
+* **Base OS:** Ubuntu 24.04 LTS (Noble Numbat)
+* **Runtime Scaffolding:** Core Kasm startup logic, environment hooks, and internal window management protocols
+* **Identity Management:** Standardized execution profiles mapping directly to `kasm_user` (UID 1000)
+* **System Layer:** Baseline POSIX system utilities and a stripped filesystem architecture highly optimized for multi-stage downstream layering
+
+## 🧱 Design Goals
+
+This image is intended to be used strictly as a base layer, not as a full desktop or end-user environment.
+
+* **Minimal Surface Area:** Reduced vulnerabilities and dependencies by stripping unneeded metapackages
+* **Explicit Behavior:** Zero hidden side effects, ensuring predictable inheritance for complex workspaces
+* **Safe Foundation:** Uniform file ownership, strict permission compliance, and predictable startup behavior inside containerized VNC runtimes
+
+## 🎯 Intended Audience
+
+This foundation is engineered specifically for system administrators and developers building customized Kasm workspaces, provisioning internal lab environments, or running specialized technical workloads that demand a high-performance, predictable Ubuntu Noble foundation.

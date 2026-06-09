@@ -23,6 +23,7 @@ main() {
     # 3. Pull the gem globally
     log "Installing origamindee gem..."
     gem install origamindee
+    gem install pdfwalker
 
     # 4. Post-install configurations (Ephemerality/Persistence handling)
     log "Step 2: Triggering Advanced UI and Policy configuration..."
