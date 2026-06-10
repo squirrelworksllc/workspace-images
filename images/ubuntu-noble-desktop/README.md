@@ -1,4 +1,4 @@
-# 🐧 Ubuntu Noble Desktop Workspace Image (`ubuntu-noble-general`)
+# 🐧 Ubuntu Noble Desktop Workspace Image (`ubuntu-noble-desktop`)
 
 This directory contains the workspace configuration and documentation for the **Ubuntu Noble Desktop** image, an immutable Kasm Workspaces desktop environment built on top of our internal base image `squirrelworks/ubuntu-noble-core`.
 
@@ -29,7 +29,7 @@ Below is the comprehensive listing of all software, frameworks, and configuratio
 * **[Mozilla Thunderbird](https://www.thunderbird.net/)** – Full-featured standalone email, newsgroup, and chat client.
 
 ### 🛡️ InfoSec & Document Analysis Tools
-* **[Tor Browser](https://www.torproject.org/) & TorSocks** – Anonymized web routing engine paired with shell-level SOCKS proxy wrappers.
+* **[Tor Browser](https://www.torproject.org/) & [TorSocks](https://github.com/dgoulet/torsocks)** – Anonymized web routing engine paired with shell-level SOCKS proxy wrappers.
 * **[QBittorrent](https://www.qbittorrent.org/)** – Lightweight P2P BitTorrent client for secure file acquisition.
 * **[Recoll](https://www.lesbonscomptes.com/recoll/)** – Full-text desktop search tool for deep indexing of local documents and forensic content.
 * **[Tesseract OCR](https://github.com/tesseract-ocr/tesseract)** – Optical Character Recognition engine for automated text extraction from images.
@@ -41,13 +41,14 @@ Below is the comprehensive listing of all software, frameworks, and configuratio
 * **[Origamindee](https://github.com/mindee/origamindee) (Origami Framework Variant):**
     * `pdfcop` – Heuristic analyzer script to parse and detect suspicious/malicious structural anomalies within PDF objects.
     * `pdfdecompress` – Command-line utility to strip compression filters (e.g., FlateDecode) out of a PDF document to expose plain-text data streams for scanning.
+* **[Zbar](https://github.com/mchehab/zbar)** - Open Source barcode reader suite of packages.
 
 ---
 
 ## 🏗️ Repository Architecture Context
 
 ```text
-images/ubuntu-noble-general/
+images/ubuntu-noble-desktop/
 ├── Dockerfile          # Image definition layer (FROM squirrelworks/ubuntu-noble-core)
 ├── .dockerignore       # Build context safety filters
 ├── Dockerhub.info      # Clean overview copy-paste for Docker Hub
