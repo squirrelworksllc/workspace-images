@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 ###############################################################################
 # install_zbar.sh
-# Purpose: Installs the ZBar barcode reader application into the workspace.
+# Purpose: Installs ZBar packages and triggers relative UI configuration.
 ###############################################################################
-set -e
+set -euo pipefail
 
-echo "Starting ZBar backend installation..."
+log() { echo "[zbar-install] $*"; }
+
+log "Starting ZBar backend installation..."
 
 # Prevent interactive prompts
 export DEBIAN_FRONTEND=noninteractive
@@ -21,9 +23,22 @@ apt-get install -y --no-install-recommends \
 apt-get clean
 rm -rf /var/lib/apt/lists/*
 
-echo "ZBar backend installation complete. Triggering UI configuration..."
+log "ZBar backend installation complete. Triggering UI configuration..."
 
-# Execute the UI script directly from the install script
-# Assuming both are staged in /tmp/ by the Dockerfile
-chmod +x /tmp/configure_ui.sh
-/tmp/configure_ui.sh
+# -----------------------------------------------------------------------------
+# THE FIX: Dynamic Path Resolution
+# Resolve the exact directory this script is currently executing from.
+# -----------------------------------------------------------------------------
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Verify the UI script exists adjacent to the install script before calling it
+if [ -f "${SCRIPT_DIR}/configure_ui.sh" ]; then
+    log "Found configure_ui.sh in ${SCRIPT_DIR}. Executing..."
+    chmod +x "${SCRIPT_DIR}/configure_ui.sh"
+    bash "${SCRIPT_DIR}/configure_ui.sh"
+else
+    log "ERROR: configure_ui.sh not found in ${SCRIPT_DIR}!" >&2
+    exit 1
+fi
+
+log "ZBar deployment pipeline finished successfully."
