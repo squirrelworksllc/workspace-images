@@ -43,7 +43,12 @@ jobs:
   build-isolated-remnux:
     name: Build Workspace
     runs-on: [kasm-builder, repo-remnux-kasm]
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    if: |
+      github.event_name == 'workflow_dispatch' || 
+      (github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')) || 
+      (github.event_name == 'workflow_run' && 
+      github.event.workflow_run.conclusion == 'success' && 
+      (github.event.workflow_run.head_branch == 'develop' || github.event.workflow_run.head_branch == 'main'))
     steps:
       - name: Checkout Source
         uses: actions/checkout@v4
