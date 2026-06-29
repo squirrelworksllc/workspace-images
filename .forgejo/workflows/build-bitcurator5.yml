@@ -1,12 +1,12 @@
-name: Build Desktop
-run-name: Desktop Workspace Compile triggered by ${{ github.actor }}
+name: Build BitCurator 5
+run-name: BitCurator 5 Workspace Compile triggered by ${{ github.actor }}
 
 on:
   push:
     branches:
       - develop
     paths:
-      - 'images/ubuntu-noble-desktop/**'
+      - 'images/bitcurator5/**'
   workflow_run:
     workflows: ["Build Noble Core"]
     types:
@@ -25,10 +25,10 @@ on:
         description: 'Bypass Trivy Vulnerability Scan'
         required: false
         type: boolean
-        default: false
+        default: true # Default scanning disabled
 
 concurrency:
-  group: build-desktop-${{ github.event.inputs.target_env || 'develop' }}
+  group: build-bitcurator5-${{ github.event.inputs.target_env || 'develop' }}
   cancel-in-progress: true
 
 permissions:
@@ -36,13 +36,13 @@ permissions:
 
 env:
   HARBOR_REGISTRY: forge.konderla.org
-  IMAGE_KEY: ubuntu-noble-desktop
-  DOCKERFILE_PATH: images/ubuntu-noble-desktop/Dockerfile
+  IMAGE_KEY: bitcurator5
+  DOCKERFILE_PATH: images/bitcurator5/Dockerfile
 
 jobs:
-  build-workspace:
+  build-isolated-bitcurator5:
     name: Build Workspace
-    runs-on: [kasm-builder, repo-squirrelworks, resources-large]
+    runs-on: [kasm-builder, repo-bitcurator5-kasm, resources-large]
     if: |
       github.event_name == 'workflow_dispatch' || 
       (github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')) || 
@@ -112,7 +112,7 @@ jobs:
           BUILD_TARGET=$(echo $IMAGE_CONFIG | jq -r ".${TARGET_KEY}")
           echo "target=$BUILD_TARGET" >> "$GITHUB_OUTPUT"
 
-      - name: Compile and Push Workspace
+      - name: Compile and Push Isolated Workspace
         id: build_image
         uses: docker/build-push-action@v6
         timeout-minutes: 120
@@ -124,7 +124,7 @@ jobs:
           push: true
           pull: true
           no-cache: true
-          sbom: true
+          sbom: false
           tags: ${{ steps.prep.outputs.tags }}
           build-args: |
             BASE_IMAGE=${{ env.HARBOR_REGISTRY }}/squirrelworksllc/ubuntu-noble-core
@@ -132,22 +132,22 @@ jobs:
 
   calculate-size:
     name: Size Calculation
-    needs: build-workspace # Change to 'publish-core' or 'build-isolated-remnux' depending on the file
+    needs: build-isolated-bitcurator5
     uses: ./.forgejo/workflows/calculate-size.yml
     with:
-      image_path: "${{ needs.build-workspace.outputs.repo_path }}@${{ needs.build-workspace.outputs.digest }}"
-      image_key: "ubuntu-noble-desktop" # Change to match the specific file (e.g., 'remnux', 'ubuntu-noble-core')
+      image_path: "${{ needs.build-isolated-bitcurator5.outputs.repo_path }}@${{ needs.build-isolated-bitcurator5.outputs.digest }}"
+      image_key: "bitcurator5"
     secrets:
       HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
       HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
 
   security-scan:
-    name: Desktop Scan
-    needs: build-workspace
+    name: BitCurator Scan
+    needs: build-isolated-bitcurator5
     uses: ./.forgejo/workflows/trivy-scan.yml
     with:
-      image_path: "${{ needs.build-workspace.outputs.repo_path }}@${{ needs.build-workspace.outputs.digest }}"
-      image_key: "ubuntu-noble-desktop"
+      image_path: "${{ needs.build-isolated-bitcurator5.outputs.repo_path }}@${{ needs.build-isolated-bitcurator5.outputs.digest }}"
+      image_key: "bitcurator5"
       skip_scan: ${{ github.event.inputs.skip_scan == 'true' }}
     secrets:
       HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}

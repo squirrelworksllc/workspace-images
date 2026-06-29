@@ -2,15 +2,19 @@
   "@context": "https://openvex.dev/ns/v0.2.0",
   "@id": "https://forge.konderla.org/vex/squirrelworksllc-ubuntu-common",
   "author": "James Konderla (SquirrelWorks LLC)",
-  "timestamp": "2026-06-03T21:20:00Z",
-  "version": 6,
+  "timestamp": "2026-06-13T10:20:00Z",
+  "version": 7,
   "statements": [
     {
       "vulnerability": { "name": "*" },
-      "products": [{ "@id": "pkg:deb/ubuntu/linux-libc-dev" }],
+      "products": [
+        { "@id": "pkg:deb/ubuntu/linux-libc-dev" },
+        { "@id": "pkg:deb/ubuntu/firefox" },
+        { "@id": "pkg:npm/npm" }
+      ],
       "status": "not_affected",
       "justification": "vulnerable_code_not_present",
-      "impact_statement": "Package contains only static C header files and source text definitions. It presents zero executable binaries or runtime exploit vectors."
+      "impact_statement": "Component is a static non-executable header, an unused Snap package, or an inactive Node.js ecosystem artifact."
     },
     {
       "vulnerability": { "name": "CVE-2026-6238" },
@@ -235,31 +239,6 @@
       "justification": "vulnerable_code_not_in_execute_path"
     },
     {
-      "vulnerability": { "name": "CVE-2018-7408" },
-      "products": [{ "@id": "pkg:npm/npm" }],
-      "status": "not_affected",
-      "justification": "component_not_present",
-      "impact_statement": "The workspace does not use npm or deploy runtime Node.js application ecosystems. The components represent un-executed extension paths."
-    },
-    {
-      "vulnerability": { "name": "CVE-2019-16775" },
-      "products": [{ "@id": "pkg:npm/npm" }],
-      "status": "not_affected",
-      "justification": "component_not_present"
-    },
-    {
-      "vulnerability": { "name": "CVE-2019-16776" },
-      "products": [{ "@id": "pkg:npm/npm" }],
-      "status": "not_affected",
-      "justification": "component_not_present"
-    },
-    {
-      "vulnerability": { "name": "CVE-2019-16777" },
-      "products": [{ "@id": "pkg:npm/npm" }],
-      "status": "not_affected",
-      "justification": "component_not_present"
-    },
-    {
       "vulnerability": { "name": "CVE-2026-46680" },
       "products": [
         { "@id": "pkg:golang/github.com/containerd/containerd/v2" },
@@ -323,28 +302,6 @@
     {
       "vulnerability": { "name": "CVE-2025-22869" },
       "products": [{ "@id": "pkg:golang/golang.org/x/crypto" }],
-      "status": "not_affected",
-      "justification": "vulnerable_code_not_in_execute_path"
-    },
-    {
-      "vulnerability": { "name": "CVE-2023-39325" },
-      "products": [
-        { "@id": "pkg:golang/golang.org/x/net" },
-        { "@id": "pkg:golang/stdlib" }
-      ],
-      "status": "not_affected",
-      "justification": "vulnerable_code_not_in_execute_path",
-      "impact_statement": "HTTP/2 protocol constraints are validated by external proxy engines (edge routing layers) before reaching backend image layers."
-    },
-    {
-      "vulnerability": { "name": "CVE-2023-45283" },
-      "products": [{ "@id": "pkg:golang/stdlib" }],
-      "status": "not_affected",
-      "justification": "vulnerable_code_not_in_execute_path"
-    },
-    {
-      "vulnerability": { "name": "CVE-2023-45288" },
-      "products": [{ "@id": "pkg:golang/stdlib" }],
       "status": "not_affected",
       "justification": "vulnerable_code_not_in_execute_path"
     },

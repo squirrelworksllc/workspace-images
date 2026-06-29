@@ -25,7 +25,7 @@ on:
         description: 'Bypass Trivy Vulnerability Scan'
         required: false
         type: boolean
-        default: false
+        default: true # Default scanning disabled
 
 concurrency:
   group: build-remnux-${{ github.event.inputs.target_env || 'develop' }}
@@ -42,29 +42,29 @@ env:
 jobs:
   build-isolated-remnux:
     name: Build Workspace
-    runs-on: [kasm-builder, repo-remnux-kasm]
+    runs-on: [kasm-builder, repo-remnux-kasm, resources-large]
     if: |
       github.event_name == 'workflow_dispatch' || 
       (github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')) || 
       (github.event_name == 'workflow_run' && 
       github.event.workflow_run.conclusion == 'success' && 
       (github.event.workflow_run.head_branch == 'develop' || github.event.workflow_run.head_branch == 'main'))
+    outputs:
+      repo_path: ${{ steps.prep.outputs.repo_path }}
+      digest: ${{ steps.build_image.outputs.digest }}
     steps:
       - name: Checkout Source
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
-      - name: Git Diff Guard (Prevent Race Conditions)
+      - name: Git Diff Guard
         if: ${{ github.event_name == 'push' }}
-        id: diff_check
         run: |
-          echo "Analyzing commit changesets..."
           if git diff --name-only HEAD~1 HEAD | grep -q 'images/ubuntu-noble-core/'; then
-            echo "::notice:: Core foundation files were modified in this same commit. Standing down to allow upstream Build Noble Core to finish first."
+            echo "::notice:: Core foundation files modified. Standing down."
             exit 1
           fi
-          echo "No core changes detected. Proceeding with immediate standalone REMnux build."
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -90,16 +90,17 @@ jobs:
           if [ "$ENV_SELECTION" = "production" ]; then
             TAG_ARRAY="prodTags"
             TARGET_KEY="prodTarget"
+            BASE_TAG="latest"
           else
             TAG_ARRAY="devTags"
             TARGET_KEY="devTarget"
+            BASE_TAG="develop"
           fi
           
+          echo "base_tag=$BASE_TAG" >> "$GITHUB_OUTPUT"
           IMAGE_CONFIG=$(jq -c ".images[] | select(.key == \"${{ env.IMAGE_KEY }}\")" "$JSON_FILE")
           RAW_TAGS=$(echo "$IMAGE_CONFIG" | jq -r ".${TAG_ARRAY}[]")
           REPO_FORGE=$(echo "$IMAGE_CONFIG" | jq -r ".repo_forge")
-          
-          # Export the base repository path for the VEX digest attestation
           echo "repo_path=${{ env.HARBOR_REGISTRY }}/${REPO_FORGE}" >> "$GITHUB_OUTPUT"
           
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
@@ -108,7 +109,6 @@ jobs:
             echo "${{ env.HARBOR_REGISTRY }}/${REPO_FORGE}:${TAG}" >> "$GITHUB_OUTPUT"
           done
           echo "$EOF" >> "$GITHUB_OUTPUT"
-          
           BUILD_TARGET=$(echo $IMAGE_CONFIG | jq -r ".${TARGET_KEY}")
           echo "target=$BUILD_TARGET" >> "$GITHUB_OUTPUT"
 
@@ -126,84 +126,29 @@ jobs:
           no-cache: true
           sbom: false
           tags: ${{ steps.prep.outputs.tags }}
+          build-args: |
+            BASE_IMAGE=${{ env.HARBOR_REGISTRY }}/squirrelworksllc/ubuntu-noble-core
+            BASE_TAG=${{ steps.prep.outputs.base_tag }}
 
-      - name: Install Trivy Scanner (User-Space)
-        if: ${{ github.event.inputs.skip_scan != 'true' }}
-        run: |
-          echo "Fetching latest Trivy binary for the specific runner hardware..."
-          mkdir -p ${{ github.workspace }}/bin
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b ${{ github.workspace }}/bin
-          ${{ github.workspace }}/bin/trivy --version
+  calculate-size:
+    name: Size Calculation
+    needs: build-isolated-remnux
+    uses: ./.forgejo/workflows/calculate-size.yml
+    with:
+      image_path: "${{ needs.build-isolated-remnux.outputs.repo_path }}@${{ needs.build-isolated-remnux.outputs.digest }}"
+      image_key: "remnux"
+    secrets:
+      HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
+      HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
 
-      - name: Run Native Trivy Scan & Generate HTML
-        if: ${{ github.event.inputs.skip_scan != 'true' }}
-        env:
-          TRIVY_USERNAME: ${{ secrets.HARBOR_USERNAME }}
-          TRIVY_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
-        run: |
-          echo "Downloading Trivy HTML Template..."
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl -o ${{ github.workspace }}/html.tpl
-          
-          echo "Generating HTML Report..."
-          ${{ github.workspace }}/bin/trivy image \
-            --ignorefile images/trivy_ubuntu_common.ignore \
-            --format template \
-            --template "@${{ github.workspace }}/html.tpl" \
-            --output ${{ github.workspace }}/trivy-report.html \
-            --ignore-unfixed \
-            --severity CRITICAL,HIGH \
-            "${{ steps.prep.outputs.repo_path }}@${{ steps.build_image.outputs.digest }}"
-
-          echo "Enforcing Pipeline Policy (Failing on unmitigated CRITICAL/HIGH)..."
-          ${{ github.workspace }}/bin/trivy image \
-            --ignorefile images/trivy_ubuntu_common.ignore \
-            --format table \
-            --exit-code 1 \
-            --ignore-unfixed \
-            --severity CRITICAL,HIGH \
-            "${{ steps.prep.outputs.repo_path }}@${{ steps.build_image.outputs.digest }}"
-
-      - name: Archive HTML Vulnerability Report
-        uses: actions/upload-artifact@v3
-        if: ${{ always() && github.event.inputs.skip_scan != 'true' }}
-        with:
-          name: Trivy-Vulnerability-Report
-          path: ${{ github.workspace }}/trivy-report.html
-
-      - name: Calculate and Report True Uncompressed Image Size
-        id: calculate_size
-        if: success()
-        run: |
-          echo "======= Calculating True Uncompressed Image Size ======="
-          
-          # Target the image digest pushed in the earlier build step
-          TARGET_IMAGE="${{ steps.prep.outputs.repo_path }}@${{ steps.build_image.outputs.digest }}"
-          
-          # 1. Pull the image to the local Docker daemon
-          echo "Pulling $TARGET_IMAGE to runner..."
-          docker pull "$TARGET_IMAGE"
-          
-          # 2. Inspect the local image footprint (outputs exact bytes)
-          SIZE_BYTES=$(docker image inspect "$TARGET_IMAGE" --format='{{.Size}}')
-          
-          # 3. Convert bytes to Megabytes (1024 * 1024)
-          SIZE_MB=$(echo "$SIZE_BYTES" | awk '{printf "%.2f", $1 / 1024 / 1024}')
-          
-          echo "Calculated True Uncompressed Size: ${SIZE_MB} MB"
-          echo "uncompressed_size_mb=${SIZE_MB}" >> "$GITHUB_OUTPUT"
-          
-          # Append a clean report to the Forgejo Workflow UI Summary
-          echo "### 📊 Kasm 1.1 Image Size Analysis" >> $GITHUB_STEP_SUMMARY
-          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Target Key** | \`${{ env.IMAGE_KEY }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Digest** | \`${{ steps.build_image.outputs.digest }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **True Uncompressed Size** | **${SIZE_MB} MB** |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "> 💡 **Kasm 1.1 Registry Tip:** Ensure the \`uncompressed_size_mb\` field in your \`workspace.json\` closely matches this value to optimize downstream Kasm deployment extractions." >> $GITHUB_STEP_SUMMARY
-          
-      - name: Post-Build Workspace Garbage Collection
-        run: |
-          docker builder prune -f
-          docker system prune -f
-        if: always()
+  security-scan:
+    name: REMnux Scan
+    needs: build-isolated-remnux
+    uses: ./.forgejo/workflows/trivy-scan.yml
+    with:
+      image_path: "${{ needs.build-isolated-remnux.outputs.repo_path }}@${{ needs.build-isolated-remnux.outputs.digest }}"
+      image_key: "remnux"
+      skip_scan: ${{ github.event.inputs.skip_scan == 'true' }}
+    secrets:
+      HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
+      HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}

@@ -104,6 +104,8 @@ jobs:
           target: ${{ matrix.lintTarget }}
           push: false
           tags: ${{ matrix.repo }}:ci-lint
+          build-args: |
+            BASE_TAG=develop
 
   lint-gate:
     name: lint / gate

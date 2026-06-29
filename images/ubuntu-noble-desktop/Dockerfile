@@ -10,8 +10,10 @@
 ################################################################################
 
 # ----------------------------- BASE IMAGE -----------------------------
+# Defaults to public Docker Hub & develop for local VSCode testing.
+# Overridden dynamically by CI/CD pipeline injections.
 ARG BASE_IMAGE="squirrelworksllc/ubuntu-noble-core"
-ARG BASE_TAG="latest"
+ARG BASE_TAG="develop"
 
 # ############################################################################
 # ------------------------------ BASE STAGE -------------------------------- #
@@ -130,7 +132,8 @@ RUN set -eux; \
       else \
         bash "${INST_DIR}${SCRIPT}"; \
       fi || { \
-        rc=$?; echo "FAILED: ${SCRIPT} (rc=$rc)"; \
+        rc=$?; \
+        echo "FAILED: ${SCRIPT} (rc=$rc)"; \
         [ "${APT_DEBUG}" = "true" ] && tail -n 100 /var/log/apt/term.log || true; \
         exit "$rc"; \
       }; \

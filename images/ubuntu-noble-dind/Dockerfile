@@ -9,8 +9,10 @@
 ################################################################################
 
 # ----------------------------- BASE IMAGE -----------------------------
+# Defaults to public Docker Hub & develop for local VSCode testing.
+# Overridden dynamically by CI/CD pipeline injections.
 ARG BASE_IMAGE="squirrelworksllc/ubuntu-noble-core"
-ARG BASE_TAG="latest"
+ARG BASE_TAG="develop"
 
 # ############################################################################
 # ------------------------------ BASE STAGE -------------------------------- #
@@ -71,43 +73,53 @@ RUN chmod 0755 /dockerstartup/tools/runtime_validation.sh
 # --- Global Build Orchestration ---
 ARG APT_DEBUG=false
 
-# --- Layer: Core System Tools ---
 RUN set -eux; \
     apt-get update; \
-    bash "${INST_DIR}/ubuntu/install/tools/install_tools.sh"; \
-    bash "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"; \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# --- Layer: Virtualization (DinD) ---
-RUN set -eux; \
-    apt-get update; \
-    bash "${INST_DIR}/ubuntu/install/dind/install_dind.sh"; \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# --- Layer: Browser ---
-RUN set -eux; \
-    if [ "${SKIP_CHROMIUM}" != "true" ]; then \
-        apt-get update; \
-        bash "${INST_DIR}/ubuntu/install/chromium/install_chromium.sh"; \
-        apt-get clean && rm -rf /var/lib/apt/lists/*; \
-    fi
-
-# --- Layer: Developer Tools (VS Code) ---
-RUN set -eux; \
-    apt-get update; \
-    bash "${INST_DIR}/ubuntu/install/vs_code/install_vs_code.sh"; \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# --- Layer: Final Polish & Baseline Cleanup ---
-RUN set -eux; \
-    bash "${INST_DIR}/ubuntu/install/desktop/install.sh"; \
-    bash "${INST_DIR}/ubuntu/install/common/01_cleanup.sh"; \
-    apt-get autoremove -y --purge; \
-    rm -rf /tmp/* /var/tmp/* /var/log/apt/* /var/log/dpkg.log; \
+    \
+    # =========================================================================
+    # SQUIRRELWORKS MODULE REGISTRY
+    # =========================================================================
+    SCRIPTS=( \
+      "/ubuntu/install/tools/install_tools.sh" \
+      "/ubuntu/install/common/00_apt_helper.sh" \
+      "/ubuntu/install/dind/install_dind.sh" \
+      "/ubuntu/install/chromium/install_chromium.sh" \
+      "/ubuntu/install/vs_code/install_vs_code.sh" \
+      "/ubuntu/install/desktop/install.sh" \
+      "/ubuntu/install/common/01_cleanup.sh" \
+    ); \
+    \
+    # Execution Loop
+    for SCRIPT in "${SCRIPTS[@]}"; do \
+      echo ">>> Executing Module: ${SCRIPT}"; \
+      \
+      # Handle conditional Chromium install
+      if [[ "${SCRIPT}" == *"chromium/install_chromium.sh" && "${SKIP_CHROMIUM}" == "true" ]]; then \
+        echo "Skipping Chromium per ENV constraint..."; \
+        continue; \
+      fi; \
+      \
+      # Handle branded desktop install
+      if [[ "${SCRIPT}" == *"desktop/install.sh" ]]; then \
+        bash "${INST_DIR}${SCRIPT}" noble; \
+      else \
+        bash "${INST_DIR}${SCRIPT}"; \
+      fi || { \
+        rc=$?; \
+        echo "FAILED: ${SCRIPT} (rc=$rc)"; \
+        [ "${APT_DEBUG}" = "true" ] && tail -n 100 /var/log/apt/term.log || true; \
+        exit "$rc"; \
+      }; \
+    done; \
+    \
+    # --- Final Session Preparation ---
     "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \
     rm -f /etc/X11/xinit/Xclients; \
     chown 1000:0 "${HOME}"; \
-    mkdir -p /home/kasm-user && chown -R 1000:0 /home/kasm-user; \
+    mkdir -p /home/kasm-user; \
+    chown -R 1000:0 /home/kasm-user; \
+    \
+    # Cleanup only the ephemeral build scripts
     rm -rf "${INST_DIR}/ubuntu/install"
 
 # ############################################################################

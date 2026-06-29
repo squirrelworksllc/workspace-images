@@ -16,14 +16,11 @@ main() {
   apt_update_if_needed
 
   if [ "${ID}" = "ubuntu" ]; then
-    log "Ubuntu detected - Adding Recoll PPA for modern indexing..."
-    # We use the 'recoll-1.15-on' PPA which is the standard for modern Ubuntu
-    add-apt-repository -y ppa:recoll-backports/recoll-1.15-on
-    apt_refresh_after_repo_change
+    log "Ubuntu detected."
+    # ARCHITECT NOTE: Ubuntu 24.04 (Noble) natively hosts Recoll 1.37+ in the universe repository.
   fi
 
-  # core: recoll, GUI: recollgui, CLI: recollcmd
-  # We also add 'python3-recoll' for potential automation scripts
+  # Install core indexing engine, GUI, CLI tooling, and Python bindings
   apt_install recoll recollgui recollcmd python3-recoll
 
   log "Triggering UI and Environment configuration..."

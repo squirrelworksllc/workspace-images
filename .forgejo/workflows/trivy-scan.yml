@@ -1,0 +1,95 @@
+name: Shared Trivy Security Scan
+on:
+  workflow_call:
+    inputs:
+      image_path:
+        required: true
+        type: string
+        description: "Full registry image path with digest (e.g., registry/repo@sha256:...)"
+      image_key:
+        required: true
+        type: string
+        description: "Identifier for the target workspace image"
+      skip_scan:
+        required: false
+        type: boolean
+        default: false
+        description: "Bypass flag for manual triggers"
+    secrets:
+      HARBOR_USERNAME:
+        required: true
+      HARBOR_PASSWORD:
+        required: true
+
+jobs:
+  trivy-execution:
+    name: Trivy Engine Scan
+    runs-on: [kasm-builder, repo-squirrelworks, resources-small]
+    if: ${{ inputs.skip_scan != true }}
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+
+      - name: Generate Execution Date
+        id: datestring
+        run: echo "SCAN_DATE=$(date +%m-%d-%Y)" >> $GITHUB_ENV
+
+      - name: Install Trivy Scanner (User-Space)
+        run: |
+          mkdir -p ${{ github.workspace }}/bin
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b ${{ github.workspace }}/bin
+
+      - name: Run Native Trivy Scan & Apply Toxic Combination Policy
+        env:
+          TRIVY_USERNAME: ${{ secrets.HARBOR_USERNAME }}
+          TRIVY_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl -o ${{ github.workspace }}/html.tpl
+          
+          echo "Generating HTML Artifact..."
+          ${{ github.workspace }}/bin/trivy image \
+            --ignorefile images/trivy_ubuntu_common.ignore \
+            --format template \
+            --template "@${{ github.workspace }}/html.tpl" \
+            --output ${{ github.workspace }}/${{ inputs.image_key }}_${{ env.SCAN_DATE }}.html \
+            --ignore-unfixed \
+            --severity CRITICAL,HIGH \
+            --timeout 15m \
+            --scanners vuln \
+            "${{ inputs.image_path }}"
+
+          echo "Generating JSON Payload for Policy Enforcement..."
+          ${{ github.workspace }}/bin/trivy image \
+            --ignorefile images/trivy_ubuntu_common.ignore \
+            --format json \
+            --output ${{ github.workspace }}/trivy-results.json \
+            --ignore-unfixed \
+            --severity CRITICAL,HIGH \
+            --timeout 15m \
+            --scanners vuln \
+            "${{ inputs.image_path }}"
+
+          echo "Analyzing vulnerabilities for Toxic Combinations..."
+          TOXIC_COUNT=$(jq '[.Results[]?.Vulnerabilities[]? | select(
+            (.CVSS | tostring | contains("AV:N")) or
+            (.Title | test("RCE|Remote Code Execution|Privilege Escalation|Escape|Breakout"; "i")) or
+            (.Description | test("RCE|Remote Code Execution|Privilege Escalation|Escape|Breakout"; "i"))
+          )] | length' ${{ github.workspace }}/trivy-results.json)
+
+          if [ -z "$TOXIC_COUNT" ] || [ "$TOXIC_COUNT" == "null" ]; then
+            TOXIC_COUNT=0
+          fi
+
+          if [ "$TOXIC_COUNT" -gt 0 ]; then
+            echo "::error::🚨 POLICY VIOLATION: Found $TOXIC_COUNT Toxic Vulnerabilities (Network-facing, RCE, or Container Escape)! Pipeline halted."
+            exit 1
+          else
+            echo "✅ SUCCESS: No Toxic Combinations found. Any remaining minor vulnerabilities are contained by Kasm Architecture."
+          fi
+
+      - name: Archive HTML Vulnerability Report
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: Trivy-Report-${{ inputs.image_key }}_${{ env.SCAN_DATE }}
+          path: ${{ github.workspace }}/${{ inputs.image_key }}_${{ env.SCAN_DATE }}.html

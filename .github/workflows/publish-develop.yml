@@ -48,7 +48,6 @@ jobs:
   publish-core:
     name: Publish – ubuntu-noble-core
     runs-on: ubuntu-latest
-    # DEPENDENCY CHANGE: Core only waits for its own lint
     needs: [validate-core]
     if: always() && needs.validate-core.result == 'success'
     steps:
@@ -66,11 +65,9 @@ jobs:
           echo "dockerfile=$(echo "$CORE_CONFIG" | jq -r '.dockerfile')" >> "$GITHUB_OUTPUT"
           echo "devTarget=$(echo "$CORE_CONFIG" | jq -r '.devTarget')" >> "$GITHUB_OUTPUT"
           
-          # NEW: Export the repo string for the size calculator
           REPO=$(echo "$CORE_CONFIG" | jq -r '.repo')
           echo "repo=$REPO" >> "$GITHUB_OUTPUT"
           
-          # Extract tags (assuming devTags for develop branch)
           TAGS=$(echo "$CORE_CONFIG" | jq -r '.devTags[]')
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "tags<<$EOF" >> "$GITHUB_OUTPUT"
@@ -101,20 +98,12 @@ jobs:
         run: |
           echo "======= Calculating True Uncompressed Image Size ======="
           TARGET_IMAGE="${{ steps.core-config.outputs.repo }}@${{ steps.build_core.outputs.digest }}"
-          
-          # 1. Pull the image to the GitHub Runner's local Docker daemon
           echo "Pulling $TARGET_IMAGE to runner..."
           docker pull "$TARGET_IMAGE"
-          
-          # 2. Inspect the local image footprint (outputs exact bytes)
           SIZE_BYTES=$(docker image inspect "$TARGET_IMAGE" --format='{{.Size}}')
-          
-          # 3. Convert bytes to Megabytes using awk
           SIZE_MB=$(echo "$SIZE_BYTES" | awk '{printf "%.2f", $1 / 1024 / 1024}')
-          
           echo "uncompressed_size_mb=${SIZE_MB}" >> "$GITHUB_OUTPUT"
           
-          # 4. Report to Workflow Summary
           echo "### 📊 Kasm 1.1 Image Size Analysis: ubuntu-noble-core" >> $GITHUB_STEP_SUMMARY
           echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
           echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
@@ -164,11 +153,12 @@ jobs:
           file: ${{ matrix.dockerfile }}
           target: ${{ matrix.lintTarget }}
           push: false
+          build-args: |
+            BASE_TAG=develop
 
   publish-others:
     name: Publish – ${{ matrix.key }}
     runs-on: ubuntu-latest
-    # DEPENDENCY CHANGE: Waits for matrix generation, its own linting, AND the core image publication
     needs: [matrix-others, validate-others, publish-core]
     if: |
       always() && 
@@ -187,7 +177,6 @@ jobs:
         run: |
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "list<<$EOF" >> "$GITHUB_OUTPUT"
-          # Convert JSON array of devTags into Docker image tags
           echo '${{ toJson(matrix.devTags) }}' | jq -r '.[]' | while read TAG; do
             echo "${{ matrix.repo }}:${TAG}" >> "$GITHUB_OUTPUT"
           done
@@ -208,6 +197,8 @@ jobs:
           target: ${{ matrix.devTarget }}
           push: true
           tags: ${{ steps.tags.outputs.list }}
+          build-args: |
+            BASE_TAG=develop
 
       - name: Calculate and Report True Uncompressed Size
         id: calculate_size
@@ -216,20 +207,12 @@ jobs:
         run: |
           echo "======= Calculating True Uncompressed Image Size ======="
           TARGET_IMAGE="${{ matrix.repo }}@${{ steps.push.outputs.digest }}"
-          
-          # 1. Pull the image to the GitHub Runner's local Docker daemon
           echo "Pulling $TARGET_IMAGE to runner..."
           docker pull "$TARGET_IMAGE"
-          
-          # 2. Inspect the local image footprint (outputs exact bytes)
           SIZE_BYTES=$(docker image inspect "$TARGET_IMAGE" --format='{{.Size}}')
-          
-          # 3. Convert bytes to Megabytes using awk
           SIZE_MB=$(echo "$SIZE_BYTES" | awk '{printf "%.2f", $1 / 1024 / 1024}')
-          
           echo "uncompressed_size_mb=${SIZE_MB}" >> "$GITHUB_OUTPUT"
           
-          # 4. Report to Workflow Summary
           echo "### 📊 Kasm 1.1 Image Size Analysis: ${{ matrix.key }}" >> $GITHUB_STEP_SUMMARY
           echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
           echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY

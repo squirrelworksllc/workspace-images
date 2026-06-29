@@ -9,8 +9,10 @@
 ################################################################################
 
 # ----------------------------- BASE IMAGE -----------------------------
+# Defaults to public Docker Hub & develop for local VSCode testing.
+# Overridden dynamically by CI/CD pipeline injections.
 ARG BASE_IMAGE="squirrelworksllc/ubuntu-noble-core"
-ARG BASE_TAG="1.18.0"
+ARG BASE_TAG="develop"
 
 # ############################################################################
 # ------------------------------ BASE STAGE -------------------------------- #
@@ -100,7 +102,7 @@ RUN set -eux; \
     done; \
     \
     # =========================================================================
-    # STEP 5: THE REMNUX CORE INSTALLER
+    # THE REMNUX CORE INSTALLER
     # =========================================================================
     log() { echo "[REMNUX-INSTALLER] $*"; }; \
     ARCH="$(dpkg --print-architecture)"; \
@@ -114,7 +116,7 @@ RUN set -eux; \
     /tmp/remnux-installer install --mode=cloud --user=kasm-user || true; \
     \
     # =========================================================================
-    # STEP 6: POST-REMNUX REPAIR & CLEANUP
+    # POST-REMNUX REPAIR & CLEANUP
     # =========================================================================
     log "Restoring Kasm-critical dependencies (PulseAudio)..."; \
     apt-get update && apt-get install -y --no-install-recommends pulseaudio; \
@@ -138,18 +140,6 @@ RUN set -eux; \
     \
     # Deep cleanup of temporary build assets
     rm -rf "${INST_DIR}/ubuntu/install" /tmp/* /var/cache/salt
-
-# ############################################################################
-# -------------------------- SECURITY METADATA LAYER ----------------------- #
-# ############################################################################
-# Create the standard OpenVEX directory and embed the unified exception profile
-RUN mkdir -p /opt/vex
-COPY images/vex_ubuntu_common.json /opt/vex/vex.json
-
-# Copy the centralized Trivy ignore file into standard system scanner paths
-COPY images/trivy_ubuntu_common.ignore /.trivyignore
-COPY images/trivy_ubuntu_common.ignore /app/.trivyignore
-ENV TRIVY_IGNOREFILE=/.trivyignore
 
 # ############################################################################
 # ------------------------------ FINALIZATION ------------------------------ #
