@@ -9,14 +9,17 @@
 ################################################################################
 
 # ----------------------------- BASE IMAGE -----------------------------
+# Defaults to public Docker Hub & develop for local VSCode testing.
+# Overridden dynamically by CI/CD pipeline injections.
 ARG BASE_IMAGE="squirrelworksllc/ubuntu-noble-core"
-ARG BASE_TAG="1.18.0"
+ARG BASE_TAG="develop"
 
 # ############################################################################
 # ------------------------------ BASE STAGE -------------------------------- #
 # ############################################################################
-FROM --platform=$BUILDPLATFORM ${BASE_IMAGE}:${BASE_TAG} AS base
+FROM ${BASE_IMAGE}:${BASE_TAG} AS base
 
+# hadolint ignore=DL3002
 USER root
 
 # Shared Environment Variables
@@ -36,25 +39,26 @@ WORKDIR ${HOME}
 # ############################################################################
 # ------------------------------ LINT TARGET ------------------------------- #
 # ############################################################################
-FROM --platform=$BUILDPLATFORM base AS lint
+FROM base AS lint
 
 WORKDIR /src
 COPY . /src
 
-RUN bash /src/tools/ci/lint_installers.sh
-RUN bash /src/tools/ci/lint-dockerfile.sh /src/images/ubuntu-noble-dind/Dockerfile
-RUN bash /src/tools/ci/lint-shell.sh
+RUN bash /src/tools/ci/lint_installers.sh && \
+    bash /src/tools/ci/lint-dockerfile.sh /src/images/ubuntu-noble-dind/Dockerfile && \
+    bash /src/tools/ci/lint-shell.sh
 
 USER 1000
 
 # ############################################################################
 # -------------------------- COMMON BUILD TARGET --------------------------- #
 # ############################################################################
-FROM --platform=$BUILDPLATFORM base AS build
+FROM base AS build
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # --- Context Guard ---
 COPY ./src/ubuntu/install/ ./__context_check__/ubuntu_install/
+COPY ./images/ubuntu-noble-dind/README.md /src/README.md
 RUN rm -rf ./__context_check__
 
 # --- Stage Resources ---
@@ -73,41 +77,36 @@ RUN set -eux; \
     apt-get update; \
     \
     # =========================================================================
-    # SQUIRRELWORKS MODULE REGISTRY (DinD Flavor)
+    # SQUIRRELWORKS MODULE REGISTRY
     # =========================================================================
     SCRIPTS=( \
-      # GROUP 1: Core System Tools & Helpers
       "/ubuntu/install/tools/install_tools.sh" \
       "/ubuntu/install/common/00_apt_helper.sh" \
-      \
-      # GROUP 2: Virtualization & Containerization
       "/ubuntu/install/dind/install_dind.sh" \
-    ); \
-    \
-    # Conditional Group: Browser selection
-    if [ "${SKIP_CHROMIUM}" != "true" ]; then \
-      SCRIPTS+=( "/ubuntu/install/chromium/install_chromium.sh" ); \
-    fi; \
-    \
-    # GROUP 3: Developer Productivity & Final Polish
-    SCRIPTS+=( \
+      "/ubuntu/install/chromium/install_chromium.sh" \
       "/ubuntu/install/vs_code/install_vs_code.sh" \
       "/ubuntu/install/desktop/install.sh" \
       "/ubuntu/install/common/01_cleanup.sh" \
-      \
-      # GROUP 4: Automated Remediation & Purge (MUST BE LAST)
-      "/ubuntu/install/common/02_remediation.sh" \
     ); \
     \
     # Execution Loop
     for SCRIPT in "${SCRIPTS[@]}"; do \
       echo ">>> Executing Module: ${SCRIPT}"; \
+      \
+      # Handle conditional Chromium install
+      if [[ "${SCRIPT}" == *"chromium/install_chromium.sh" && "${SKIP_CHROMIUM}" == "true" ]]; then \
+        echo "Skipping Chromium per ENV constraint..."; \
+        continue; \
+      fi; \
+      \
+      # Handle branded desktop install
       if [[ "${SCRIPT}" == *"desktop/install.sh" ]]; then \
         bash "${INST_DIR}${SCRIPT}" noble; \
       else \
         bash "${INST_DIR}${SCRIPT}"; \
       fi || { \
-        rc=$?; echo "FAILED: ${SCRIPT} (rc=$rc)"; \
+        rc=$?; \
+        echo "FAILED: ${SCRIPT} (rc=$rc)"; \
         [ "${APT_DEBUG}" = "true" ] && tail -n 100 /var/log/apt/term.log || true; \
         exit "$rc"; \
       }; \
@@ -120,7 +119,7 @@ RUN set -eux; \
     mkdir -p /home/kasm-user; \
     chown -R 1000:0 /home/kasm-user; \
     \
-    # Cleanup ephemeral build scripts
+    # Cleanup only the ephemeral build scripts
     rm -rf "${INST_DIR}/ubuntu/install"
 
 # ############################################################################
@@ -148,11 +147,11 @@ CMD ["--tail-log"]
 # ############################################################################
 # ------------------------------- DEVELOP IMAGE ---------------------------- #
 # ############################################################################
-FROM --platform=$BUILDPLATFORM build AS develop
+FROM build AS develop
 ENV DEBUG=true
 
 # ############################################################################
 # ----------------------------- PRODUCTION IMAGE --------------------------- #
 # ############################################################################
-FROM --platform=$BUILDPLATFORM build AS production
+FROM build AS production
 ENV DEBUG=false

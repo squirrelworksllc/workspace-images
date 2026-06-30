@@ -9,13 +9,15 @@
 ################################################################################
 
 # ----------------------------- BASE IMAGE -----------------------------
+# Defaults to public Docker Hub & develop for local VSCode testing.
+# Overridden dynamically by CI/CD pipeline injections.
 ARG BASE_IMAGE="squirrelworksllc/ubuntu-noble-core"
-ARG BASE_TAG="1.18.0"
+ARG BASE_TAG="develop"
 
 # ############################################################################
 # ------------------------------ BASE STAGE -------------------------------- #
 # ############################################################################
-FROM --platform=$BUILDPLATFORM ${BASE_IMAGE}:${BASE_TAG} AS base
+FROM ${BASE_IMAGE}:${BASE_TAG} AS base
 
 USER root
 
@@ -33,7 +35,7 @@ WORKDIR ${HOME}
 # ############################################################################
 # ------------------------------ LINT TARGET ------------------------------- #
 # ############################################################################
-FROM --platform=$BUILDPLATFORM base AS lint
+FROM base AS lint
 WORKDIR /src
 COPY . /src
 RUN bash /src/tools/ci/lint_installers.sh
@@ -44,7 +46,7 @@ USER 1000
 # ############################################################################
 # -------------------------- COMMON BUILD TARGET --------------------------- #
 # ############################################################################
-FROM --platform=$BUILDPLATFORM base AS build
+FROM base AS build
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # --- Context Guard ---
@@ -53,6 +55,7 @@ RUN rm -rf ./__context_check__
 
 # --- Stage Resources ---
 COPY ./src/ubuntu/ ${INST_DIR}/ubuntu/
+COPY ./images/remnux/README.md /src/README.md
 RUN find "${INST_DIR}/ubuntu/install" -maxdepth 4 -type f -name '*.sh' -exec chmod +x {} \;
 
 # --- Runtime Validation Tools ---
@@ -99,7 +102,7 @@ RUN set -eux; \
     done; \
     \
     # =========================================================================
-    # STEP 5: THE REMNUX CORE INSTALLER
+    # THE REMNUX CORE INSTALLER
     # =========================================================================
     log() { echo "[REMNUX-INSTALLER] $*"; }; \
     ARCH="$(dpkg --print-architecture)"; \
@@ -113,7 +116,7 @@ RUN set -eux; \
     /tmp/remnux-installer install --mode=cloud --user=kasm-user || true; \
     \
     # =========================================================================
-    # STEP 6: POST-REMNUX REPAIR & CLEANUP
+    # POST-REMNUX REPAIR & CLEANUP
     # =========================================================================
     log "Restoring Kasm-critical dependencies (PulseAudio)..."; \
     apt-get update && apt-get install -y --no-install-recommends pulseaudio; \
@@ -139,18 +142,6 @@ RUN set -eux; \
     rm -rf "${INST_DIR}/ubuntu/install" /tmp/* /var/cache/salt
 
 # ############################################################################
-# -------------------------- SECURITY METADATA LAYER ----------------------- #
-# ############################################################################
-# Create the standard OpenVEX directory and embed the unified exception profile
-RUN mkdir -p /opt/vex
-COPY images/vex_ubuntu_common.json /opt/vex/vex.json
-
-# Copy the centralized Trivy ignore file into standard system scanner paths
-COPY images/trivy_ubuntu_common.ignore /.trivyignore
-COPY images/trivy_ubuntu_common.ignore /app/.trivyignore
-ENV TRIVY_IGNOREFILE=/.trivyignore
-
-# ############################################################################
 # ------------------------------ FINALIZATION ------------------------------ #
 # ############################################################################
 ENV HOME=/home/kasm-user
@@ -161,11 +152,11 @@ CMD ["--tail-log"]
 # ############################################################################
 # ------------------------------- DEVELOP --------------------------------- #
 # ############################################################################
-FROM --platform=$BUILDPLATFORM build AS develop
+FROM build AS develop
 ENV DEBUG=true
 
 # ############################################################################
 # ----------------------------- PRODUCTION -------------------------------- #
 # ############################################################################
-FROM --platform=$BUILDPLATFORM build AS production
+FROM build AS production
 ENV DEBUG=false

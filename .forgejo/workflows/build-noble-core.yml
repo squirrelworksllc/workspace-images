@@ -38,7 +38,10 @@ env:
 jobs:
   publish-core:
     name: Build Core
-    runs-on: [kasm-builder, repo-squirrelworks]
+    runs-on: [kasm-builder, repo-squirrelworks, resources-small]
+    outputs:
+      repo_path: ${{ steps.prep.outputs.repo_path }}
+      digest: ${{ steps.build_image.outputs.digest }}
     steps:
       - name: Checkout Source
         uses: actions/checkout@v4
@@ -74,11 +77,8 @@ jobs:
           
           IMAGE_CONFIG=$(jq -c ".images[] | select(.key == \"${{ env.IMAGE_KEY }}\")" "$JSON_FILE")
           RAW_TAGS=$(echo "$IMAGE_CONFIG" | jq -r ".${TAG_ARRAY}[]")
-          
-          # Read your new harbor mapping variable from the JSON config natively
           REPO_FORGE=$(echo "$IMAGE_CONFIG" | jq -r ".repo_forge")
           
-          # Export the base repository path for the VEX digest attestation
           echo "repo_path=${{ env.HARBOR_REGISTRY }}/${REPO_FORGE}" >> "$GITHUB_OUTPUT"
           
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
@@ -99,56 +99,31 @@ jobs:
           context: .
           file: ${{ env.DOCKERFILE_PATH }}
           target: ${{ steps.prep.outputs.target }}
+          platforms: linux/amd64
           push: true
           pull: true      
           no-cache: true  
           tags: ${{ steps.prep.outputs.tags }}
 
-      - name: Install Trivy Scanner (User-Space)
-        if: ${{ github.event.inputs.skip_scan != 'true' }}
-        run: |
-          echo "Fetching latest Trivy binary for the specific runner hardware..."
-          mkdir -p ${{ github.workspace }}/bin
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b ${{ github.workspace }}/bin
-          ${{ github.workspace }}/bin/trivy --version
+  calculate-size:
+    name: Size Calculation
+    needs: publish-core
+    uses: ./.forgejo/workflows/calculate-size.yml
+    with:
+      image_path: "${{ needs.publish-core.outputs.repo_path }}@${{ needs.publish-core.outputs.digest }}"
+      image_key: "ubuntu-noble-core" 
+    secrets:
+      HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
+      HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
 
-      - name: Run Native Trivy Scan & Generate HTML
-        if: ${{ github.event.inputs.skip_scan != 'true' }}
-        env:
-          TRIVY_USERNAME: ${{ secrets.HARBOR_USERNAME }}
-          TRIVY_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
-        run: |
-          echo "Downloading Trivy HTML Template..."
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl -o ${{ github.workspace }}/html.tpl
-          
-          echo "Generating HTML Report..."
-          ${{ github.workspace }}/bin/trivy image \
-            --ignorefile images/trivy_ubuntu_common.ignore \
-            --format template \
-            --template "@${{ github.workspace }}/html.tpl" \
-            --output ${{ github.workspace }}/trivy-report.html \
-            --ignore-unfixed \
-            --severity CRITICAL,HIGH \
-            "${{ steps.prep.outputs.repo_path }}@${{ steps.build_image.outputs.digest }}"
-
-          echo "Enforcing Pipeline Policy (Failing on unmitigated CRITICAL/HIGH)..."
-          ${{ github.workspace }}/bin/trivy image \
-            --ignorefile images/trivy_ubuntu_common.ignore \
-            --format table \
-            --exit-code 1 \
-            --ignore-unfixed \
-            --severity CRITICAL,HIGH \
-            "${{ steps.prep.outputs.repo_path }}@${{ steps.build_image.outputs.digest }}"
-
-      - name: Archive HTML Vulnerability Report
-        uses: actions/upload-artifact@v3
-        if: ${{ always() && github.event.inputs.skip_scan != 'true' }}
-        with:
-          name: Trivy-Vulnerability-Report
-          path: ${{ github.workspace }}/trivy-report.html
-
-      - name: Post-Build Workspace Garbage Collection
-        run: |
-          docker builder prune -f
-          docker system prune -f
-        if: always()
+  security-scan:
+    name: Core Scan
+    needs: publish-core
+    uses: ./.forgejo/workflows/trivy-scan.yml
+    with:
+      image_path: "${{ needs.publish-core.outputs.repo_path }}@${{ needs.publish-core.outputs.digest }}"
+      image_key: "ubuntu-noble-core"
+      skip_scan: ${{ github.event.inputs.skip_scan == 'true' }}
+    secrets:
+      HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
+      HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}

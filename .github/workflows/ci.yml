@@ -30,7 +30,6 @@ jobs:
           set -euo pipefail
           CORE_CONFIG=$(jq -r '.images[] | select(.key == "ubuntu-noble-core" and .enabled != false)' "$IMAGES_JSON")
           
-          # If the core configuration is missing or disabled, fail immediately
           if [ -z "$CORE_CONFIG" ]; then
             echo "❌ CRITICAL ERROR: 'ubuntu-noble-core' is missing or disabled in images.json!" >&2
             echo "The core foundation layer is a mandatory pipeline invariant." >&2
@@ -105,8 +104,8 @@ jobs:
           target: ${{ matrix.lintTarget }}
           push: false
           tags: ${{ matrix.repo }}:ci-lint
-          cache-from: type=gha,scope=ci-${{ matrix.key }}
-          cache-to: type=gha,mode=max,scope=ci-${{ matrix.key }}
+          build-args: |
+            BASE_TAG=develop
 
   lint-gate:
     name: lint / gate

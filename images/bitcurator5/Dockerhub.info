@@ -1,0 +1,19 @@
+# 🔍 BitCurator 5 Digital Forensics & Archival Workstation (Kasm-Enhanced)
+
+An advanced digital forensics and data curation environment built on top of `squirrelworksllc/ubuntu-noble-core`. This image seamlessly pairs the full BitCurator 5 SaltStack software catalog with the lightweight, high-performance runtime performance of modern Kasm Workspaces.
+
+## ✔️ Included Tool Ecosystem
+
+*   **Forensic Imaging & Triage:** Guymager, Nwipe, Disktype
+*   **Filesystem Forensics:** The Sleuth Kit (TSK), Fiwalk, BitCurator Reports
+*   **Data Identification & NLP:** Bulk Extractor, BitCurator NLP, Brunnhilde, RegEx tools
+*   **Malware & File Analysis:** ClamAV, Hashdeep, Fido, Siegfried
+*   **Code & Script Analysis:** Visual Studio Code (pre-configured), Python3 toolkit
+
+## 🎯 Purpose
+
+This workstation provides a standardized, immutable, and completely isolated sandbox environment designed specifically for digital archivists, institutional curators, and forensic researchers. It is tailored for:
+
+*   Executing interactive disk imaging and legacy data curation safely inside container boundaries.
+*   Conducting metadata extraction, PII identification, and digital preservation workflows.
+*   Serving as a reproducible remote forensics and archival workstation within the Kasm 1.18 platform architecture.

@@ -1,0 +1,18 @@
+# 🐧 Ubuntu Noble 24.04 Desktop (Kasm-Enhanced)
+
+A lightweight Ubuntu Noble 24.04 desktop environment built on top of `squirrelworks/ubuntu-noble-core`. Designed for use inside Kasm Workspaces or as a base image for custom corporate builds.
+
+## ✔️ Included Tools
+
+* **Browsers:** Chrome, Firefox, Chromium, Tor Browser (with TorSocks)
+* **Developer & Productivity:** VSCode, Ansible, LibreOffice, Remmina, Gimp, Obsidian, Filezilla
+* **Communication:** Signal, Slack, Discord, Teams, Telegram, Thunderbird
+* **InfoSec & Analysis:** Yara 4.5.5 (with Python Tools & VSCode integration), Recoll, Tesseract OCR, Gimagereader, QBittorrent, Origamindee (Origami, pdfcop, pdfdecompress)
+
+## 🎯 Purpose
+
+This image provides a clean, ready-to-use desktop with commonly used productivity, communication, and development tools. It’s ideal for:
+
+* Running inside Kasm Workspaces
+* Serving as a foundation for further customization and layered builds
+* Rapid setup of consistent remote desktop environments

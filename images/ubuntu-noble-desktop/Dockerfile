@@ -10,13 +10,15 @@
 ################################################################################
 
 # ----------------------------- BASE IMAGE -----------------------------
+# Defaults to public Docker Hub & develop for local VSCode testing.
+# Overridden dynamically by CI/CD pipeline injections.
 ARG BASE_IMAGE="squirrelworksllc/ubuntu-noble-core"
-ARG BASE_TAG="1.18.0"
+ARG BASE_TAG="develop"
 
 # ############################################################################
 # ------------------------------ BASE STAGE -------------------------------- #
 # ############################################################################
-FROM --platform=$BUILDPLATFORM ${BASE_IMAGE}:${BASE_TAG} AS base
+FROM ${BASE_IMAGE}:${BASE_TAG} AS base
 
 USER root
 
@@ -35,7 +37,7 @@ WORKDIR ${HOME}
 # ############################################################################
 # ------------------------------ LINT TARGET ------------------------------- #
 # ############################################################################
-FROM --platform=$BUILDPLATFORM base AS lint
+FROM base AS lint
 
 WORKDIR /src
 COPY . /src
@@ -50,7 +52,7 @@ USER 1000
 # ############################################################################
 # -------------------------- COMMON BUILD TARGET --------------------------- #
 # ############################################################################
-FROM --platform=$BUILDPLATFORM base AS build
+FROM base AS build
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # --- Context Guard ---
@@ -60,6 +62,7 @@ RUN rm -rf ./__context_check__
 
 # --- Stage Resources ---
 COPY ./src/ubuntu/ ${INST_DIR}/ubuntu/
+COPY ./images/ubuntu-noble-desktop/README.md /src/README.md
 RUN find "${INST_DIR}/ubuntu/install" -maxdepth 4 -type f -name '*.sh' -exec chmod +x {} \;
 
 # --- Runtime Validation Tools ---
@@ -102,6 +105,8 @@ RUN set -eux; \
       "/ubuntu/install/torsocks/install_torsocks.sh" \
       "/ubuntu/install/recoll/install_recoll.sh" \
       "/ubuntu/install/qbittorrent/install_qbittorrent.sh" \
+      "/ubuntu/install/origamindee/install_origamindee.sh" \
+      "/ubuntu/install/zbar/install_zbar.sh" \
       \
       # GROUP 5: Communication (Autostart Suppressed)
       "/ubuntu/install/signal/install_signal.sh" \
@@ -127,7 +132,8 @@ RUN set -eux; \
       else \
         bash "${INST_DIR}${SCRIPT}"; \
       fi || { \
-        rc=$?; echo "FAILED: ${SCRIPT} (rc=$rc)"; \
+        rc=$?; \
+        echo "FAILED: ${SCRIPT} (rc=$rc)"; \
         [ "${APT_DEBUG}" = "true" ] && tail -n 100 /var/log/apt/term.log || true; \
         exit "$rc"; \
       }; \
@@ -168,11 +174,11 @@ CMD ["--tail-log"]
 # ############################################################################
 # ------------------------------- DEVELOP IMAGE ---------------------------- #
 # ############################################################################
-FROM --platform=$BUILDPLATFORM build AS develop
+FROM build AS develop
 ENV DEBUG=true
 
 # ############################################################################
 # ----------------------------- PRODUCTION IMAGE --------------------------- #
 # ############################################################################
-FROM --platform=$BUILDPLATFORM build AS production
+FROM build AS production
 ENV DEBUG=false

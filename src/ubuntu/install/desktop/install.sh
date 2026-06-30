@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 ###############################################################################
 # install.sh (Desktop Module)
-# Purpose: Orchestrates system-wide branding and UI pinning.
+# Purpose: Orchestrates system-wide branding, UI pinning, and documentation.
 ###############################################################################
 set -euo pipefail
 
@@ -22,6 +22,12 @@ fi
 # 2. Run the UI configuration (The XFCE pinning logic)
 if [ -f "${SCRIPT_DIR}/configure_ui.sh" ]; then
     bash "${SCRIPT_DIR}/configure_ui.sh"
+fi
+
+# 3. Generate Local HTML Documentation & Package Manifests
+# Make sure generate_desktop_docs.sh is saved in this same directory!
+if [ -f "${SCRIPT_DIR}/generate_desktop_docs.sh" ]; then
+    bash "${SCRIPT_DIR}/generate_desktop_docs.sh"
 fi
 
 log "Desktop environment branding complete."
