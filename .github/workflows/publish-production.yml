@@ -197,12 +197,12 @@ jobs:
         with:
           context: .
           file: ${{ matrix.dockerfile }}
-          # Fix 1: Changed from prodTarget to devTarget (as defined in your matrix generation)
+          # Aligns with the target key extracted in the matrix-others job
           target: ${{ matrix.devTarget }} 
-          # Note: If you need specific platforms, you must add 'architectures' to your jq filter in matrix-others. 
-          # Otherwise, hardcode it or remove it to default to the runner's architecture.
+          # Hardcoded to explicitly target x86/x64 architecture
+          platforms: linux/amd64
           push: true
-          # Fix 2: Point to the 'tags' step output list instead of the empty matrix variable
+          # Correctly pulls the formatted multi-line string array from tags step
           tags: ${{ steps.tags.outputs.list }}
           provenance: true
           sbom: true
