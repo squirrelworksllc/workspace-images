@@ -197,10 +197,13 @@ jobs:
         with:
           context: .
           file: ${{ matrix.dockerfile }}
-          target: ${{ matrix.prodTarget }}
+          # Fix 1: Changed from prodTarget to devTarget (as defined in your matrix generation)
+          target: ${{ matrix.devTarget }} 
+          # Note: If you need specific platforms, you must add 'architectures' to your jq filter in matrix-others. 
+          # Otherwise, hardcode it or remove it to default to the runner's architecture.
           push: true
-          tags: ${{ matrix.tags }}
-          # Attach the VEX data inside an officially supported attestation format:
+          # Fix 2: Point to the 'tags' step output list instead of the empty matrix variable
+          tags: ${{ steps.tags.outputs.list }}
           provenance: true
           sbom: true
           attests: |
