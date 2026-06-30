@@ -194,11 +194,17 @@ jobs:
         with:
           context: .
           file: ${{ matrix.dockerfile }}
-          target: ${{ matrix.devTarget }}
+          target: ${{ matrix.prodTarget }}
+          platforms: ${{ matrix.architectures }}
           push: true
-          tags: ${{ steps.tags.outputs.list }}
-          build-args: |
-            BASE_TAG=develop
+          tags: ${{ matrix.tags }}
+          # Attach the VEX data inside an officially supported attestation format:
+          provenance: true
+          sbom: true
+          attests: |
+            type=sbom,generator=docker/buildkit-syft-scanner,vulnerability-vulnerabilities=@images/vex_ubuntu_common.json
+          cache-from: type=gha,scope=pubprod-${{ matrix.key }}
+          cache-to: type=gha,mode=max,scope=pubprod-${{ matrix.key }}
 
       - name: Calculate and Report True Uncompressed Size
         id: calculate_size
