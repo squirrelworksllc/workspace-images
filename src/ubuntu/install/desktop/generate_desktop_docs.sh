@@ -11,14 +11,15 @@ log() { echo "[DESKTOP-DOCS] $*"; }
 main() {
     log "Generating local workspace documentation..."
 
-    # Ensure the markdown parser is available
+    # Ensure the markdown parser + the URL opener are available
     apt-get update
-    apt-get install -y --no-install-recommends python3-markdown
+    apt-get install -y --no-install-recommends python3-markdown xdg-utils
 
-    # Define the Kasm skeleton desktop path
+    # Canonical (stable) location for the generated docs, plus the Desktop copy.
+    export DOCS_DIR="/usr/share/squirrelworks-docs"
     export DESKTOP_DIR="/home/kasm-default-profile/Desktop"
     export README_PATH="/src/README.md"
-    mkdir -p "${DESKTOP_DIR}"
+    mkdir -p "${DOCS_DIR}" "${DESKTOP_DIR}"
 
     # 1. Generate the Raw Package Data into temporary files
     log "Dumping APT, PIP, and GEM package states..."
@@ -47,10 +48,10 @@ import sys
 import os
 
 readme_path = os.environ.get("README_PATH")
-desktop_dir = os.environ.get("DESKTOP_DIR")
+docs_dir = os.environ.get("DOCS_DIR")
 
-guide_out = os.path.join(desktop_dir, "Workspace_Guide.html")
-manifest_out = os.path.join(desktop_dir, "installed_packages.html")
+guide_out = os.path.join(docs_dir, "Workspace_Guide.html")
+manifest_out = os.path.join(docs_dir, "installed_packages.html")
 
 # ==========================================
 # PART A: Generate Workspace Guide (README)
@@ -178,9 +179,43 @@ EOF
     # Clean up temporary bash files
     rm -f /tmp/apt_packages.txt /tmp/pip_packages.txt /tmp/gem_packages.txt
 
-    # Ensure the kasm user owns/can read these root-created files on the desktop
-    chmod 644 "${DESKTOP_DIR}/Workspace_Guide.html" "${DESKTOP_DIR}/installed_packages.html" 2>/dev/null || true
+    # Publish onto the Desktop as well (existing behaviour).
+    cp -f "${DOCS_DIR}/Workspace_Guide.html" "${DOCS_DIR}/installed_packages.html" \
+          "${DESKTOP_DIR}/" 2>/dev/null || true
+    chmod 644 "${DOCS_DIR}"/*.html "${DESKTOP_DIR}"/*.html 2>/dev/null || true
     chown -R 1000:0 "${DESKTOP_DIR}" 2>/dev/null || true
+
+    # Applications menu -> Documentation category
+    log "Registering the docs in the Applications menu..."
+    cat > /usr/share/applications/squirrelworks-guide.desktop <<EOF
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Workspace Application Guide
+Comment=Overview of the tools installed in this workspace
+Exec=xdg-open ${DOCS_DIR}/Workspace_Guide.html
+Icon=help-contents
+Terminal=false
+Categories=Documentation;
+EOF
+
+    cat > /usr/share/applications/squirrelworks-manifest.desktop <<EOF
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Installed Packages Manifest
+Comment=Full list of APT, pip and gem packages installed on this system
+Exec=xdg-open ${DOCS_DIR}/installed_packages.html
+Icon=text-html
+Terminal=false
+Categories=Documentation;
+EOF
+    chmod 644 /usr/share/applications/squirrelworks-guide.desktop \
+              /usr/share/applications/squirrelworks-manifest.desktop
+
+    if command -v update-desktop-database > /dev/null; then
+        update-desktop-database /usr/share/applications/
+    fi
 
     log "Documentation generated successfully."
 }

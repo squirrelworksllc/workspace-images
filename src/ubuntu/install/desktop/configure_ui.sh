@@ -19,10 +19,9 @@ Name=Documentation
 Icon=help-browser
 EOF
 
-# 2. Merge it into the XFCE Applications menu
-mkdir -p /etc/xdg/menus/applications-merged
-cat <<EOF > /etc/xdg/menus/applications-merged/documentation.menu
-<!DOCTYPE Menu PUBLIC "-//freedesktop//DTD Menu 1.0//EN"
+# 2. Merge it into the Applications menu. XFCE's <DefaultMergeDirs/> resolves to
+#    xfce-applications-merged/; generic tools use applications-merged/. Write both.
+DOC_MENU='<!DOCTYPE Menu PUBLIC "-//freedesktop//DTD Menu 1.0//EN"
   "http://www.freedesktop.org/standards/menu-spec/1.0/menu.dtd">
 <Menu>
   <Name>Applications</Name>
@@ -33,8 +32,11 @@ cat <<EOF > /etc/xdg/menus/applications-merged/documentation.menu
       <Category>Documentation</Category>
     </Include>
   </Menu>
-</Menu>
-EOF
+</Menu>'
+for _merged in applications-merged xfce-applications-merged; do
+    mkdir -p "/etc/xdg/menus/${_merged}"
+    printf '%s\n' "$DOC_MENU" > "/etc/xdg/menus/${_merged}/documentation.menu"
+done
 
 # 3. Apply Wallpaper XML
 cat <<EOF > "$KASM_HOME/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.xml"

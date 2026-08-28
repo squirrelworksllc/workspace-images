@@ -12,7 +12,8 @@ log() { echo "[zbar-install] $*"; }
 log "Starting ZBar backend installation..."
 
 apt_update_if_needed
-apt_install zbar-tools libzbar-dev libv4l-0
+# zenity gives the no-webcam fallback a graphical file picker.
+apt_install zbar-tools libzbar-dev libv4l-0 zenity
 
 log "ZBar backend installation complete. Triggering UI configuration..."
 
