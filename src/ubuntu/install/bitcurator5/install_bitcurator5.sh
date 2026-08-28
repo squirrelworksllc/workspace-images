@@ -13,6 +13,10 @@
 #   * policy-rc.d blocks package post-install service starts.
 #   * --mode=addon keeps salt from pulling a full GNOME/MATE desktop + display
 #     manager that would collide with Kasm's XFCE/KasmVNC stack.
+#   * BitCurator's SaltStack templates expect an underscore username, so we
+#     create `kasm_user` as an ALIAS of the real Kasm account (same uid 1000,
+#     same group 0, same home /home/kasm-user). Anything Salt configures for
+#     kasm_user therefore lands in the running session's home automatically.
 #   * The salt run is best-effort: a handful of service states WILL report
 #     failure in a container; that is expected. Full log at
 #     /var/log/bitcurator-install.log.
@@ -26,7 +30,8 @@ log() { echo "[BITCURATOR-INSTALL] $*"; }
 
 BC_CLI_VERSION="${BC_CLI_VERSION:-v3.0.0}"
 BC_CLI_URL="https://github.com/BitCurator/bitcurator-cli/releases/download/${BC_CLI_VERSION}/bitcurator-cli-linux"
-BC_USER="${BC_USER:-kasm-user}"
+KASM_USER="kasm-user"          # the real Kasm session account (uid 1000)
+BC_USER="${BC_USER:-kasm_user}" # underscore alias BitCurator's salt prefers
 BC_MODE="${BC_MODE:-addon}"
 BC_LOG="/var/log/bitcurator-install.log"
 
@@ -85,11 +90,23 @@ main() {
               python3 python3-pip build-essential perl
 
   # --- User / group setup (idempotent) -----------------------------------
+  # kasm_user = alias of the real Kasm account: same uid/gid, same home.
+  local kasm_home kasm_gid
+  kasm_home="$(getent passwd 1000 | cut -d: -f6 || echo /home/kasm-user)"
+  kasm_gid="$(getent passwd 1000 | cut -d: -f4 || echo 0)"
+  if ! getent passwd "${BC_USER}" >/dev/null 2>&1; then
+    log "Creating '${BC_USER}' as an alias of uid 1000 (gid ${kasm_gid}, home ${kasm_home})..."
+    useradd -o -u 1000 -g "${kasm_gid}" -M -d "${kasm_home}" -s /bin/bash "${BC_USER}"
+  fi
+
   getent group bcadmin >/dev/null 2>&1 || groupadd bcadmin
-  for grp in sudo bcadmin; do
-    if getent group "$grp" >/dev/null 2>&1; then
-      usermod -aG "$grp" "${BC_USER}" || true
-    fi
+  for user in "${KASM_USER}" "${BC_USER}"; do
+    getent passwd "$user" >/dev/null 2>&1 || continue
+    for grp in sudo bcadmin; do
+      if getent group "$grp" >/dev/null 2>&1; then
+        usermod -aG "$grp" "$user" || true
+      fi
+    done
   done
 
   # --- Fetch the official CLI (release binary, renamed to `bitcurator`) ---
