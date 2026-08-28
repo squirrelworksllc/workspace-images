@@ -16,9 +16,11 @@ SYSTEM_AUTOSTART="/etc/xdg/autostart/discord.desktop"
 
 log "Patching Discord for Container Sandboxing..."
 if [ -f "$DESKTOP_FILE" ]; then
-    # Step 1: Inject --no-sandbox into the system-wide desktop entry
+    # Step 1: Inject --no-sandbox into the system-wide desktop entry (idempotent).
     # Electron apps in Kasm containers require this to initialize correctly.
-    sed -i 's@Exec=/usr/share/discord/Discord@Exec=/usr/share/discord/Discord --no-sandbox@g' "$DESKTOP_FILE"
+    if ! grep -q -- '--no-sandbox' "$DESKTOP_FILE"; then
+        sed -i 's@Exec=/usr/share/discord/Discord@Exec=/usr/share/discord/Discord --no-sandbox@g' "$DESKTOP_FILE"
+    fi
 
     # Step 2: Categorizing for Start Menu
     sed -i 's/Categories=.*/Categories=Network;InstantMessaging;Chat;/g' "$DESKTOP_FILE"
@@ -55,8 +57,8 @@ Hidden=true
 NoDisplay=true
 EOF
 
-    # Ensure ownership is correct for the Kasm default profile (UID 1000)
-    chown -R 1000:1000 "$KASM_HOME/.config"
+    # Ensure ownership is correct for the Kasm default profile (UID 1000, group 0)
+    chown -R 1000:0 "$KASM_HOME/.config" 2>/dev/null || true
 
     log "Discord UI configuration (Nuclear/Clean-Desktop) complete."
 else

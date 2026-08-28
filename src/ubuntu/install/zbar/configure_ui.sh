@@ -3,16 +3,16 @@
 # configure_ui.sh
 # Purpose: Configures the ZBar groups, UI elements, and Start Menu.
 ###############################################################################
-set -e
+set -euo pipefail
 
-echo "Configuring ZBar UI elements for Kasm workspace..."
+log() { echo "[zbar-ui] $*"; }
 
-DESKTOP_DIR="/home/kasm-default-profile/Desktop"
-ZBAR_DESKTOP_FILE="${DESKTOP_DIR}/zbarcam.desktop"
+KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile")
 
-mkdir -p "${DESKTOP_DIR}"
+log "Configuring ZBar UI elements for Kasm workspace..."
 
-cat > "${ZBAR_DESKTOP_FILE}" << EOF
+# System-wide menu entry
+cat > /usr/share/applications/zbarcam.desktop <<EOF
 [Desktop Entry]
 Version=1.0
 Type=Application
@@ -23,8 +23,16 @@ Icon=scanner
 Terminal=false
 Categories=Utility;
 EOF
+chmod 644 /usr/share/applications/zbarcam.desktop
 
-chown -R 1000:1000 /home/kasm-default-profile/Desktop/
-chmod +x "${ZBAR_DESKTOP_FILE}"
+# Desktop shortcut
+mkdir -p "${KASM_HOME}/Desktop"
+cp /usr/share/applications/zbarcam.desktop "${KASM_HOME}/Desktop/zbarcam.desktop"
+chmod +x "${KASM_HOME}/Desktop/zbarcam.desktop"
+chown -R 1000:0 "${KASM_HOME}/Desktop" 2>/dev/null || true
 
-echo "ZBar UI configuration complete."
+if command -v update-desktop-database > /dev/null; then
+    update-desktop-database /usr/share/applications/
+fi
+
+log "ZBar UI configuration complete."

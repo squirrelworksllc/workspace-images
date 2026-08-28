@@ -18,10 +18,9 @@ if [ -f "$DESKTOP_FILE" ]; then
     # 1. Start Menu Registration
     # Ensure it shows up in 'Multimedia' and 'Video' categories
     sed -i 's/Categories=.*/Categories=AudioVideo;Player;Recorder;Multimedia;/g' "$DESKTOP_FILE"
-    
-    # FIX: Disable VLC's built-in sandboxing check which fails in some Docker envs
-    # We do this by modifying the Exec line in the global .desktop file
-    sed -i 's/Exec=\/usr\/bin\/vlc/Exec=\/usr\/bin\/vlc --no-sandbox/g' "$DESKTOP_FILE"
+
+    # (VLC is not an Electron/Chromium app - it has no --no-sandbox flag and
+    #  passing one makes the launcher fail, so we deliberately don't touch Exec.)
 
     # 2. Refresh Application Database
     if command -v update-desktop-database > /dev/null; then
@@ -35,7 +34,7 @@ if [ -f "$DESKTOP_FILE" ]; then
     
     # Enable the 'Allow Launching' bit for XFCE/Ubuntu Noble
     chmod +x "$KASM_HOME/Desktop/vlc.desktop"
-    chown 1000:1000 "$KASM_HOME/Desktop/vlc.desktop"
+    chown 1000:0 "$KASM_HOME/Desktop/vlc.desktop" 2>/dev/null || true
     
     log "VLC UI configuration applied."
 else

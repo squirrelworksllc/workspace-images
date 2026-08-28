@@ -5,6 +5,7 @@
 # Purpose: Installs Tesseract OCR and NormCap.
 ###############################################################################
 set -euo pipefail
+: "${INST_DIR:=/dockerstartup/install}"
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
 log() { echo "[TESSERACT-INSTALL] $*"; }

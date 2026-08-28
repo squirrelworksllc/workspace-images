@@ -18,8 +18,10 @@ SYSTEM_AUTOSTART="/etc/xdg/autostart/slack.desktop"
 
 if [ -f "$DESKTOP_FILE" ]; then
     log "Step 1: Applying --no-sandbox fix for Kasm compatibility..."
-    # Slack is an Electron app; needs no-sandbox in restricted containers
-    sed -i 's@Exec=/usr/bin/slack@Exec=/usr/bin/slack --no-sandbox@' "$DESKTOP_FILE"
+    # Slack is an Electron app; needs no-sandbox in restricted containers (idempotent)
+    if ! grep -q -- '--no-sandbox' "$DESKTOP_FILE"; then
+        sed -i 's@Exec=/usr/bin/slack@Exec=/usr/bin/slack --no-sandbox@' "$DESKTOP_FILE"
+    fi
 
     log "Step 2: Categorizing Start Menu entry..."
     sed -i 's/Categories=.*/Categories=Network;InstantMessaging;Chat;/g' "$DESKTOP_FILE"
@@ -58,8 +60,8 @@ Hidden=true
 NoDisplay=true
 EOF
 
-    # Ensure ownership is correct for the Kasm default profile UID 1000
-    chown -R 1000:1000 "$KASM_HOME/.config"
+    # Ensure ownership is correct for the Kasm default profile (UID 1000, group 0)
+    chown -R 1000:0 "$KASM_HOME/.config" 2>/dev/null || true
 
     log "Slack UI configuration (Nuclear/Clean-Desktop) complete."
 else

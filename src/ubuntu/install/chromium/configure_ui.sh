@@ -29,7 +29,10 @@ CHROME_ARGS="--password-store=basic --no-sandbox --ignore-gpu-blocklist --user-d
 REAL_BIN="chromium"
 [ -f /usr/bin/chromium-browser ] && REAL_BIN="chromium-browser"
 
-mv "/usr/bin/${REAL_BIN}" "/usr/bin/${REAL_BIN}-orig"
+# Idempotent: only shift the real binary aside once
+if [ -f "/usr/bin/${REAL_BIN}" ] && [ ! -f "/usr/bin/${REAL_BIN}-orig" ]; then
+    mv "/usr/bin/${REAL_BIN}" "/usr/bin/${REAL_BIN}-orig"
+fi
 
 cat <<EOF > "/usr/bin/${REAL_BIN}"
 #!/usr/bin/env bash
@@ -59,5 +62,5 @@ if [ -f "$SRC_DESKTOP" ]; then
     mkdir -p "$KASM_HOME/Desktop"
     cp "$SRC_DESKTOP" "$KASM_HOME/Desktop/Chromium.desktop"
     chmod +x "$KASM_HOME/Desktop/Chromium.desktop"
-    chown -R 1000:1000 "$KASM_HOME/Desktop"
+    chown -R 1000:0 "$KASM_HOME/Desktop" 2>/dev/null || true
 fi

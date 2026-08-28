@@ -17,8 +17,10 @@ SYSTEM_AUTOSTART="/etc/xdg/autostart/signal-desktop.desktop"
 
 if [ -f "$DESKTOP_FILE" ]; then
     log "Step 1: Applying --no-sandbox fix for Kasm compatibility..."
-    # Mandatory for Signal (Electron) in most Kasm/Docker environments
-    sed -i 's@Exec=/opt/Signal/signal-desktop@Exec=/opt/Signal/signal-desktop --no-sandbox@' "$DESKTOP_FILE"
+    # Mandatory for Signal (Electron) in most Kasm/Docker environments (idempotent)
+    if ! grep -q -- '--no-sandbox' "$DESKTOP_FILE"; then
+        sed -i 's@Exec=/opt/Signal/signal-desktop@Exec=/opt/Signal/signal-desktop --no-sandbox@' "$DESKTOP_FILE"
+    fi
 
     log "Step 2: Categorizing Start Menu entry..."
     sed -i 's/Categories=.*/Categories=Network;InstantMessaging;Chat;/g' "$DESKTOP_FILE"
@@ -55,8 +57,8 @@ Hidden=true
 NoDisplay=true
 EOF
 
-    # Ensure permissions are correct for the Kasm default profile (UID 1000)
-    chown -R 1000:1000 "$KASM_HOME/.config"
+    # Ensure permissions are correct for the Kasm default profile (UID 1000, group 0)
+    chown -R 1000:0 "$KASM_HOME/.config" 2>/dev/null || true
 
     log "Signal UI configuration (Nuclear/Clean-Desktop) complete."
 else

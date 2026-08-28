@@ -4,6 +4,7 @@
 # Purpose: Installs VLC and triggers UI integration.
 ###############################################################################
 set -euo pipefail
+: "${INST_DIR:=/dockerstartup/install}"
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
 log() { echo "[VLC-INSTALL] $*"; }

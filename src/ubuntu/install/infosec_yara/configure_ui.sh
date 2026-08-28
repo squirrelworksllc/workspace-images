@@ -10,27 +10,58 @@ log() { echo "[YARA-UI] $*"; }
 KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile")
 
 log "Step 1: Pre-staging VS Code Environment for YARA..."
-mkdir -p "${KASM_HOME}/.config/Code/User"
-mkdir -p "${KASM_HOME}/.vscode/extensions"
+CODE_USER_DIR="${KASM_HOME}/.config/Code/User"
+CODE_EXT_DIR="${KASM_HOME}/.vscode/extensions"
+mkdir -p "${CODE_USER_DIR}" "${CODE_EXT_DIR}"
 
-# We inject the YLS path into VS Code settings so the analyst doesn't have to
-cat <<EOF > "${KASM_HOME}/.config/Code/User/settings.json"
+# Merge the YLS keys into the existing settings.json rather than clobbering the
+# global "Silent Analyst" config that vs_code/configure_ui.sh wrote earlier.
+SETTINGS_FILE="${CODE_USER_DIR}/settings.json"
+if command -v python3 >/dev/null 2>&1; then
+    python3 - "$SETTINGS_FILE" <<'PY' || log "WARNING: settings.json merge failed; leaving existing config untouched."
+import json, os, sys
+path = sys.argv[1]
+data = {}
+if os.path.isfile(path):
+    try:
+        with open(path) as fh:
+            data = json.load(fh)
+    except (ValueError, OSError):
+        data = {}
+data.update({
+    "yara.languageServerPath": "/usr/local/bin/yls",
+    "yara.yls.enabled": True,
+    "editor.formatOnSave": True,
+})
+with open(path, "w") as fh:
+    json.dump(data, fh, indent=4)
+PY
+elif [ ! -f "$SETTINGS_FILE" ]; then
+    # No python and no prior config: write a minimal standalone file
+    cat <<EOF > "$SETTINGS_FILE"
 {
     "yara.languageServerPath": "/usr/local/bin/yls",
     "yara.yls.enabled": true,
     "editor.formatOnSave": true
 }
 EOF
-
-log "Step 2: Installing extensions via CLI (Best Effort)..."
-# Note: Using --no-sandbox is mandatory here. 
-# We ignore errors because if VS Code isn't fully 'happy' in the build env, 
-# the user can still install these manually from the marketplace.
-if command -v code >/dev/null 2>&1; then
-    code --no-sandbox --user-data-dir "${KASM_HOME}/.config/Code" --install-extension infosec-intern.yara || true
-    code --no-sandbox --user-data-dir "${KASM_HOME}/.config/Code" --install-extension avast-threatlabs-yara.vscode-yls || true
+else
+    log "WARNING: python3 unavailable; cannot merge YLS keys into existing settings.json."
 fi
 
-chown -R 1000:1000 "${KASM_HOME}/.config/Code" "${KASM_HOME}/.vscode"
+log "Step 2: Installing extensions via CLI (Best Effort)..."
+# Runs as root at build time: pin HOME + data/extension dirs at the Kasm profile
+# so the extensions don't land in /root/.vscode and vanish. Errors ignored - the
+# analyst can still install from the marketplace.
+if command -v code >/dev/null 2>&1; then
+    for EXT in infosec-intern.yara avast-threatlabs-yara.vscode-yls; do
+        HOME="${KASM_HOME}" code --no-sandbox \
+            --user-data-dir "${KASM_HOME}/.config/Code" \
+            --extensions-dir "${CODE_EXT_DIR}" \
+            --install-extension "$EXT" || true
+    done
+fi
+
+chown -R 1000:0 "${KASM_HOME}/.config/Code" "${KASM_HOME}/.vscode" 2>/dev/null || true
 
 log "YARA UI configuration applied."

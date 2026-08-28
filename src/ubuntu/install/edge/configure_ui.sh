@@ -30,8 +30,11 @@ EOF
 log "Step 2: Creating Advanced Binary Wrapper..."
 EDGE_ARGS="--password-store=basic --no-sandbox --ignore-gpu-blocklist --user-data-dir --no-first-run --simulate-outdated-no-au='Tue, 31 Dec 2099 23:59:59 GMT' --disable-gpu"
 
-[ -f /usr/bin/microsoft-edge-stable ] && [ ! -f /usr/bin/microsoft-edge-stable-orig ] && \
+# Idempotent: only shift the real binary aside once
+# (an && chain here would trip `set -e` on the no-op re-run)
+if [ -f /usr/bin/microsoft-edge-stable ] && [ ! -f /usr/bin/microsoft-edge-stable-orig ]; then
     mv /usr/bin/microsoft-edge-stable /usr/bin/microsoft-edge-stable-orig
+fi
 
 cat <<EOF > /usr/bin/microsoft-edge-stable
 #!/usr/bin/env bash
@@ -55,9 +58,10 @@ chmod +x /usr/bin/microsoft-edge-stable
 # 3. Desktop Shortcut
 log "Step 3: Deploying Desktop Shortcut..."
 KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile")
-mkdir -p "\$KASM_HOME/Desktop"
-if [ -f /usr/share/applications/microsoft-edge.desktop ]; then
-    cp /usr/share/applications/microsoft-edge.desktop "\$KASM_HOME/Desktop/"
-    chmod +x "\$KASM_HOME/Desktop/microsoft-edge.desktop"
-    chown -R 1000:1000 "\$KASM_HOME/Desktop"
+SRC_DESKTOP="/usr/share/applications/microsoft-edge.desktop"
+if [ -f "$SRC_DESKTOP" ]; then
+    mkdir -p "$KASM_HOME/Desktop"
+    cp "$SRC_DESKTOP" "$KASM_HOME/Desktop/microsoft-edge.desktop"
+    chmod +x "$KASM_HOME/Desktop/microsoft-edge.desktop"
+    chown -R 1000:0 "$KASM_HOME/Desktop" 2>/dev/null || true
 fi

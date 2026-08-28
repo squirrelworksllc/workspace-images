@@ -5,6 +5,7 @@
 # Purpose: Installs Thunderbird via DEB and triggers UI hardening.
 ###############################################################################
 set -euo pipefail
+: "${INST_DIR:=/dockerstartup/install}"
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
 log() { echo "[THUNDERBIRD-INSTALL] $*"; }
@@ -69,7 +70,7 @@ else
     if [ -f /usr/share/applications/thunderbird.desktop ]; then
       cp /usr/share/applications/thunderbird.desktop "$HOME/Desktop/"
       chmod +x "$HOME/Desktop/thunderbird.desktop"
-      chown 1000:1000 "$HOME/Desktop/thunderbird.desktop" 2>/dev/null || true
+      chown 1000:0 "$HOME/Desktop/thunderbird.desktop" 2>/dev/null || true
     fi
 fi
 

@@ -7,6 +7,7 @@
 # Note: Common Pre-Requisite apt packages are called via install_tools.sh
 ###############################################################################
 set -euo pipefail
+: "${INST_DIR:=/dockerstartup/install}"
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
 log "======= Install Microsoft Teams (teams-for-linux) ======="

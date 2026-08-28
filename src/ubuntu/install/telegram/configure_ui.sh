@@ -36,12 +36,14 @@ else
 fi
 
 log "Writing single source-of-truth: /usr/share/applications/telegram.desktop"
+# No -workdir: Telegram defaults to ~/.local/share/TelegramDesktop at runtime.
+# Baking $KASM_HOME here would pin it to the build-time home.
 cat >/usr/share/applications/telegram.desktop <<EOL
 [Desktop Entry]
 Version=1.0
 Name=Telegram Desktop
 Comment=Official desktop version of Telegram messaging app
-Exec=$EXEC_PATH -workdir $KASM_HOME/.local/share/TelegramDesktop -- %u
+Exec=$EXEC_PATH -- %u
 Icon=$ICON_PATH
 Terminal=false
 StartupWMClass=TelegramDesktop
@@ -70,14 +72,15 @@ cat <<EOF > "$AUTOSTART_DIR/telegramdesktop.desktop"
 [Desktop Entry]
 Type=Application
 Name=Telegram Desktop
-Exec=$EXEC_PATH -workdir $KASM_HOME/.local/share/TelegramDesktop -startintray
+Exec=$EXEC_PATH -startintray
 X-GNOME-Autostart-enabled=false
 Hidden=true
 NoDisplay=true
 EOF
 
 # Ensure the Kasm user owns their config/local directories
-chown -R 1000:1000 "$KASM_HOME/.config"
-chown -R 1000:1000 "$KASM_HOME/.local"
+# (Noble runs the session user with primary group 0)
+mkdir -p "$KASM_HOME/.local/share/TelegramDesktop"
+chown -R 1000:0 "$KASM_HOME/.config" "$KASM_HOME/.local" 2>/dev/null || true
 
 log "Telegram UI configuration complete. Menu entry created; Desktop clean."

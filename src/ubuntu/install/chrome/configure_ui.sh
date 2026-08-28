@@ -29,7 +29,10 @@ log "Step 2: Creating Advanced Binary Wrapper..."
 # Your arguments merged:
 CHROME_ARGS="--password-store=basic --no-sandbox --ignore-gpu-blocklist --user-data-dir --no-first-run --disable-search-engine-choice-screen --simulate-outdated-no-au='Tue, 31 Dec 2099 23:59:59 GMT' --disable-gpu"
 
-mv /usr/bin/google-chrome-stable /usr/bin/google-chrome-orig
+# Idempotent: only shift the real binary aside once
+if [ -f /usr/bin/google-chrome-stable ] && [ ! -f /usr/bin/google-chrome-orig ]; then
+    mv /usr/bin/google-chrome-stable /usr/bin/google-chrome-orig
+fi
 
 cat <<EOF > /usr/bin/google-chrome-stable
 #!/usr/bin/env bash
@@ -54,9 +57,12 @@ ln -sf /usr/bin/google-chrome-stable /usr/bin/chrome
 # 3. Desktop Shortcut
 log "Step 3: Deploying Desktop Shortcut..."
 KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile")
-mkdir -p "\$KASM_HOME/Desktop"
-cp /usr/share/applications/google-chrome.desktop "\$KASM_HOME/Desktop/"
-chmod +x "\$KASM_HOME/Desktop/google-chrome.desktop"
-chown -R 1000:1000 "\$KASM_HOME/Desktop"
+SRC_DESKTOP="/usr/share/applications/google-chrome.desktop"
+if [ -f "$SRC_DESKTOP" ]; then
+    mkdir -p "$KASM_HOME/Desktop"
+    cp "$SRC_DESKTOP" "$KASM_HOME/Desktop/google-chrome.desktop"
+    chmod +x "$KASM_HOME/Desktop/google-chrome.desktop"
+    chown -R 1000:0 "$KASM_HOME/Desktop" 2>/dev/null || true
+fi
 
 log "Chrome UI configuration applied."

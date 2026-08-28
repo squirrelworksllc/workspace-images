@@ -12,7 +12,8 @@ IFS=$'\n\t'
 # Responsibilities:
 #   - Install [APP NAME] via apt or external tarball/binary
 #   - Create desktop entry in /usr/share/applications
-#   - Place a launcher on the user's Desktop and set ownership to uid/gid 1000
+#   - Place a launcher on the user's Desktop and set ownership to uid 1000 / gid 0
+#     (Kasm Noble runs the session user with primary group 0)
 #
 # Env expectations:
 #   INST_DIR   (default: /dockerstartup/install) - location of apt helper
@@ -58,13 +59,15 @@ main() {
 
   # Step 3: Desktop shortcut
   log "Step 3: Setting up desktop shortcut"
-  local desktop_dir="${HOME}/Desktop"
-  mkdir -p "${desktop_dir}"
+  # Resolve the primary user's home from the passwd DB, not $HOME.
+  local kasm_home
+  kasm_home="$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile")"
 
   # if [ -f "/usr/share/applications/APPNAME.desktop" ]; then
-  #   cp "/usr/share/applications/APPNAME.desktop" "${desktop_dir}/APPNAME.desktop"
-  #   chmod +x "${desktop_dir}/APPNAME.desktop" 2>/dev/null || true
-  #   chown 1000:1000 "${desktop_dir}/APPNAME.desktop" 2>/dev/null || true
+  #   mkdir -p "${kasm_home}/Desktop"
+  #   cp "/usr/share/applications/APPNAME.desktop" "${kasm_home}/Desktop/APPNAME.desktop"
+  #   chmod +x "${kasm_home}/Desktop/APPNAME.desktop" 2>/dev/null || true
+  #   chown -R 1000:0 "${kasm_home}/Desktop" 2>/dev/null || true
   # else
   #   log "WARNING: APPNAME.desktop not found."
   # fi
