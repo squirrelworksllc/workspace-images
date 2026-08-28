@@ -33,7 +33,10 @@ on:
 
 concurrency:
   group: build-remnux-${{ github.event.inputs.target_env || 'develop' }}
-  cancel-in-progress: true
+  # Image builds are expensive - let a running build finish and queue the next
+  # trigger rather than killing it mid-run (which surfaces as buildkit
+  # "graceful_stop" / GOAWAY).
+  cancel-in-progress: false
 
 permissions:
   contents: read

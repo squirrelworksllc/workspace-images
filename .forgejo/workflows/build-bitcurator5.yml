@@ -33,14 +33,17 @@ on:
 
 concurrency:
   group: build-bitcurator5-${{ github.event.inputs.target_env || 'develop' }}
-  cancel-in-progress: true
+  # Image builds are expensive - let a running build finish and queue the next
+  # trigger rather than killing it mid-run (which surfaces as buildkit
+  # "graceful_stop" / GOAWAY).
+  cancel-in-progress: false
 
 permissions:
   contents: read
 
 env:
   HARBOR_REGISTRY: forge.konderla.org
-  IMAGE_KEY: bitcurator5
+  IMAGE_KEY: bitcurator5-kasm
   DOCKERFILE_PATH: images/bitcurator5/Dockerfile
 
 jobs:
