@@ -59,7 +59,7 @@ else
     log "WARNING: Source .desktop file not found in /opt/gimp/app."
 fi
 
-# Ensure permissions for the Kasm user
-chown -R 1000:1000 "$KASM_HOME/.config/GIMP"
+# Ensure permissions for the Kasm user (Noble runs the session user with group 0)
+chown -R 1000:0 "$KASM_HOME/.config/GIMP" 2>/dev/null || true
 
 log "GIMP UI configuration complete. Desktop clean, Menu hardened."

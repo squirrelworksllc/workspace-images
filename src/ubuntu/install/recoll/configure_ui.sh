@@ -30,11 +30,12 @@ if [ -f "$DESKTOP_SRC" ]; then
     mkdir -p "$KASM_HOME/Desktop"
     cp "$DESKTOP_SRC" "$KASM_HOME/Desktop/Recoll.desktop"
     chmod +x "$KASM_HOME/Desktop/Recoll.desktop"
-    
+    chown -R 1000:0 "$KASM_HOME/Desktop" 2>/dev/null || true
+
     log "Categorizing Start Menu entry..."
     sed -i 's/Categories=.*/Categories=System;Filesystem;Utility;Search;/g' "$DESKTOP_SRC"
 fi
 
-chown -R 1000:1000 "$KASM_HOME/.recoll" "$KASM_HOME/Desktop"
+chown -R 1000:0 "$KASM_HOME/.recoll" 2>/dev/null || true
 
 log "Recoll UI configuration complete."

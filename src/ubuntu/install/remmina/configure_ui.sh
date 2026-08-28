@@ -18,12 +18,12 @@ mkdir -p "$PREF_DIR"
 if [ -f "$SCRIPT_DIR/remmina.pref" ]; then
     cp "$SCRIPT_DIR/remmina.pref" "$PREF_DIR/remmina.pref"
 else
-    # Fallback: Create the silent prefs if file is missing
+    # Fallback: Create the silent prefs if file is missing.
+    # Leave datadir/screenshot paths unset so Remmina uses its own ~-relative
+    # defaults at runtime (baking $KASM_HOME here points at the build-time home).
     cat <<EOF > "$PREF_DIR/remmina.pref"
 [remmina_pref]
 disable_tray_icon=true
-datadir_path=$KASM_HOME/.local/share/remmina
-screenshot_path=$KASM_HOME/Pictures
 [usage_stats]
 periodic_usage_stats_permitted=false
 [remmina_news]
@@ -69,6 +69,7 @@ X-GNOME-Autostart-enabled=false
 NoDisplay=true
 EOF
 
-chown -R 1000:1000 "$KASM_HOME/.config" "$KASM_HOME/.local"
+# Noble runs the session user with primary group 0
+chown -R 1000:0 "$KASM_HOME/.config" "$KASM_HOME/.local" 2>/dev/null || true
 
 log "Remmina UI configuration complete."

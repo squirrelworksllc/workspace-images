@@ -27,7 +27,7 @@ chmod +x /usr/share/applications/torsocks-status.desktop
 mkdir -p "$KASM_HOME/Desktop"
 cp /usr/share/applications/torsocks-status.desktop "$KASM_HOME/Desktop/"
 chmod +x "$KASM_HOME/Desktop/torsocks-status.desktop"
-chown 1000:1000 "$KASM_HOME/Desktop/torsocks-status.desktop"
+chown 1000:0 "$KASM_HOME/Desktop/torsocks-status.desktop" 2>/dev/null || true
 
 if command -v update-desktop-database > /dev/null; then
     update-desktop-database /usr/share/applications/

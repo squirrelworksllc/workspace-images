@@ -40,8 +40,7 @@ if [ -f "$SRC_DESKTOP" ]; then
     # Ensure the icon path is standard
     sed -i 's/^Icon=.*/Icon=firefox/g' "$KASM_HOME/Desktop/firefox.desktop"
     chmod +x "$KASM_HOME/Desktop/firefox.desktop"
+    chown -R 1000:0 "$KASM_HOME/Desktop" 2>/dev/null || true
 fi
-
-chown -R 1000:1000 "$KASM_HOME/Desktop"
 
 log "Firefox configuration successfully applied."

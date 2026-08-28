@@ -20,6 +20,6 @@ if ! grep -q "bash_completion.d" "$KASM_HOME/.bashrc"; then
     echo 'for f in ~/.bash_completion.d/*; do [ -f "$f" ] && . "$f"; done' >> "$KASM_HOME/.bashrc"
 fi
 
-chown -R 1000:1000 "$KASM_HOME"
+chown -R 1000:0 "$KASM_HOME" 2>/dev/null || true
 
 log "DinD environment configuration complete."

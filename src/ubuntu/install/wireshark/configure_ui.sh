@@ -16,7 +16,7 @@ log "Configuring Wireshark permissions and UI..."
 # Add the Kasm user to the wireshark group so they can see interfaces
 if getent group wireshark > /dev/null; then
     usermod -aG wireshark kasm-user 2>/dev/null || true
-    usermod -aG wireshark $(id -nu 1000) 2>/dev/null || true
+    usermod -aG wireshark "$(id -nu 1000)" 2>/dev/null || true
     # Set capabilities on dumpcap so it can capture without root
     chgrp wireshark /usr/bin/dumpcap
     chmod 750 /usr/bin/dumpcap
@@ -39,7 +39,7 @@ if [ -f "$DESKTOP_FILE" ]; then
     mkdir -p "$KASM_HOME/Desktop"
     cp "$DESKTOP_FILE" "$KASM_HOME/Desktop/wireshark.desktop"
     chmod +x "$KASM_HOME/Desktop/wireshark.desktop"
-    chown 1000:1000 "$KASM_HOME/Desktop/wireshark.desktop"
+    chown 1000:0 "$KASM_HOME/Desktop/wireshark.desktop" 2>/dev/null || true
 fi
 
 log "Wireshark UI configuration complete."

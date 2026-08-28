@@ -36,8 +36,12 @@ fi
 log "Starting SquirrelWorks Runtime Initialization..."
 
 # 1. Sync Permissions (Crucial if using Kasm Persistent Profiles)
+# Kasm Noble runs the session user with primary group 0, so stay consistent
+# with 01_cleanup.sh / the Dockerfiles and use 1000:0 (not 1000:1000).
+# Best-effort: custom_startup.sh may run unprivileged, and a failed chown here
+# must not abort the module loop below (script runs under `set -e`).
 KASM_HOME=$(getent passwd 1000 | cut -d: -f6)
-chown 1000:1000 "$KASM_HOME"
+chown 1000:0 "$KASM_HOME" 2>/dev/null || true
 
 # 2. Iterate and Execute
 # This finds any 'startup.sh' in the app subdirectories

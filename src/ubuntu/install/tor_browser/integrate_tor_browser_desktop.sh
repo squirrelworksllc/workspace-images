@@ -38,7 +38,7 @@ EOF
     
     # Critical for Noble/XFCE: Allow Launching
     chmod +x "${KASM_HOME}/Desktop/Tor Browser.desktop"
-    chown -R 1000:1000 "${KASM_HOME}/Desktop"
+    chown -R 1000:0 "${KASM_HOME}/Desktop" 2>/dev/null || true
 
     log "Refreshing Application Database"
     if command -v update-desktop-database > /dev/null; then

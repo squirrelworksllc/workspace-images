@@ -6,7 +6,7 @@ set -e
 
 log() { echo "[CHROME-STARTUP] $*"; }
 
-KASM_HOME=$(getent passwd 1000 | cut -d: -f6)
+KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile")
 CHROME_DIR="$KASM_HOME/.config/google-chrome"
 
 if [ -d "$CHROME_DIR" ]; then
@@ -23,6 +23,6 @@ if [ -d "$CHROME_DIR" ]; then
         sed -i 's/"exit_type":"Crashed"/"exit_type":"None"/' "$PREF_FILE" || true
     fi
 
-    # 3. Ensure permissions
-    chown -R 1000:1000 "$CHROME_DIR"
+    # 3. Ensure permissions (best-effort: custom_startup.sh may run unprivileged)
+    chown -R 1000:0 "$CHROME_DIR" 2>/dev/null || true
 fi

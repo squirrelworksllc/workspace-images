@@ -178,8 +178,9 @@ EOF
     # Clean up temporary bash files
     rm -f /tmp/apt_packages.txt /tmp/pip_packages.txt /tmp/gem_packages.txt
 
-    # Ensure kasm-user can read these files once they populate on the desktop
-    chmod 644 "${DESKTOP_DIR}/Workspace_Guide.html" "${DESKTOP_DIR}/installed_packages.html" || true
+    # Ensure the kasm user owns/can read these root-created files on the desktop
+    chmod 644 "${DESKTOP_DIR}/Workspace_Guide.html" "${DESKTOP_DIR}/installed_packages.html" 2>/dev/null || true
+    chown -R 1000:0 "${DESKTOP_DIR}" 2>/dev/null || true
 
     log "Documentation generated successfully."
 }

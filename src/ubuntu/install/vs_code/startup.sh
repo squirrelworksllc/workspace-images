@@ -25,16 +25,16 @@ PATHS=(
 )
 
 for path in "${PATHS[@]}"; do
-    if [ -d "$path" ]; then
-        # -R ensures subfolders like 'User' and 'CachedData' are fixed
-        chown -R 1000:0 "$path"
-        chmod -R u+rw "$path"
-    else
-        # If directories don't exist yet, create them to prevent 
+    if [ ! -d "$path" ]; then
+        # If directories don't exist yet, create them to prevent
         # root-owned folders being created by the app later
         mkdir -p "$path"
-        chown -R 1000:0 "$path"
     fi
+    # -R ensures subfolders like 'User' and 'CachedData' are fixed.
+    # custom_startup.sh may run unprivileged, so chown is best-effort;
+    # chmod still succeeds for paths the session user already owns.
+    chown -R 1000:0 "$path" 2>/dev/null || true
+    chmod -R u+rw "$path" 2>/dev/null || true
 done
 
 log "VS Code permissions verified. Ready for launch."

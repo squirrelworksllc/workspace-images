@@ -34,7 +34,7 @@ else
     echo '{"SKIP_HOST_UPDATE": true}' > "$DISCORD_CONF/settings.json"
 fi
 
-# 3. Final Permission Sync
-chown -R 1000:1000 "$DISCORD_CONF"
+# 3. Final Permission Sync (best-effort: custom_startup.sh may run unprivileged)
+chown -R 1000:0 "$DISCORD_CONF" 2>/dev/null || true
 
 log "Discord is shielded from host updates. Ready to launch."

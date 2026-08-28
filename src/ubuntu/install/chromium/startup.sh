@@ -5,7 +5,7 @@
 set -e
 log() { echo "[CHROMIUM-STARTUP] $*"; }
 
-KASM_HOME=$(getent passwd 1000 | cut -d: -f6)
+KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile")
 CHROMIUM_DIR="$KASM_HOME/.config/chromium"
 
 if [ -d "$CHROMIUM_DIR" ]; then
@@ -21,5 +21,5 @@ if [ -d "$CHROMIUM_DIR" ]; then
         sed -i 's/"exit_type":"Crashed"/"exit_type":"None"/' "$PREF_FILE" || true
     fi
 
-    chown -R 1000:1000 "$CHROMIUM_DIR"
+    chown -R 1000:0 "$CHROMIUM_DIR" 2>/dev/null || true
 fi

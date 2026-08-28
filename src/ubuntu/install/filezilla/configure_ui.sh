@@ -29,8 +29,9 @@ if [ -f "$SRC_DESKTOP" ]; then
     mkdir -p "$KASM_HOME/Desktop"
     cp "$SRC_DESKTOP" "$KASM_HOME/Desktop/filezilla.desktop"
     chmod +x "$KASM_HOME/Desktop/filezilla.desktop"
+    chown -R 1000:0 "$KASM_HOME/Desktop" 2>/dev/null || true
 fi
 
-chown -R 1000:1000 "$CONF_DIR" "$KASM_HOME/Desktop"
+chown -R 1000:0 "$CONF_DIR" 2>/dev/null || true
 
 log "FileZilla UI configuration complete."

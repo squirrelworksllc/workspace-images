@@ -68,5 +68,5 @@ if [ -n "$WHISKER_CONF" ] && [ -f "$WHISKER_CONF" ]; then
     sed -i 's/^button-icon=.*/button-icon=distributor-logo-ubuntu/g' "$WHISKER_CONF"
 fi
 
-chown -R 1000:1000 "$KASM_HOME/.config/xfce4"
+chown -R 1000:0 "$KASM_HOME/.config/xfce4" 2>/dev/null || true
 log "UI Configuration Complete."

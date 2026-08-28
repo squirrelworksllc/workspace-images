@@ -107,7 +107,7 @@ main() {
     tar -xJf "${tmp}/tor-browser-linux-${arch}-${version}.tar.xz" -C "${install_dir}" --strip-components=1
 
     # Ensure UID 1000 owns the install so the internal updater works
-    chown -R 1000:1000 "${install_dir}"
+    chown -R 1000:0 "${install_dir}"
 
     log "Creating CLI wrapper"
     cat >/usr/local/bin/tor-browser <<EOF
