@@ -74,47 +74,21 @@ RUN set -eux; \
       "/ubuntu/install/tools/install_tools.sh" \
       "/ubuntu/install/common/00_apt_helper.sh" \
       "/ubuntu/install/desktop/install.sh" \
+      "/ubuntu/install/bitcurator5/install_bitcurator5.sh" \
     ); \
     \
-    # Execution Loop for Prereqs
+    # Execution Loop
     for SCRIPT in "${SCRIPTS[@]}"; do \
       echo ">>> Executing Module: ${SCRIPT}"; \
       if [[ "${SCRIPT}" == *"desktop/install.sh" ]]; then \
-        # Passing 'bitcurator5' to trigger specific branding & desktop overrides
         bash "${INST_DIR}${SCRIPT}" bitcurator5; \
       else \
         bash "${INST_DIR}${SCRIPT}"; \
-      fi || { exit 1; }; \
-    done; \ 
+      fi || { rc=$?; echo "FAILED: ${SCRIPT} (rc=$rc)"; exit "$rc"; }; \
+    done; \
     \
-    # =========================================================================
-    # THE BITCURATOR V5 CORE INSTALLER
-    # =========================================================================
-    log() { echo -e "\n\033[1;34m[BITCURATOR-INSTALLER]\033[0m $*"; }; \
-    \
-    log "Fetching prerequisites and BitCurator CLI..."; \
-    apt-get install -y --no-install-recommends curl wget git python3 python3-pip sudo ca-certificates; \
-    wget -qO- https://raw.githubusercontent.com/BitCurator/bitcurator-cli/main/install.sh | bash; \
-    \
-    log "Executing BitCurator SaltStack States (Expected service warnings)..."; \
-    bitcurator-cli install bitcurator --user kasm-user || log "Salt applied. Expected Docker service warnings bypassed."; \
-    \
-    # =========================================================================
-    # DESKTOP OVERRIDE REPAIR
-    # =========================================================================
-    log "Purging overlapping Desktop Environments installed by Salt..."; \
-    # Added '|| true' to safeguard against package-not-found or partial install crashes under set -e
-    apt-get purge -y ubuntu-desktop gnome-shell gdm3 lightdm ubuntu-session || true; \
-    apt-get autoremove -y; \
-    \
-    log "Restoring Kasm XFCE & Critical Dependencies..."; \
-    update-alternatives --set x-session-manager /usr/bin/xfce4-session || true; \
-    apt-get update && apt-get install -y --no-install-recommends pulseaudio; \
-    \
-    # =========================================================================
-    # POST-INSTALL POLISH & CLEANUP
-    # =========================================================================
-    log "Running Global SquirrelWorks Cleanup..."; \
+    # Force the SquirrelWorks cleanup pass (shared SKIP_CLEAN=true only defers
+    # it in the Core base layer).
     SKIP_CLEAN=false bash "${INST_DIR}/ubuntu/install/common/01_cleanup.sh"; \
     \
     # --- Final Session Preparation ---
@@ -122,7 +96,7 @@ RUN set -eux; \
       cat /home/kasm-user/.bashrc >> "${HOME}/.bashrc"; \
       rm /home/kasm-user/.bashrc; \
     fi; \
-    cp -a /home/kasm-user/. "${HOME}/" || true; \
+    cp -a /home/kasm-user/. "${HOME}/" 2>/dev/null || true; \
     rm -rf /home/kasm-user; \
     \
     "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \
@@ -130,14 +104,33 @@ RUN set -eux; \
     mkdir -p /home/kasm-user; \
     chown -R 1000:0 /home/kasm-user; \
     \
-    # Deep cleanup of temporary build assets
-    rm -rf "${INST_DIR}/ubuntu/install" /tmp/* /var/cache/salt
+    # Prune the ephemeral build-only installers, but KEEP the runtime layer:
+    #   common/**     -> master_startup.sh + shared helpers
+    #   */startup.sh  -> per-app runtime permission / daemon modules
+    find "${INST_DIR}/ubuntu/install" -type f \
+         ! -name 'startup.sh' ! -path '*/common/*' -delete; \
+    find "${INST_DIR}/ubuntu/install" -type d -empty -delete; \
+    rm -rf /tmp/* /var/cache/salt
+
+# ############################################################################
+# ------------------------- RUNTIME STARTUP HOOK -------------------------- #
+# ############################################################################
+# Kasm executes ${STARTUPDIR}/custom_startup.sh at session start. This is the
+# only entrypoint into the per-app runtime module chain (master_startup.sh ->
+# */startup.sh).
+COPY ./src/ubuntu/startup/custom_startup.sh /dockerstartup/custom_startup.sh
+RUN chmod 0755 /dockerstartup/custom_startup.sh
 
 # ############################################################################
 # -------------------------- SECURITY METADATA LAYER ----------------------- #
 # ############################################################################
 RUN mkdir -p /opt/vex
 COPY images/vex_ubuntu_common.json /opt/vex/vex.json
+
+# Centralized Trivy ignore file for the workspace scanners
+COPY images/trivy_ubuntu_common.ignore /.trivyignore
+COPY images/trivy_ubuntu_common.ignore /app/.trivyignore
+ENV TRIVY_IGNOREFILE=/.trivyignore
 
 # ############################################################################
 # ------------------------------ FINALIZATION ------------------------------ #
