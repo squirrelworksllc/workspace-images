@@ -32,6 +32,11 @@ ENV HOME=/home/kasm-default-profile \
     INST_DIR=/dockerstartup/install \
     INSTALL_CHROME=true
 
+# Desktop-icon toggles (per app). Set to "true" to place an icon on the Desktop;
+# the app stays in the Applications menu either way.
+ENV CHROME_DESKTOP_ICON=false \
+    FILEZILLA_DESKTOP_ICON=false
+
 WORKDIR ${HOME}
 
 # ############################################################################
