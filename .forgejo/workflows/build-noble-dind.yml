@@ -7,6 +7,10 @@ on:
       - develop
     paths:
       - 'images/ubuntu-noble-dind/**'
+      - 'src/ubuntu/**'
+      - 'src/tools/**'
+      - 'images.json'
+      - '.forgejo/workflows/build-noble-dind.yml'
   workflow_run:
     workflows: ["Build Noble Core"]
     types:
@@ -59,11 +63,12 @@ jobs:
           fetch-depth: 2
 
       - name: Git Diff Guard
+        id: guard
         if: ${{ github.event_name == 'push' }}
         run: |
           if git diff --name-only HEAD~1 HEAD | grep -q 'images/ubuntu-noble-core/'; then
-            echo "::notice:: Core foundation files modified. Standing down."
-            exit 1
+            echo "::notice:: Core foundation files modified; the Core build cascades this workspace via workflow_run. Skipping the push here."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Set up Docker Buildx
@@ -80,6 +85,20 @@ jobs:
           registry: ${{ env.HARBOR_REGISTRY }}
           username: ${{ secrets.HARBOR_USERNAME }}
           password: ${{ secrets.HARBOR_PASSWORD }}
+
+      # Builds the Dockerfile's `lint` stage (shellcheck + hadolint), which is
+      # defined + referenced in images.json but was never run by CI.
+      # Starts non-blocking; flip `continue-on-error` to false once it is green.
+      - name: Lint (shellcheck + hadolint)
+        continue-on-error: true
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ env.DOCKERFILE_PATH }}
+          target: lint
+          platforms: linux/amd64
+          push: false
+          pull: true
 
       - name: Extract Tags from images.json
         id: prep
@@ -114,6 +133,7 @@ jobs:
 
       - name: Compile and Push Workspace
         id: build_image
+        if: ${{ steps.guard.outputs.skip != 'true' }}
         uses: docker/build-push-action@v6
         timeout-minutes: 120
         with:
@@ -132,11 +152,13 @@ jobs:
 
   calculate-size:
     name: Size Calculation
-    needs: build-workspace # Change to 'publish-core' or 'build-isolated-remnux' depending on the file
+    needs: build-workspace
+    if: ${{ needs.build-workspace.outputs.digest != '' }}
     uses: ./.forgejo/workflows/calculate-size.yml
     with:
       image_path: "${{ needs.build-workspace.outputs.repo_path }}@${{ needs.build-workspace.outputs.digest }}"
-      image_key: "ubuntu-noble-dind" # Change to match the specific file (e.g., 'remnux', 'ubuntu-noble-core')
+      image_key: "ubuntu-noble-dind"
+      runner: '["kasm-builder", "repo-squirrelworks", "resources-large"]'
     secrets:
       HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
       HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
@@ -144,6 +166,7 @@ jobs:
   security-scan:
     name: DinD Scan
     needs: build-workspace
+    if: ${{ needs.build-workspace.outputs.digest != '' }}
     uses: ./.forgejo/workflows/trivy-scan.yml
     with:
       image_path: "${{ needs.build-workspace.outputs.repo_path }}@${{ needs.build-workspace.outputs.digest }}"

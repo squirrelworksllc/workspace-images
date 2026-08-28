@@ -1,74 +1,172 @@
 name: Shared Image Size Calculation
+
+# Reusable workflow: measures a pushed image and returns its size to the caller.
+#
+#   jobs:
+#     calculate-size:
+#       needs: build
+#       uses: ./.forgejo/workflows/calculate-size.yml
+#       with:
+#         image_path: "${{ needs.build.outputs.repo_path }}@${{ needs.build.outputs.digest }}"
+#         image_key: "ubuntu-noble-desktop"
+#         runner: '["kasm-builder", "resources-large"]'   # size the runner to the image
+#       secrets:
+#         HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
+#         HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
+#
+#     # downstream job can then consume needs.calculate-size.outputs.size_mb
+
 on:
   workflow_call:
     inputs:
       image_path:
         required: true
         type: string
-        description: "Full registry image path with digest"
+        description: "Immutable image ref to measure (repo@sha256:...)"
       image_key:
         required: true
         type: string
-        description: "Identifier for the target workspace image"
+        description: "Workspace image key (matches images.json .key)"
+      registry:
+        required: false
+        type: string
+        default: forge.konderla.org
+        description: "Container registry host to authenticate against"
+      runner:
+        required: false
+        type: string
+        default: '["kasm-builder", "resources-small"]'
+        description: >-
+          JSON array of runner labels. Pass the build image's own pool
+          (e.g. resources-large) for images that are multi-GB uncompressed.
+      report_html:
+        required: false
+        type: boolean
+        default: true
+        description: "Also upload the stylized standalone HTML report as an artifact"
     secrets:
       HARBOR_USERNAME:
         required: true
       HARBOR_PASSWORD:
         required: true
+    outputs:
+      size_bytes:
+        description: "Uncompressed on-disk size in bytes (docker image inspect .Size)"
+        value: ${{ jobs.calculate-size.outputs.size_bytes }}
+      size_mb:
+        description: "Uncompressed size in MB, 2dp (Kasm registry uncompressed_size_mb)"
+        value: ${{ jobs.calculate-size.outputs.size_mb }}
+      compressed_bytes:
+        description: "Registry download size in bytes (sum of layer + config blobs); 0 if unavailable"
+        value: ${{ jobs.calculate-size.outputs.compressed_bytes }}
 
 jobs:
   calculate-size:
     name: Calculate & Report Size
-    runs-on: [kasm-builder, repo-squirrelworks, resources-small]
+    runs-on: ${{ fromJSON(inputs.runner) }}
+    outputs:
+      size_bytes: ${{ steps.calc.outputs.size_bytes }}
+      size_mb: ${{ steps.calc.outputs.size_mb }}
+      compressed_bytes: ${{ steps.calc.outputs.compressed_bytes }}
     steps:
-      - name: Set up Docker Config
-        run: |
-          mkdir -p ~/.docker
-          echo '{"auths":{"forge.konderla.org":{}}}' > ~/.docker/config.json
-
-      - name: Login to local Harbor
+      - name: Log in to registry
         uses: docker/login-action@v3
         with:
-          registry: forge.konderla.org
+          registry: ${{ inputs.registry }}
           username: ${{ secrets.HARBOR_USERNAME }}
           password: ${{ secrets.HARBOR_PASSWORD }}
 
-      - name: Generate Execution Date
-        id: datestring
-        run: echo "REPORT_DATE=$(date +%m-%d-%Y)" >> $GITHUB_ENV
-
-      - name: Calculate and Report True Uncompressed Image Size
+      - name: Measure image
         id: calc
+        shell: bash
+        env:
+          IMAGE_PATH: ${{ inputs.image_path }}
         run: |
-          echo "======= Calculating True Uncompressed Image Size ======="
-          TARGET_IMAGE="${{ inputs.image_path }}"
-          
-          echo "Pulling $TARGET_IMAGE to runner..."
-          docker pull "$TARGET_IMAGE"
-          SIZE_BYTES=$(docker image inspect "$TARGET_IMAGE" --format='{{.Size}}')
-          SIZE_MB=$(echo "$SIZE_BYTES" | awk '{printf "%.2f", $1 / 1024 / 1024}')
-          
-          echo "Calculated True Uncompressed Size: ${SIZE_MB} MB"
-          
-          # 1. Update the native GitHub UI Summary
-          echo "### 📊 Kasm 1.1 Image Size Analysis" >> $GITHUB_STEP_SUMMARY
-          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Target Key** | \`${{ inputs.image_key }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Target Hash** | \`${{ inputs.image_path }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **True Uncompressed Size** | **${SIZE_MB} MB** |" >> $GITHUB_STEP_SUMMARY
-          
-          # 2. Generate the Stylized HTML Report appending the datestring
-          REPORT_FILE="${{ github.workspace }}/Size-Report-${{ inputs.image_key }}_${{ env.REPORT_DATE }}.html"
-          cat <<EOF > "$REPORT_FILE"
+          set -euo pipefail
+          REPO="${IMAGE_PATH%@*}"
+
+          # --- Compressed / download size: registry metadata only, no blob pull. ---
+          # Entirely best-effort: every failure path falls back to 0, never aborts.
+          echo "::group::Compressed size (registry metadata)"
+          COMPRESSED_BYTES=0
+          if RAW=$(docker buildx imagetools inspect "$IMAGE_PATH" --raw 2>/dev/null); then
+            if printf '%s' "$RAW" | jq -e 'has("manifests")' >/dev/null 2>&1; then
+              # OCI index / manifest list -> pick the linux/amd64 child
+              CHILD=$(printf '%s' "$RAW" | jq -r '
+                [ .manifests[]
+                  | select(.platform.os == "linux" and .platform.architecture == "amd64")
+                  | .digest ][0] // ""')
+              if [ -n "$CHILD" ] && CHILD_RAW=$(docker buildx imagetools inspect "${REPO}@${CHILD}" --raw 2>/dev/null); then
+                RAW="$CHILD_RAW"
+              fi
+            fi
+            COMPRESSED_BYTES=$(printf '%s' "$RAW" | jq '([.config.size // 0] + [(.layers // [])[].size]) | add // 0' 2>/dev/null || echo 0)
+          else
+            echo "imagetools inspect unavailable; compressed size reported as 0"
+          fi
+          echo "compressed_bytes=${COMPRESSED_BYTES}" >> "$GITHUB_OUTPUT"
+          echo "Compressed (download) size: ${COMPRESSED_BYTES} bytes"
+          echo "::endgroup::"
+
+          # --- Uncompressed size: the authoritative value Kasm wants. ---
+          # This one is allowed to fail the job (no number is worse than a wrong one).
+          echo "::group::Uncompressed size (pull + inspect)"
+          docker pull "$IMAGE_PATH"
+          SIZE_BYTES=$(docker image inspect "$IMAGE_PATH" --format='{{.Size}}')
+          docker image rm "$IMAGE_PATH" >/dev/null 2>&1 || true
+          echo "::endgroup::"
+
+          SIZE_MB=$(awk -v b="$SIZE_BYTES" 'BEGIN { printf "%.2f", b / 1024 / 1024 }')
+          {
+            echo "size_bytes=${SIZE_BYTES}"
+            echo "size_mb=${SIZE_MB}"
+          } >> "$GITHUB_OUTPUT"
+          echo "Uncompressed size: ${SIZE_BYTES} bytes (${SIZE_MB} MB)"
+
+      - name: Job summary
+        shell: bash
+        env:
+          IMAGE_KEY: ${{ inputs.image_key }}
+          IMAGE_PATH: ${{ inputs.image_path }}
+          SIZE_MB: ${{ steps.calc.outputs.size_mb }}
+          COMPRESSED_BYTES: ${{ steps.calc.outputs.compressed_bytes }}
+        run: |
+          set -euo pipefail
+          COMPRESSED_MB=$(awk -v b="$COMPRESSED_BYTES" 'BEGIN { printf "%.2f", b / 1024 / 1024 }')
+          {
+            echo "### 📊 Image Size — \`${IMAGE_KEY}\`"
+            echo ""
+            echo "| Metric | Value |"
+            echo "| --- | --- |"
+            echo "| Ref | \`${IMAGE_PATH}\` |"
+            echo "| Uncompressed (Kasm \`uncompressed_size_mb\`) | **${SIZE_MB} MB** |"
+            echo "| Compressed (download) | ${COMPRESSED_MB} MB |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Render HTML report
+        id: report
+        if: ${{ inputs.report_html }}
+        shell: bash
+        env:
+          IMAGE_KEY: ${{ inputs.image_key }}
+          IMAGE_PATH: ${{ inputs.image_path }}
+          SIZE_MB: ${{ steps.calc.outputs.size_mb }}
+        run: |
+          set -euo pipefail
+          REPORT_DATE=$(date -u +%Y-%m-%d)
+          REPORT_NAME="Size-Report-${IMAGE_KEY}_${REPORT_DATE}"
+          REPORT_FILE="${REPORT_NAME}.html"
+
+          # Values are constrained (key, repo@sha256, number) so a plain heredoc is safe.
+          cat > "$REPORT_FILE" <<HTML
           <!DOCTYPE html>
           <html lang="en">
           <head>
               <meta charset="UTF-8">
               <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <title>SquirrelWorks 1.1 Image Size Report</title>
+              <title>SquirrelWorks Image Size Report</title>
               <style>
-                  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #0d1117; color: #c9d1d9; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+                  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #0d1117; color: #c9d1d9; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
                   .card { background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 30px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); width: 100%; max-width: 600px; }
                   h1 { color: #58a6ff; font-size: 1.5rem; margin-top: 0; border-bottom: 1px solid #21262d; padding-bottom: 15px; margin-bottom: 25px; }
                   .metric-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px dashed #30363d; }
@@ -80,14 +178,14 @@ jobs:
           </head>
           <body>
               <div class="card">
-                  <h1>Kasm Workspace Architect Report</h1>
+                  <h1>Kasm Workspace Size Report</h1>
                   <div class="metric-row">
                       <div class="metric-label">Image Target Key</div>
-                      <div class="metric-value" style="font-size: 1rem;">${{ inputs.image_key }}</div>
+                      <div class="metric-value" style="font-size: 1rem;">${IMAGE_KEY}</div>
                   </div>
                   <div class="metric-row">
                       <div class="metric-label">Registry Target</div>
-                      <div class="metric-value">${{ inputs.image_path }}</div>
+                      <div class="metric-value">${IMAGE_PATH}</div>
                   </div>
                   <div class="metric-row">
                       <div class="metric-label">Uncompressed Extracted Size</div>
@@ -95,20 +193,27 @@ jobs:
                   </div>
                   <div class="tip-box">
                       <strong>Registry Maintenance Tip:</strong><br><br>
-                      To ensure seamless Kasm orchestrator provisioning, update the <code>uncompressed_size_mb</code> parameter in your 1.1 <code>workspace.json</code> schema to match this precise value.
+                      Set <code>uncompressed_size_mb</code> in the Kasm 1.1 <code>workspace.json</code> schema to <strong>${SIZE_MB}</strong> for this image.
                   </div>
               </div>
           </body>
           </html>
-          EOF
+          HTML
 
-      - name: Archive HTML Size Report
-        uses: actions/upload-artifact@v3
-        if: success()
+          echo "name=${REPORT_NAME}" >> "$GITHUB_OUTPUT"
+          echo "file=${REPORT_FILE}" >> "$GITHUB_OUTPUT"
+
+      - name: Archive HTML report
+        if: ${{ inputs.report_html && success() }}
+        # Non-fatal: the authoritative numbers are the job outputs + step summary.
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
         with:
-          name: Size-Report-${{ inputs.image_key }}_${{ env.REPORT_DATE }}
-          path: ${{ github.workspace }}/Size-Report-${{ inputs.image_key }}_${{ env.REPORT_DATE }}.html
+          name: ${{ steps.report.outputs.name }}
+          path: ${{ steps.report.outputs.file }}
+          if-no-files-found: error
+          retention-days: 90
 
-      - name: Clean Runner Workspace
-        run: docker rmi "${{ inputs.image_path }}" || true
+      - name: Clean runner image cache
         if: always()
+        run: docker image rm "${{ inputs.image_path }}" 2>/dev/null || true

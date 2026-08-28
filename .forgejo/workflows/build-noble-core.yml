@@ -7,6 +7,11 @@ on:
       - develop
     paths:
       - 'images/ubuntu-noble-core/**'
+      - 'src/ubuntu/install/common/**'
+      - 'src/ubuntu/install/tools/**'
+      - 'src/tools/**'
+      - 'images.json'
+      - '.forgejo/workflows/build-noble-core.yml'
   workflow_dispatch:
     inputs:
       target_env:
@@ -61,6 +66,20 @@ jobs:
           username: ${{ secrets.HARBOR_USERNAME }}
           password: ${{ secrets.HARBOR_PASSWORD }}
 
+      # Builds the Dockerfile's `lint` stage (shellcheck + hadolint), which is
+      # defined + referenced in images.json but was never run by CI.
+      # Starts non-blocking; flip `continue-on-error` to false once it is green.
+      - name: Lint (shellcheck + hadolint)
+        continue-on-error: true
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ env.DOCKERFILE_PATH }}
+          target: lint
+          platforms: linux/amd64
+          push: false
+          pull: true
+
       - name: Extract Tags from images.json
         id: prep
         run: |
@@ -111,7 +130,8 @@ jobs:
     uses: ./.forgejo/workflows/calculate-size.yml
     with:
       image_path: "${{ needs.publish-core.outputs.repo_path }}@${{ needs.publish-core.outputs.digest }}"
-      image_key: "ubuntu-noble-core" 
+      image_key: "ubuntu-noble-core"
+      runner: '["kasm-builder", "repo-squirrelworks", "resources-small"]'
     secrets:
       HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
       HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
