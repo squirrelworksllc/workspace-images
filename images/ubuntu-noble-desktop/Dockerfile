@@ -129,6 +129,8 @@ RUN set -eux; \
       echo ">>> Executing Module: ${SCRIPT}"; \
       if [[ "${SCRIPT}" == *"desktop/install.sh" ]]; then \
         bash "${INST_DIR}${SCRIPT}" noble; \
+      elif [[ "${SCRIPT}" == *"common/01_cleanup.sh" ]]; then \
+        SKIP_CLEAN=false bash "${INST_DIR}${SCRIPT}"; \
       else \
         bash "${INST_DIR}${SCRIPT}"; \
       fi || { \
@@ -146,8 +148,21 @@ RUN set -eux; \
     mkdir -p /home/kasm-user; \
     chown -R 1000:0 /home/kasm-user; \
     \
-    # Cleanup only the ephemeral build scripts, keeping the shared common tools
-    rm -rf "${INST_DIR}/ubuntu/install"
+    # Prune the ephemeral build-only installers, but KEEP the runtime layer:
+    #   common/**     -> master_startup.sh + shared helpers (run/sourced at boot)
+    #   */startup.sh  -> per-app runtime permission / daemon modules
+    find "${INST_DIR}/ubuntu/install" -type f \
+         ! -name 'startup.sh' ! -path '*/common/*' -delete; \
+    find "${INST_DIR}/ubuntu/install" -type d -empty -delete
+
+# ############################################################################
+# ------------------------- RUNTIME STARTUP HOOK -------------------------- #
+# ############################################################################
+# Kasm executes ${STARTUPDIR}/custom_startup.sh at session start. This is the
+# only entrypoint into the per-app runtime module chain (master_startup.sh ->
+# */startup.sh), e.g. the VS Code profile-permission sync.
+COPY ./src/ubuntu/startup/custom_startup.sh /dockerstartup/custom_startup.sh
+RUN chmod 0755 /dockerstartup/custom_startup.sh
 
 # ############################################################################
 # -------------------------- SECURITY METADATA LAYER ----------------------- #

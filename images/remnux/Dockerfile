@@ -138,8 +138,22 @@ RUN set -eux; \
     mkdir -p /home/kasm-user; \
     chown -R 1000:0 /home/kasm-user; \
     \
-    # Deep cleanup of temporary build assets
-    rm -rf "${INST_DIR}/ubuntu/install" /tmp/* /var/cache/salt
+    # Deep cleanup of temporary build assets. Prune the ephemeral installers but
+    # KEEP the runtime layer: common/** (master_startup.sh + helpers) and every
+    # */startup.sh (per-app runtime permission / daemon modules).
+    find "${INST_DIR}/ubuntu/install" -type f \
+         ! -name 'startup.sh' ! -path '*/common/*' -delete; \
+    find "${INST_DIR}/ubuntu/install" -type d -empty -delete; \
+    rm -rf /tmp/* /var/cache/salt
+
+# ############################################################################
+# ------------------------- RUNTIME STARTUP HOOK -------------------------- #
+# ############################################################################
+# Kasm executes ${STARTUPDIR}/custom_startup.sh at session start. This is the
+# only entrypoint into the per-app runtime module chain (master_startup.sh ->
+# */startup.sh), e.g. the VS Code profile-permission sync.
+COPY ./src/ubuntu/startup/custom_startup.sh /dockerstartup/custom_startup.sh
+RUN chmod 0755 /dockerstartup/custom_startup.sh
 
 # ############################################################################
 # ------------------------------ FINALIZATION ------------------------------ #

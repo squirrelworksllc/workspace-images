@@ -85,6 +85,15 @@ main() {
   # Deploy the Guard Helper
   install_guard_helper "/usr/local/bin/torsocks-guard"
 
+  # Register the runtime validator so runtime_validation.sh picks it up at
+  # session start (kept out of the ephemeral install tree on purpose).
+  if [ -f "${script_dir}/validate_torsocks.sh" ]; then
+    install -d -m 0755 /dockerstartup/tools/validators
+    install -m 0755 "${script_dir}/validate_torsocks.sh" \
+      /dockerstartup/tools/validators/torsocks.sh
+    log "Registered torsocks runtime validator"
+  fi
+
   # Trigger UI Integration
   if [ -f "${script_dir}/configure_ui.sh" ]; then
     bash "${script_dir}/configure_ui.sh"
