@@ -1,34 +1,37 @@
 #!/usr/bin/env bash
 ###############################################################################
 # configure_ui.sh
-# Purpose: Sets up desktop shortcuts or UI hooks for IOC Parser.
+# Purpose: Applications-menu entry + optional Desktop icon for IOC Parser.
 ###############################################################################
 set -euo pipefail
 
 log() { echo "[IOC-PARSER-UI] $*"; }
 
-main() {
-    log "Configuring UI elements for IOC Parser..."
-    
-    mkdir -p /usr/share/applications
-    
-    # Create an XFCE start menu entry that launches a terminal instance
-    cat << 'EOF' > /usr/share/applications/ioc-parser.desktop
+# shellcheck source=/dev/null
+source "${INST_DIR:-/dockerstartup/install}/ubuntu/install/common/10_desktop_icon.sh"
+
+log "Configuring IOC Parser UI..."
+
+cat > /usr/share/applications/ioc-parser.desktop <<'EOF'
 [Desktop Entry]
 Version=1.0
 Type=Application
 Name=IOC Parser
-Comment=Parse Indicators of Compromise from documents
-Exec=xfce4-terminal -e "/usr/local/bin/ioc-parser --help"
+GenericName=Indicator Extractor
+Comment=Extract URLs, IPs, domains, emails and hashes from a document
+Exec=xfce4-terminal --title=IOC-Parser --command=/usr/local/bin/ioc-parser
 Icon=utilities-terminal
 Terminal=false
 Categories=Utility;Security;
+Keywords=ioc;threat;intel;indicator;forensics;
 EOF
+chmod 0644 /usr/share/applications/ioc-parser.desktop
 
-    # Ensure kasm_user (UID 1000) maintains access
-    chmod 644 /usr/share/applications/ioc-parser.desktop
+if command -v update-desktop-database > /dev/null; then
+    update-desktop-database /usr/share/applications/
+fi
 
-    log "UI configuration applied successfully."
-}
+# Desktop icon (opt-in via IOC_PARSER_DESKTOP_ICON=true; default off)
+desktop_icon ioc_parser /usr/share/applications/ioc-parser.desktop false
 
-main "$@"
+log "IOC Parser UI configuration applied."

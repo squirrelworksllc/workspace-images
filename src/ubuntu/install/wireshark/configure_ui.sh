@@ -9,6 +9,8 @@ log() { echo "[wireshark-ui] $*"; }
 
 # Kasm 1.18+ standard user home detection
 KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile")
+# shellcheck source=/dev/null
+source "${INST_DIR:-/dockerstartup/install}/ubuntu/install/common/10_desktop_icon.sh"
 
 log "Configuring Wireshark permissions and UI..."
 
@@ -24,22 +26,17 @@ if getent group wireshark > /dev/null; then
     log "Permissions updated: UID 1000 can now capture packets without sudo."
 fi
 
-# 2. Start Menu & Desktop Icon
+# 2. Start Menu
 DESKTOP_FILE="/usr/share/applications/wireshark.desktop"
 if [ -f "$DESKTOP_FILE" ]; then
     log "Categorizing Wireshark for the Applications Menu..."
-    # Ensure it shows up in 'Sniffing' or 'Network' folders
     sed -i 's/Categories=.*/Categories=Network;Monitor;Security;System;/g' "$DESKTOP_FILE"
-    
     if command -v update-desktop-database > /dev/null; then
         update-desktop-database /usr/share/applications/
     fi
-
-    log "Deploying Desktop shortcut to $KASM_HOME"
-    mkdir -p "$KASM_HOME/Desktop"
-    cp "$DESKTOP_FILE" "$KASM_HOME/Desktop/wireshark.desktop"
-    chmod +x "$KASM_HOME/Desktop/wireshark.desktop"
-    chown 1000:0 "$KASM_HOME/Desktop/wireshark.desktop" 2>/dev/null || true
 fi
+
+# 3. Desktop icon (opt-in via WIRESHARK_DESKTOP_ICON=true; default off)
+desktop_icon wireshark "$DESKTOP_FILE" false
 
 log "Wireshark UI configuration complete."

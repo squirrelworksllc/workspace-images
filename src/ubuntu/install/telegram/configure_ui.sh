@@ -2,7 +2,7 @@
 ###############################################################################
 # configure_ui.sh
 #
-# Purpose: Configures UI, prevents duplicates, and REMOVES desktop shortcut.
+# Purpose: Single menu entry, autostart suppression, opt-in Desktop icon.
 # Optimized for: Kasm 1.18+ / Ubuntu Noble
 ###############################################################################
 set -euo pipefail
@@ -11,13 +11,13 @@ log() { echo "[TELEGRAM-UI] $*"; }
 
 # Kasm 1.18+ Dynamic Home Detection
 KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile")
+# shellcheck source=/dev/null
+source "${INST_DIR:-/dockerstartup/install}/ubuntu/install/common/10_desktop_icon.sh"
 
-# --- Step 0: Nuclear Duplicate & Desktop Cleanup ---
-log "Cleaning up duplicate menu entries and desktop shortcuts..."
+# --- Step 0: De-duplicate the packaged menu entries ---
+log "Cleaning up duplicate menu entries..."
 rm -f /usr/share/applications/telegram-desktop.desktop
 rm -f /usr/share/applications/org.telegram.desktop.desktop
-# Nuclear: Remove the shortcut from the desktop if it exists
-rm -f "$KASM_HOME/Desktop/telegram.desktop"
 
 # 1. Determine Binary Path
 if [ -f "/opt/Telegram/Telegram" ]; then
@@ -83,4 +83,7 @@ EOF
 mkdir -p "$KASM_HOME/.local/share/TelegramDesktop"
 chown -R 1000:0 "$KASM_HOME/.config" "$KASM_HOME/.local" 2>/dev/null || true
 
-log "Telegram UI configuration complete. Menu entry created; Desktop clean."
+# Desktop icon (opt-in via TELEGRAM_DESKTOP_ICON=true; default off)
+desktop_icon telegram /usr/share/applications/telegram.desktop false
+
+log "Telegram UI configuration complete."

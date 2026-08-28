@@ -32,10 +32,27 @@ ENV HOME=/home/kasm-default-profile \
     INST_DIR=/dockerstartup/install \
     INSTALL_CHROME=true
 
-# Desktop-icon toggles (per app). Set to "true" to place an icon on the Desktop;
-# the app stays in the Applications menu either way.
-ENV CHROME_DESKTOP_ICON=false \
-    FILEZILLA_DESKTOP_ICON=false
+# Desktop-icon toggles (per app). "true" places an icon on the Desktop; the app
+# stays in the Applications menu either way. Browsers default on, everything
+# else off.
+ENV FIREFOX_DESKTOP_ICON=true \
+    TOR_BROWSER_DESKTOP_ICON=true \
+    CHROME_DESKTOP_ICON=false \
+    FILEZILLA_DESKTOP_ICON=false \
+    VS_CODE_DESKTOP_ICON=false \
+    GIMP_DESKTOP_ICON=false \
+    OBSIDIAN_DESKTOP_ICON=false \
+    QBITTORRENT_DESKTOP_ICON=false \
+    REMMINA_DESKTOP_ICON=false \
+    RECOLL_DESKTOP_ICON=false \
+    TORSOCKS_DESKTOP_ICON=false \
+    ZBAR_DESKTOP_ICON=false \
+    DISCORD_DESKTOP_ICON=false \
+    SIGNAL_DESKTOP_ICON=false \
+    SLACK_DESKTOP_ICON=false \
+    TEAMS_DESKTOP_ICON=false \
+    TELEGRAM_DESKTOP_ICON=false \
+    THUNDERBIRD_DESKTOP_ICON=false
 
 WORKDIR ${HOME}
 

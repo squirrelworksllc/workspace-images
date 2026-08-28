@@ -6,6 +6,8 @@
 set -euo pipefail
 : "${INST_DIR:=/dockerstartup/install}"
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
+# shellcheck source=/dev/null
+source "${INST_DIR}/ubuntu/install/common/10_desktop_icon.sh"
 
 log() { echo "[QBITTORRENT-INSTALL] $*"; }
 
@@ -57,6 +59,9 @@ EOF
 
     # Ownership (Noble runs the session user with primary group 0)
     chown -R 1000:0 "${RUNTIME_HOME}/.config" "${RUNTIME_HOME}/Downloads" 2>/dev/null || true
+
+    # Desktop icon (opt-in via QBITTORRENT_DESKTOP_ICON=true; default off)
+    desktop_icon qbittorrent /usr/share/applications/org.qbittorrent.qBittorrent.desktop false qbittorrent.desktop
 
     log "qBittorrent installation complete."
 }

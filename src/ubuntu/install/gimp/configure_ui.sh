@@ -10,6 +10,8 @@ log() { echo "[GIMP-UI] $*"; }
 
 # Kasm 1.18+ Dynamic Home Detection
 KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile")
+# shellcheck source=/dev/null
+source "${INST_DIR:-/dockerstartup/install}/ubuntu/install/common/10_desktop_icon.sh"
 
 log "Pre-configuring Single-Window Mode..."
 # We target both 2.10 and 3.0 paths to ensure the 'floating window' issue 
@@ -46,12 +48,7 @@ if [ -n "$SRC_DESKTOP" ]; then
         sed -i "s@Icon=.*@Icon=$GIMP_ICON@g" /usr/share/applications/gimp.desktop
     fi
     
-    # 3. Clean Desktop Policy
-    log "Removing desktop shortcut to maintain clean workspace..."
-    rm -f "$KASM_HOME/Desktop/GIMP.desktop"
-    rm -f "$KASM_HOME/Desktop/gimp.desktop"
-    
-    # 4. Update system database to register the new icon/path
+    # 3. Update system database to register the new icon/path
     if command -v update-desktop-database > /dev/null; then
         update-desktop-database /usr/share/applications/
     fi
@@ -59,7 +56,12 @@ else
     log "WARNING: Source .desktop file not found in /opt/gimp/app."
 fi
 
+# Drop the legacy capitalised Desktop name, then apply the icon policy.
+rm -f "$KASM_HOME/Desktop/GIMP.desktop"
+# Desktop icon (opt-in via GIMP_DESKTOP_ICON=true; default off)
+desktop_icon gimp /usr/share/applications/gimp.desktop false
+
 # Ensure permissions for the Kasm user (Noble runs the session user with group 0)
 chown -R 1000:0 "$KASM_HOME/.config/GIMP" 2>/dev/null || true
 
-log "GIMP UI configuration complete. Desktop clean, Menu hardened."
+log "GIMP UI configuration complete."

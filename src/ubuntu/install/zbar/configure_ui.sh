@@ -9,6 +9,8 @@ set -euo pipefail
 log() { echo "[zbar-ui] $*"; }
 
 KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile")
+# shellcheck source=/dev/null
+source "${INST_DIR:-/dockerstartup/install}/ubuntu/install/common/10_desktop_icon.sh"
 
 log "Installing the zbar-scan launcher..."
 # zbarcam needs a V4L2 device (/dev/video0), which most Kasm workspaces do not
@@ -67,17 +69,14 @@ Keywords=barcode;qr;qrcode;scan;zbar;
 EOF
 chmod 0644 /usr/share/applications/zbar-scan.desktop
 
-# Drop the old name if a previous build left one behind.
+# Drop the old name if a previous build left it behind.
 rm -f /usr/share/applications/zbarcam.desktop "${KASM_HOME}/Desktop/zbarcam.desktop"
-
-log "Deploying the Desktop shortcut..."
-mkdir -p "${KASM_HOME}/Desktop"
-cp /usr/share/applications/zbar-scan.desktop "${KASM_HOME}/Desktop/zbar-scan.desktop"
-chmod +x "${KASM_HOME}/Desktop/zbar-scan.desktop"
-chown -R 1000:0 "${KASM_HOME}/Desktop" 2>/dev/null || true
 
 if command -v update-desktop-database > /dev/null; then
     update-desktop-database /usr/share/applications/
 fi
+
+# Desktop icon (opt-in via ZBAR_DESKTOP_ICON=true; default off)
+desktop_icon zbar /usr/share/applications/zbar-scan.desktop false
 
 log "ZBar UI configuration complete."

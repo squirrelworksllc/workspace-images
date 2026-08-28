@@ -11,6 +11,8 @@ log() { echo "[SIGNAL-UI] $*"; }
 
 # Kasm 1.18+ Dynamic Home Detection
 KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile")
+# shellcheck source=/dev/null
+source "${INST_DIR:-/dockerstartup/install}/ubuntu/install/common/10_desktop_icon.sh"
 
 DESKTOP_FILE="/usr/share/applications/signal-desktop.desktop"
 SYSTEM_AUTOSTART="/etc/xdg/autostart/signal-desktop.desktop"
@@ -28,10 +30,6 @@ if [ -f "$DESKTOP_FILE" ]; then
     if command -v update-desktop-database > /dev/null; then
         update-desktop-database /usr/share/applications/
     fi
-
-    # Step 3: Clean Desktop Policy
-    log "Step 3: Removing desktop shortcut to maintain clean workspace..."
-    rm -f "$KASM_HOME/Desktop/signal-desktop.desktop"
 
     # Step 4: Nuclear Option - Remove System Autostart
     if [ -f "$SYSTEM_AUTOSTART" ]; then
@@ -64,3 +62,6 @@ EOF
 else
     log "WARNING: signal-desktop.desktop not found at $DESKTOP_FILE."
 fi
+
+# Desktop icon (opt-in via SIGNAL_DESKTOP_ICON=true; default off)
+desktop_icon signal "$DESKTOP_FILE" false

@@ -55,13 +55,7 @@ EOF
 
 chmod +x /usr/bin/microsoft-edge-stable
 
-# 3. Desktop Shortcut
-log "Step 3: Deploying Desktop Shortcut..."
-KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile")
-SRC_DESKTOP="/usr/share/applications/microsoft-edge.desktop"
-if [ -f "$SRC_DESKTOP" ]; then
-    mkdir -p "$KASM_HOME/Desktop"
-    cp "$SRC_DESKTOP" "$KASM_HOME/Desktop/microsoft-edge.desktop"
-    chmod +x "$KASM_HOME/Desktop/microsoft-edge.desktop"
-    chown -R 1000:0 "$KASM_HOME/Desktop" 2>/dev/null || true
-fi
+# 3. Desktop icon (opt-in via EDGE_DESKTOP_ICON=true; default off)
+# shellcheck source=/dev/null
+source "${INST_DIR:-/dockerstartup/install}/ubuntu/install/common/10_desktop_icon.sh"
+desktop_icon edge /usr/share/applications/microsoft-edge.desktop false

@@ -7,6 +7,8 @@ set -euo pipefail
 log() { echo "[torsocks-ui] $*"; }
 
 KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile")
+# shellcheck source=/dev/null
+source "${INST_DIR:-/dockerstartup/install}/ubuntu/install/common/10_desktop_icon.sh"
 
 log "Creating Torsocks Guard UI components..."
 
@@ -21,16 +23,13 @@ Type=Application
 Categories=Network;Security;
 EOF
 
-chmod +x /usr/share/applications/torsocks-status.desktop
-
-# Copy to Desktop for immediate access
-mkdir -p "$KASM_HOME/Desktop"
-cp /usr/share/applications/torsocks-status.desktop "$KASM_HOME/Desktop/"
-chmod +x "$KASM_HOME/Desktop/torsocks-status.desktop"
-chown 1000:0 "$KASM_HOME/Desktop/torsocks-status.desktop" 2>/dev/null || true
+chmod 0644 /usr/share/applications/torsocks-status.desktop
 
 if command -v update-desktop-database > /dev/null; then
     update-desktop-database /usr/share/applications/
 fi
+
+# Desktop icon (opt-in via TORSOCKS_DESKTOP_ICON=true; default off)
+desktop_icon torsocks /usr/share/applications/torsocks-status.desktop false
 
 log "Torsocks UI integration complete."

@@ -9,6 +9,8 @@ log() { echo "[REMMINA-UI] $*"; }
 
 KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile")
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+source "${INST_DIR:-/dockerstartup/install}/ubuntu/install/common/10_desktop_icon.sh"
 
 log "Step 1: Applying global preferences..."
 PREF_DIR="$KASM_HOME/.config/remmina"
@@ -56,6 +58,9 @@ if [ -f "$DESKTOP_FILE" ]; then
     # Ensure it's in 'Network' and 'RemoteAccess' categories
     sed -i 's/Categories=.*/Categories=Network;RemoteAccess;/g' "$DESKTOP_FILE"
 fi
+
+# Desktop icon (opt-in via REMMINA_DESKTOP_ICON=true; default off)
+desktop_icon remmina "$DESKTOP_FILE" false remmina.desktop
 
 # Step 4: Disable Autostart (Remmina loves to linger in the background)
 log "Disabling background autostart..."

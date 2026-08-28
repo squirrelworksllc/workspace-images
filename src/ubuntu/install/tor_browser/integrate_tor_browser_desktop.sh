@@ -11,6 +11,8 @@ log() { echo "[tor-browser-ui] $*"; }
 
 # Standard for Kasm 1.18+: Detect home of the primary user (UID 1000)
 KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile")
+# shellcheck source=/dev/null
+source "${INST_DIR:-/dockerstartup/install}/ubuntu/install/common/10_desktop_icon.sh"
 
 main() {
     local install_dir="${TORBROWSER_INSTALL_DIR:-/opt/tor-browser}"
@@ -30,22 +32,16 @@ Categories=Network;WebBrowser;
 Terminal=false
 StartupNotify=true
 EOF
-    chmod 0755 "$desktop_path"
+    chmod 0644 "$desktop_path"
 
-    log "Placing icon on Desktop at $KASM_HOME"
-    mkdir -p "${KASM_HOME}/Desktop"
-    cp "$desktop_path" "${KASM_HOME}/Desktop/Tor Browser.desktop"
-    
-    # Critical for Noble/XFCE: Allow Launching
-    chmod +x "${KASM_HOME}/Desktop/Tor Browser.desktop"
-    chown -R 1000:0 "${KASM_HOME}/Desktop" 2>/dev/null || true
-
-    log "Refreshing Application Database"
     if command -v update-desktop-database > /dev/null; then
         update-desktop-database /usr/share/applications/
     fi
 
-    log "UI integration complete for $KASM_HOME"
+    # Desktop icon (opt-in via TOR_BROWSER_DESKTOP_ICON; default ON for the browser)
+    desktop_icon tor_browser "$desktop_path" true "Tor Browser.desktop"
+
+    log "UI integration complete"
 }
 
 main "$@"

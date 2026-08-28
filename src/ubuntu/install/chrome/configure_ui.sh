@@ -54,20 +54,9 @@ EOF
 chmod +x /usr/bin/google-chrome-stable
 ln -sf /usr/bin/google-chrome-stable /usr/bin/chrome
 
-# 3. Desktop shortcut - opt-in. Set CHROME_DESKTOP_ICON=true in the image to
-#    place an icon on the Desktop; otherwise Chrome lives in the menu only.
-KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile")
-SRC_DESKTOP="/usr/share/applications/google-chrome.desktop"
-: "${CHROME_DESKTOP_ICON:=false}"
-if [ "${CHROME_DESKTOP_ICON}" = "true" ] && [ -f "$SRC_DESKTOP" ]; then
-    log "Step 3: Deploying the Chrome desktop shortcut..."
-    mkdir -p "$KASM_HOME/Desktop"
-    cp "$SRC_DESKTOP" "$KASM_HOME/Desktop/google-chrome.desktop"
-    chmod +x "$KASM_HOME/Desktop/google-chrome.desktop"
-    chown -R 1000:0 "$KASM_HOME/Desktop" 2>/dev/null || true
-else
-    log "Step 3: Chrome desktop icon disabled (menu entry retained)."
-    rm -f "$KASM_HOME/Desktop/google-chrome.desktop"
-fi
+# 3. Desktop icon (opt-in via CHROME_DESKTOP_ICON=true; default off)
+# shellcheck source=/dev/null
+source "${INST_DIR:-/dockerstartup/install}/ubuntu/install/common/10_desktop_icon.sh"
+desktop_icon chrome /usr/share/applications/google-chrome.desktop false google-chrome.desktop
 
 log "Chrome UI configuration applied."

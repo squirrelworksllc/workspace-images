@@ -8,6 +8,8 @@ set -euo pipefail
 log() { echo "[RECOLL-UI] $*"; }
 
 KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile")
+# shellcheck source=/dev/null
+source "${INST_DIR:-/dockerstartup/install}/ubuntu/install/common/10_desktop_icon.sh"
 
 log "Step 1: Pre-configuring Recoll to skip first-run prompts..."
 RECOLL_CONF_DIR="$KASM_HOME/.recoll"
@@ -21,20 +23,21 @@ skippedNames = .thumbnails .cache .wine .config .local
 idxflushthreshold = 10
 EOF
 
-log "Step 2: Deploying Desktop Shortcut..."
-# Recoll might use 'recoll.desktop' or 'recollgui.desktop'
+log "Step 2: Menu + Desktop integration..."
+# Recoll might ship 'recoll.desktop' or 'recollgui.desktop'
 DESKTOP_SRC="/usr/share/applications/recoll.desktop"
-[ ! -f "$DESKTOP_SRC" ] && DESKTOP_SRC="/usr/share/applications/recollgui.desktop"
+[ -f "$DESKTOP_SRC" ] || DESKTOP_SRC="/usr/share/applications/recollgui.desktop"
 
 if [ -f "$DESKTOP_SRC" ]; then
-    mkdir -p "$KASM_HOME/Desktop"
-    cp "$DESKTOP_SRC" "$KASM_HOME/Desktop/Recoll.desktop"
-    chmod +x "$KASM_HOME/Desktop/Recoll.desktop"
-    chown -R 1000:0 "$KASM_HOME/Desktop" 2>/dev/null || true
-
-    log "Categorizing Start Menu entry..."
-    sed -i 's/Categories=.*/Categories=System;Filesystem;Utility;Search;/g' "$DESKTOP_SRC"
+    # Move the menu entry into the Graphics category.
+    sed -i 's/Categories=.*/Categories=Graphics;Utility;/g' "$DESKTOP_SRC"
+    if command -v update-desktop-database > /dev/null; then
+        update-desktop-database /usr/share/applications/
+    fi
 fi
+
+# Desktop icon (opt-in via RECOLL_DESKTOP_ICON=true; default off)
+desktop_icon recoll "$DESKTOP_SRC" false Recoll.desktop
 
 chown -R 1000:0 "$KASM_HOME/.recoll" 2>/dev/null || true
 

@@ -13,6 +13,8 @@ fi
 
 # Kasm 1.18+ Dynamic Home Detection
 KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile")
+# shellcheck source=/dev/null
+source "${INST_DIR:-/dockerstartup/install}/ubuntu/install/common/10_desktop_icon.sh"
 
 log "Step 2: Desktop & Start Menu shortcut..."
 
@@ -34,14 +36,10 @@ if [ -f "$DESKTOP_FILE" ]; then
   if command -v update-desktop-database > /dev/null; then
     update-desktop-database /usr/share/applications/
   fi
-
-  # 2. Desktop Icon Logic
-  log "Deploying Desktop icon to $KASM_HOME"
-  mkdir -p "$KASM_HOME/Desktop"
-  cp "$DESKTOP_FILE" "$KASM_HOME/Desktop/code.desktop"
-  chmod +x "$KASM_HOME/Desktop/code.desktop"
-  chown 1000:0 "$KASM_HOME/Desktop/code.desktop" 2>/dev/null || true
 fi
+
+# 2. Desktop icon (opt-in via VS_CODE_DESKTOP_ICON=true; default off)
+desktop_icon vs_code "$DESKTOP_FILE" false code.desktop
 
 log "Step 3: Applying 'Silent Analyst' global settings..."
 # Create the settings directory for the Kasm user

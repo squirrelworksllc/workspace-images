@@ -64,14 +64,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ -f "${SCRIPT_DIR}/configure_ui.sh" ]; then
     bash "${SCRIPT_DIR}/configure_ui.sh"
 else
-    log "WARNING: configure_ui.sh not found. Using internal fallback for desktop icon."
-    # Fallback icon placement if standalone script is missing
-    mkdir -p "$HOME/Desktop"
-    if [ -f /usr/share/applications/thunderbird.desktop ]; then
-      cp /usr/share/applications/thunderbird.desktop "$HOME/Desktop/"
-      chmod +x "$HOME/Desktop/thunderbird.desktop"
-      chown 1000:0 "$HOME/Desktop/thunderbird.desktop" 2>/dev/null || true
-    fi
+    log "WARNING: configure_ui.sh not found; skipping UI configuration."
 fi
 
 log "Thunderbird installation and UI setup complete!"
