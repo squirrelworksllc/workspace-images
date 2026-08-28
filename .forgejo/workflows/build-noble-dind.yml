@@ -147,7 +147,9 @@ jobs:
           push: true
           pull: true
           no-cache: true
-          sbom: true
+          # A full image's SPDX SBOM exceeds BuildKit's 40 MiB embedded
+          # attestation cap; vulnerability coverage comes from trivy-scan.yml.
+          sbom: false
           tags: ${{ steps.prep.outputs.tags }}
           build-args: |
             BASE_IMAGE=${{ env.HARBOR_REGISTRY }}/squirrelworksllc/ubuntu-noble-core
