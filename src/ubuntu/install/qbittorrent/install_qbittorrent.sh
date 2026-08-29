@@ -4,12 +4,10 @@
 # Purpose: Installs qBittorrent with "No-Seed" Enforcement for SquirrelWorks
 ###############################################################################
 set -euo pipefail
+LOG_TAG="QBITTORRENT-INSTALL"
 : "${INST_DIR:=/dockerstartup/install}"
-source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 # shellcheck source=/dev/null
-source "${INST_DIR}/ubuntu/install/common/10_desktop_icon.sh"
-
-log() { echo "[QBITTORRENT-INSTALL] $*"; }
+source "${INST_DIR}/ubuntu/install/common/03_scaffold.sh"
 
 main() {
     log "======= Installing qBittorrent (No-Seed Policy) ======="
