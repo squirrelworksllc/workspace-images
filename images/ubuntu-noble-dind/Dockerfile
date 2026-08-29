@@ -34,10 +34,9 @@ ENV HOME=/home/kasm-default-profile \
     SKIP_CHROMIUM=false \
     DEBUG=false
 
-# Desktop-icon toggles (per app). "true" places an icon on the Desktop; the app
+# Desktop-icon toggle. "true" places a Chromium icon on the Desktop; the app
 # stays in the Applications menu either way.
-ENV CHROMIUM_DESKTOP_ICON=false \
-    VS_CODE_DESKTOP_ICON=false
+ENV CHROMIUM_DESKTOP_ICON=false
 
 WORKDIR ${HOME}
 
@@ -63,17 +62,11 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # --- Context Guard ---
 COPY ./src/ubuntu/install/ ./__context_check__/ubuntu_install/
-COPY ./images/ubuntu-noble-dind/README.md /src/README.md
 RUN rm -rf ./__context_check__
 
 # --- Stage Resources ---
 COPY ./src/ubuntu/ ${INST_DIR}/ubuntu/
 RUN find "${INST_DIR}/ubuntu/install" -maxdepth 4 -type f -name '*.sh' -exec chmod +x {} \;
-
-# --- Runtime Validation Tools ---
-RUN mkdir -p /dockerstartup/tools
-COPY ./src/tools/runtime/runtime_validation.sh /dockerstartup/tools/runtime_validation.sh
-RUN chmod 0755 /dockerstartup/tools/runtime_validation.sh
 
 # --- Global Build Orchestration ---
 ARG APT_DEBUG=false
@@ -84,13 +77,14 @@ RUN set -eux; \
     # =========================================================================
     # SQUIRRELWORKS MODULE REGISTRY
     # =========================================================================
+    # DinD is Core + Chromium + Docker/k8s tooling. Nothing else - no desktop
+    # branding module, no extra apps. It inherits the Kasm core XFCE session
+    # untouched.
     SCRIPTS=( \
       "/ubuntu/install/tools/install_tools.sh" \
       "/ubuntu/install/common/00_apt_helper.sh" \
       "/ubuntu/install/dind/install_dind.sh" \
       "/ubuntu/install/chromium/install_chromium.sh" \
-      "/ubuntu/install/vs_code/install_vs_code.sh" \
-      "/ubuntu/install/desktop/install.sh" \
       "/ubuntu/install/common/01_cleanup.sh" \
     ); \
     \
@@ -104,14 +98,7 @@ RUN set -eux; \
         continue; \
       fi; \
       \
-      # Handle branded desktop install
-      if [[ "${SCRIPT}" == *"desktop/install.sh" ]]; then \
-        bash "${INST_DIR}${SCRIPT}" noble; \
-      elif [[ "${SCRIPT}" == *"common/01_cleanup.sh" ]]; then \
-        SKIP_CLEAN=false bash "${INST_DIR}${SCRIPT}"; \
-      else \
-        bash "${INST_DIR}${SCRIPT}"; \
-      fi || { \
+      bash "${INST_DIR}${SCRIPT}" || { \
         rc=$?; \
         echo "FAILED: ${SCRIPT} (rc=$rc)"; \
         [ "${APT_DEBUG}" = "true" ] && tail -n 100 /var/log/apt/term.log || true; \
@@ -126,21 +113,8 @@ RUN set -eux; \
     mkdir -p /home/kasm-user; \
     chown -R 1000:0 /home/kasm-user; \
     \
-    # Prune the ephemeral build-only installers, but KEEP the runtime layer:
-    #   common/**     -> master_startup.sh + shared helpers (run/sourced at boot)
-    #   */startup.sh  -> per-app runtime permission / daemon modules
-    find "${INST_DIR}/ubuntu/install" -type f \
-         ! -name 'startup.sh' ! -path '*/common/*' -delete; \
-    find "${INST_DIR}/ubuntu/install" -type d -empty -delete
-
-# ############################################################################
-# ------------------------- RUNTIME STARTUP HOOK -------------------------- #
-# ############################################################################
-# Kasm executes ${STARTUPDIR}/custom_startup.sh at session start. This is the
-# only entrypoint into the per-app runtime module chain (master_startup.sh ->
-# */startup.sh), e.g. the VS Code profile-permission sync.
-COPY ./src/ubuntu/startup/custom_startup.sh /dockerstartup/custom_startup.sh
-RUN chmod 0755 /dockerstartup/custom_startup.sh
+    # Cleanup only the ephemeral build scripts
+    rm -rf "${INST_DIR}/ubuntu/install"
 
 # ############################################################################
 # -------------------------- SECURITY METADATA LAYER ----------------------- #
