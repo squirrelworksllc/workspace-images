@@ -4,19 +4,10 @@
 # Optimized for SquirrelWorks Kasm 1.18+
 ###############################################################################
 set -euo pipefail
-IFS=$'\n\t'
-
+LOG_TAG="TORSOCKS-INSTALL"
 : "${INST_DIR:=/dockerstartup/install}"
-source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
-
-log() { echo "[torsocks-install] $*"; }
-
-require_root() {
-  if [ "$(id -u)" -ne 0 ]; then
-    echo "[torsocks] ERROR: must be run as root" >&2
-    exit 1
-  fi
-}
+# shellcheck source=/dev/null
+source "${INST_DIR}/ubuntu/install/common/03_scaffold.sh"
 
 install_guard_helper() {
   local path="$1"
@@ -67,8 +58,9 @@ EOF
 }
 
 main() {
+  require_root
   log "======= Installing torsocks Environment ======="
-  
+
   apt_update_if_needed
   apt_install torsocks
   
@@ -95,9 +87,7 @@ main() {
   fi
 
   # Trigger UI Integration
-  if [ -f "${script_dir}/configure_ui.sh" ]; then
-    bash "${script_dir}/configure_ui.sh"
-  fi
+  run_configure_ui
 
   log "torsocks installation complete."
 }

@@ -6,13 +6,10 @@
 # Target: Kasm 1.18+ (Ubuntu Noble / Debian)
 ###############################################################################
 set -euo pipefail
-IFS=$'\n\t'
-
-log() { echo "[tor-browser-install] $*"; }
-
-# Source Kasm apt helpers
+LOG_TAG="TOR-BROWSER-INSTALL"
 : "${INST_DIR:=/dockerstartup/install}"
-source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
+# shellcheck source=/dev/null
+source "${INST_DIR}/ubuntu/install/common/03_scaffold.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

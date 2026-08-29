@@ -19,10 +19,10 @@
 # with a file picker.
 ###############################################################################
 set -euo pipefail
+LOG_TAG="IOCEXTRACT-INSTALL"
 : "${INST_DIR:=/dockerstartup/install}"
-source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
-
-log() { echo "[IOCEXTRACT-INSTALL] $*"; }
+# shellcheck source=/dev/null
+source "${INST_DIR}/ubuntu/install/common/03_scaffold.sh"
 
 VENV="/opt/iocextract/venv"
 
@@ -96,10 +96,7 @@ EOF
     chmod 0755 /usr/local/bin/iocextract
 
     log "Step 5: Triggering UI integration..."
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    if [ -f "${SCRIPT_DIR}/configure_ui.sh" ]; then
-        bash "${SCRIPT_DIR}/configure_ui.sh"
-    fi
+    run_configure_ui
 
     log "iocextract installation complete."
 }
