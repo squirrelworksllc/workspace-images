@@ -71,9 +71,39 @@ main() {
     useradd -U dockremap || true
     echo "dockremap:165536:65536" >> /etc/subuid
     echo "dockremap:165536:65536" >> /etc/subgid
-    
+
     # Ensure the Kasm user is in the docker group
     usermod -aG docker kasm-user || true
+
+    log "Step 6: Deferred dockerd autostart (fires once the XFCE session is up)..."
+    local here
+    here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    install -m 0755 "${here}/autostart_dockerd.sh" /usr/local/bin/dind-autostart-dockerd
+
+    # Session user may start the Kasm dockerd entrypoint as root, nothing else.
+    cat > /etc/sudoers.d/dind-dockerd <<'EOF'
+kasm-user ALL=(root) NOPASSWD: /usr/local/bin/dockerd-entrypoint.sh
+EOF
+    chmod 0440 /etc/sudoers.d/dind-dockerd
+
+    # XFCE runs this after the desktop loads.
+    install -d -m 0755 /etc/xdg/autostart
+    cat > /etc/xdg/autostart/dind-dockerd.desktop <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=DinD Docker Daemon
+Comment=Start the nested Docker daemon after the desktop is ready
+Exec=/usr/local/bin/dind-autostart-dockerd
+Terminal=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+EOF
+    chmod 0644 /etc/xdg/autostart/dind-dockerd.desktop
+
+    # Shared log, writable by the docker group (kasm-user is a member).
+    touch /var/log/dockerd.log
+    chgrp docker /var/log/dockerd.log 2>/dev/null || true
+    chmod 0664 /var/log/dockerd.log
 
     run_configure_ui
 }

@@ -34,9 +34,12 @@ ENV HOME=/home/kasm-default-profile \
     SKIP_CHROMIUM=false \
     DEBUG=false
 
-# Desktop-icon toggle. "true" places a Chromium icon on the Desktop; the app
-# stays in the Applications menu either way.
-ENV CHROMIUM_DESKTOP_ICON=false
+# DOCKERD_AUTOSTART=true  -> an XFCE autostart entry starts the nested Docker
+#   daemon once the desktop is up (after Kasm has finished provisioning the
+#   session). Set to false to leave dockerd stopped and start it by hand.
+# CHROMIUM_DESKTOP_ICON=true -> also drop a Chromium icon on the Desktop.
+ENV DOCKERD_AUTOSTART=true \
+    CHROMIUM_DESKTOP_ICON=false
 
 WORKDIR ${HOME}
 
@@ -69,9 +72,10 @@ COPY ./src/ubuntu/ ${INST_DIR}/ubuntu/
 RUN find "${INST_DIR}/ubuntu/install" -maxdepth 4 -type f -name '*.sh' -exec chmod +x {} \;
 
 # --- Global Build Orchestration ---
-# DinD is Core + Chromium + Docker/k8s tooling - nothing else. No desktop
-# branding module, no extra apps; it inherits the Kasm core XFCE session
-# untouched. SCRIPTS run in order; Chromium is skipped when SKIP_CHROMIUM=true.
+# DinD is Core + Chromium + Docker/k8s tooling - no desktop-branding module and
+# no extra apps. The only runtime addition is the deferred dockerd launcher
+# wired further down. SCRIPTS run in order; Chromium is skipped when
+# SKIP_CHROMIUM=true.
 ARG APT_DEBUG=false
 
 RUN set -eux; \
@@ -102,6 +106,15 @@ RUN set -eux; \
     mkdir -p /home/kasm-user; \
     chown -R 1000:0 /home/kasm-user; \
     rm -rf "${INST_DIR}/ubuntu/install"
+
+# ############################################################################
+# ------------------------- RUNTIME STARTUP HOOK -------------------------- #
+# ############################################################################
+# Non-blocking: backgrounds the deferred dockerd launch and returns. The
+# install step also drops an equivalent XFCE autostart entry; a sentinel keeps
+# them to a single daemon start per session. See dind/autostart_dockerd.sh.
+COPY ./src/ubuntu/install/dind/custom_startup.sh /dockerstartup/custom_startup.sh
+RUN chmod 0755 /dockerstartup/custom_startup.sh
 
 # ############################################################################
 # -------------------------- SECURITY METADATA LAYER ----------------------- #
