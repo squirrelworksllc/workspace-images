@@ -42,6 +42,7 @@ Below is the comprehensive listing of all software, frameworks, and configuratio
     * `pdfcop` – Heuristic analyzer script to parse and detect suspicious/malicious structural anomalies within PDF objects.
     * `pdfdecompress` – Command-line utility to strip compression filters (e.g., FlateDecode) out of a PDF document to expose plain-text data streams for scanning.
 * **[Zbar](https://github.com/mchehab/zbar)** - Open Source barcode reader suite of packages.
+* **[iocextract](https://github.com/InQuest/iocextract)** – InQuest's IOC extractor. Pulls URLs, IPv4/IPv6 addresses, domains, e-mail addresses, file hashes and YARA rules out of a document or stream and automatically re-fangs defanged indicators (`hxxp://`, `1[.]2[.]3[.]4`). Available as the `iocextract` command and a terminal launcher; full usage in the [official documentation](https://inquest.readthedocs.io/projects/iocextract/en/latest/).
 
 ---
 

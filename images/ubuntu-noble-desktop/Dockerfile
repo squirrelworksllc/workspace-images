@@ -45,6 +45,7 @@ ENV FIREFOX_DESKTOP_ICON=true \
     QBITTORRENT_DESKTOP_ICON=false \
     REMMINA_DESKTOP_ICON=false \
     RECOLL_DESKTOP_ICON=false \
+    IOCEXTRACT_DESKTOP_ICON=false \
     TORSOCKS_DESKTOP_ICON=false \
     ZBAR_DESKTOP_ICON=false \
     DISCORD_DESKTOP_ICON=false \
@@ -128,6 +129,7 @@ RUN set -eux; \
       "/ubuntu/install/recoll/install_recoll.sh" \
       "/ubuntu/install/qbittorrent/install_qbittorrent.sh" \
       "/ubuntu/install/origamindee/install_origamindee.sh" \
+      "/ubuntu/install/iocextract/install_iocextract.sh" \
       "/ubuntu/install/zbar/install_zbar.sh" \
       \
       # GROUP 5: Communication (Autostart Suppressed)
