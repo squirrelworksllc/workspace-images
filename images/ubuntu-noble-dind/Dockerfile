@@ -34,6 +34,11 @@ ENV HOME=/home/kasm-default-profile \
     SKIP_CHROMIUM=false \
     DEBUG=false
 
+# Desktop-icon toggles (per app). "true" places an icon on the Desktop; the app
+# stays in the Applications menu either way.
+ENV CHROMIUM_DESKTOP_ICON=false \
+    VS_CODE_DESKTOP_ICON=false
+
 WORKDIR ${HOME}
 
 # ############################################################################
