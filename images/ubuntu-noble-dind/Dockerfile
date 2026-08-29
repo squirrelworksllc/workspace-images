@@ -69,17 +69,13 @@ COPY ./src/ubuntu/ ${INST_DIR}/ubuntu/
 RUN find "${INST_DIR}/ubuntu/install" -maxdepth 4 -type f -name '*.sh' -exec chmod +x {} \;
 
 # --- Global Build Orchestration ---
+# DinD is Core + Chromium + Docker/k8s tooling - nothing else. No desktop
+# branding module, no extra apps; it inherits the Kasm core XFCE session
+# untouched. SCRIPTS run in order; Chromium is skipped when SKIP_CHROMIUM=true.
 ARG APT_DEBUG=false
 
 RUN set -eux; \
     apt-get update; \
-    \
-    # =========================================================================
-    # SQUIRRELWORKS MODULE REGISTRY
-    # =========================================================================
-    # DinD is Core + Chromium + Docker/k8s tooling. Nothing else - no desktop
-    # branding module, no extra apps. It inherits the Kasm core XFCE session
-    # untouched.
     SCRIPTS=( \
       "/ubuntu/install/tools/install_tools.sh" \
       "/ubuntu/install/common/00_apt_helper.sh" \
@@ -87,17 +83,12 @@ RUN set -eux; \
       "/ubuntu/install/chromium/install_chromium.sh" \
       "/ubuntu/install/common/01_cleanup.sh" \
     ); \
-    \
-    # Execution Loop
     for SCRIPT in "${SCRIPTS[@]}"; do \
       echo ">>> Executing Module: ${SCRIPT}"; \
-      \
-      # Handle conditional Chromium install
       if [[ "${SCRIPT}" == *"chromium/install_chromium.sh" && "${SKIP_CHROMIUM}" == "true" ]]; then \
         echo "Skipping Chromium per ENV constraint..."; \
         continue; \
       fi; \
-      \
       bash "${INST_DIR}${SCRIPT}" || { \
         rc=$?; \
         echo "FAILED: ${SCRIPT} (rc=$rc)"; \
@@ -105,15 +96,11 @@ RUN set -eux; \
         exit "$rc"; \
       }; \
     done; \
-    \
-    # --- Final Session Preparation ---
     "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \
     rm -f /etc/X11/xinit/Xclients; \
     chown 1000:0 "${HOME}"; \
     mkdir -p /home/kasm-user; \
     chown -R 1000:0 /home/kasm-user; \
-    \
-    # Cleanup only the ephemeral build scripts
     rm -rf "${INST_DIR}/ubuntu/install"
 
 # ############################################################################
