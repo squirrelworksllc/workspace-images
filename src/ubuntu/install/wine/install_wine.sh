@@ -4,11 +4,10 @@
 # Purpose: Installs WineHQ Staging for Kasm 1.18+ (Noble/Debian)
 ###############################################################################
 set -euo pipefail
-
+LOG_TAG="WINE-INSTALL"
 : "${INST_DIR:=/dockerstartup/install}"
-source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
-
-log() { echo "[WINE-INSTALL] $*"; }
+# shellcheck source=/dev/null
+source "${INST_DIR}/ubuntu/install/common/03_scaffold.sh"
 
 main() {
   log "======= Installing WineHQ Staging ======="
@@ -71,10 +70,7 @@ EOF
   log "Wine dependencies pre-cached."
 
   # 6. Trigger UI & Environment Cleanup
-  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  if [ -f "${SCRIPT_DIR}/configure_ui.sh" ]; then
-    bash "${SCRIPT_DIR}/configure_ui.sh"
-  fi
+  run_configure_ui
 
   log "Cleaning up WineHQ repository files to prevent conflicts with REMnux installer..."
   rm -f /etc/apt/sources.list.d/winehq.sources

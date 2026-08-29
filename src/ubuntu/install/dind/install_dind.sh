@@ -5,10 +5,10 @@
 #          Script is designed to fetch latest "Go" ON PURPOSE.
 ###############################################################################
 set -euo pipefail
+LOG_TAG="DIND-INSTALL"
 : "${INST_DIR:=/dockerstartup/install}"
-source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
-
-log() { echo "[DIND-INSTALL] $*"; }
+# shellcheck source=/dev/null
+source "${INST_DIR}/ubuntu/install/common/03_scaffold.sh"
 
 main() {
     log "======= Installing Docker-In-Docker (DinD) ======="
@@ -75,11 +75,7 @@ main() {
     # Ensure the Kasm user is in the docker group
     usermod -aG docker kasm-user || true
 
-    log "Triggering UI/Config configuration..."
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    if [ -f "${SCRIPT_DIR}/configure_ui.sh" ]; then
-        bash "${SCRIPT_DIR}/configure_ui.sh"
-    fi
+    run_configure_ui
 }
 
 main "$@"
