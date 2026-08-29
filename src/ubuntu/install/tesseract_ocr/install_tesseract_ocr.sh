@@ -1,40 +1,31 @@
 #!/usr/bin/env bash
 ###############################################################################
 # install_tesseract_ocr.sh
-#
-# Purpose: Installs Tesseract OCR and NormCap.
+# Purpose: Installs Tesseract OCR + NormCap.
 ###############################################################################
 set -euo pipefail
+LOG_TAG="TESSERACT-INSTALL"
 : "${INST_DIR:=/dockerstartup/install}"
-source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
+# shellcheck source=/dev/null
+source "${INST_DIR}/ubuntu/install/common/03_scaffold.sh"
 
-log() { echo "[TESSERACT-INSTALL] $*"; }
+main() {
+    log "======= Installing Tesseract OCR Environment ======="
 
-log "======= Installing Tesseract OCR Environment ======="
+    log "Step 1: System packages..."
+    apt_update_if_needed
+    apt_install \
+        tesseract-ocr tesseract-ocr-eng libtesseract-dev libleptonica-dev \
+        python3-venv build-essential python3-opencv wl-clipboard gimagereader
 
-log "Step 1: Installing system packages..."
-apt_update_if_needed
+    log "Step 2: NormCap into /opt/venv..."
+    python3 -m venv /opt/venv
+    /opt/venv/bin/pip install --no-cache-dir --upgrade pip
+    /opt/venv/bin/pip install --no-cache-dir normcap
+    ln -sf /opt/venv/bin/normcap /usr/local/bin/normcap
 
-apt_install \
-  tesseract-ocr \
-  tesseract-ocr-eng \
-  libtesseract-dev \
-  libleptonica-dev \
-  python3-venv \
-  build-essential \
-  python3-opencv \
-  wl-clipboard \
-  gimagereader
+    run_configure_ui
+    log "Tesseract OCR Environment installation complete!"
+}
 
-log "Step 2: Installing normcap into /opt/venv..."
-python3 -m venv /opt/venv
-/opt/venv/bin/pip install --no-cache-dir --upgrade pip
-/opt/venv/bin/pip install --no-cache-dir normcap
-ln -sf /opt/venv/bin/normcap /usr/local/bin/normcap
-
-log "Step 3: Triggering UI configuration..."
-# Dynamically find the script directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-bash "${SCRIPT_DIR}/configure_ui.sh"
-
-log "Tesseract OCR Environment installation complete!"
+main "$@"

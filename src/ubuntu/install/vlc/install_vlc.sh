@@ -4,21 +4,19 @@
 # Purpose: Installs VLC and triggers UI integration.
 ###############################################################################
 set -euo pipefail
+LOG_TAG="VLC-INSTALL"
 : "${INST_DIR:=/dockerstartup/install}"
-source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
+# shellcheck source=/dev/null
+source "${INST_DIR}/ubuntu/install/common/03_scaffold.sh"
 
-log() { echo "[VLC-INSTALL] $*"; }
+main() {
+    log "======= Installing VLC Media Player ======="
 
-log "======= Installing VLC Media Player ======="
+    apt_update_if_needed
+    apt_install vlc
 
-log "Step 1: Installing VLC via apt..."
-apt_update_if_needed
-apt_install vlc
+    run_configure_ui
+    log "VLC installation complete!"
+}
 
-log "Step 2: Triggering UI and environment configuration..."
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -f "${SCRIPT_DIR}/configure_ui.sh" ]; then
-    bash "${SCRIPT_DIR}/configure_ui.sh"
-fi
-
-log "VLC installation complete!"
+main "$@"
