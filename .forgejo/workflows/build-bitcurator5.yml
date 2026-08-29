@@ -43,13 +43,13 @@ permissions:
 
 env:
   HARBOR_REGISTRY: forge.konderla.org
-  IMAGE_KEY: bitcurator5-kasm
+  IMAGE_KEY: bitcurator5
   DOCKERFILE_PATH: images/bitcurator5/Dockerfile
 
 jobs:
   build-isolated-bitcurator5:
     name: Build Workspace
-    runs-on: [kasm-builder, repo-bitcurator5-kasm, resources-large]
+    runs-on: [kasm-builder, repo-bitcurator5, resources-large]
     if: |
       github.event_name == 'workflow_dispatch' || 
       (github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')) || 
@@ -174,7 +174,7 @@ jobs:
     with:
       image_path: "${{ needs.build-isolated-bitcurator5.outputs.repo_path }}@${{ needs.build-isolated-bitcurator5.outputs.digest }}"
       image_key: "bitcurator5"
-      runner: '["kasm-builder", "repo-bitcurator5-kasm", "resources-large"]'
+      runner: '["kasm-builder", "repo-bitcurator5", "resources-large"]'
     secrets:
       HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
       HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
