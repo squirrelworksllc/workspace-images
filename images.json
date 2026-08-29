@@ -57,7 +57,7 @@
       "enabled": false,
       "dockerfile": "images/bitcurator5/Dockerfile",
       "repo": "squirrelworksllc/bitcurator5",
-      "repo_forge": "bitcurator-kasm/bitcurator5",
+      "repo_forge": "bitcurator/bitcurator5",
       "prodTags": ["1.19.0", "1.18.0", "1.18.1", "latest"],
       "devTags": ["develop"],
       "devTarget": "develop",
