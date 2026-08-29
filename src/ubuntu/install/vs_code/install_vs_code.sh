@@ -1,41 +1,30 @@
 #!/usr/bin/env bash
 ###############################################################################
 # install_vs_code.sh
-#
-# Purpose: Installs vs_code.
-#
-# Note: Common Pre-Requisite apt packages are called via install_tools.sh
+# Purpose: Installs the Visual Studio Code .deb from the official channel.
 ###############################################################################
 set -euo pipefail
+LOG_TAG="VSCODE-INSTALL"
 : "${INST_DIR:=/dockerstartup/install}"
-source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
+# shellcheck source=/dev/null
+source "${INST_DIR}/ubuntu/install/common/03_scaffold.sh"
 
-log "======= Installing VS Code ======="
-log "Step 1: Download and install..."
+main() {
+    log "======= Installing VS Code ======="
 
-# VS Code uses "x64" naming; map dpkg arch -> code arch token
-ARCH="$(dpkg --print-architecture)"
-case "${ARCH}" in
-  amd64) CODE_ARCH="x64" ;;
-  arm64) CODE_ARCH="arm64" ;;
-  *)
-    log "Unsupported arch for VS Code: ${ARCH}" >&2
-    exit 1
-    ;;
-esac
+    # VS Code uses "x64" naming; map the dpkg arch to its download token.
+    local code_arch
+    case "$(dpkg --print-architecture)" in
+        amd64) code_arch="x64" ;;
+        arm64) code_arch="arm64" ;;
+        *) log "ERROR: unsupported arch $(dpkg --print-architecture)" >&2; exit 1 ;;
+    esac
 
-apt_update_if_needed
+    apt_update_if_needed
+    install_deb "https://update.code.visualstudio.com/latest/linux-deb-${code_arch}/stable"
 
-TMP_DEB="/tmp/vscode.deb"
-URL="https://update.code.visualstudio.com/latest/linux-deb-${CODE_ARCH}/stable"
+    run_configure_ui
+    log "VS Code installed!"
+}
 
-# Use curl with -f so HTTP errors fail the build, and show them.
-curl -fL --retry 5 --retry-delay 2 -o "${TMP_DEB}" "${URL}"
-
-# Install the deb; apt will pull dependencies.
-apt-get install -y "${TMP_DEB}"
-rm -f "${TMP_DEB}"
-
-bash "${INST_DIR}/ubuntu/install/vs_code/configure_ui.sh"
-
-log "VS Code installed!"
+main "$@"

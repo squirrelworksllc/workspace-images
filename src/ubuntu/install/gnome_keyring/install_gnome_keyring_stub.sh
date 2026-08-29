@@ -4,10 +4,10 @@
 # Purpose: Satisfies REMnux SaltStack dependencies to prevent build failures.
 ###############################################################################
 set -euo pipefail
+LOG_TAG="KEYRING-STUB"
 : "${INST_DIR:=/dockerstartup/install}"
-source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
-
-log() { echo "[KEYRING-STUB] $*"; }
+# shellcheck source=/dev/null
+source "${INST_DIR}/ubuntu/install/common/03_scaffold.sh"
 
 main() {
     log "======= Pre-conditioning GNOME Keyring for REMnux ======="
