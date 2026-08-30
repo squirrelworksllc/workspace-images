@@ -19,16 +19,16 @@ The image is deliberately minimal: **it is `ubuntu-noble-core` plus Chromium plu
 provisioned the container, generated its nginx proxy config and handed the live session to
 the user, so the daemon's `docker0` bridge / iptables setup can't race Kasm's provisioning.
 
-- Triggered from both `/dockerstartup/custom_startup.sh` (non-blocking; backs the launch
-  into the background and returns) and an `/etc/xdg/autostart` entry. A sentinel
-  (`/tmp/.dind-autostart-dockerd.done`) keeps it to one start per session.
-- The launcher (`/usr/local/bin/dind-autostart-dockerd`) waits for the desktop, checks the
-  container is privileged (bails quietly if not), then starts `dockerd-entrypoint.sh` via
-  `sudo` and waits for `/var/run/docker.sock`. Log: `/var/log/dockerd.log`.
+- Triggered purely from an `/etc/xdg/autostart` entry that runs when the XFCE session
+  starts. **Nothing Kasm owns is touched** — no `/dockerstartup/*`, no session scripts. A
+  sentinel (`/tmp/.dind-autostart-dockerd.done`) keeps it to one start per session.
+- The launcher (`/usr/local/bin/dind-autostart-dockerd`) waits for the desktop, then starts
+  `dockerd-entrypoint.sh` via `sudo` (one whitelisted command in `/etc/sudoers.d/dind-dockerd`)
+  and waits for `/var/run/docker.sock`. Log: `/var/log/dockerd.log`.
 - `kasm-user` is in the `docker` group, so `docker` / `docker compose` work without `sudo`
   once the socket is up.
-- **Toggle:** build with `--build-arg`-style `ENV DOCKERD_AUTOSTART=false` (or set it on the
-  Kasm Workspace) to leave the daemon stopped and start it by hand.
+- **Toggle:** set `DOCKERD_AUTOSTART=false` (Dockerfile `ENV` or the Kasm Workspace) to
+  leave the daemon stopped and start it by hand.
 
 ### 🌐 Web Browser
 * **[Chromium](https://www.chromium.org/Home)** – installed by default with a `--no-sandbox` wrapper for use inside the container. Can be skipped at build time with `SKIP_CHROMIUM=true`. (Google Chrome is **not** installed here — `INSTALL_CHROME=false`.)
@@ -59,3 +59,9 @@ images/ubuntu-noble-dind/
 
 Build targets (shared across all images): `lint` → `build` → `develop` / `production`.
 The build context is always the **repo root**.
+
+The `build` stage deliberately mirrors `ubuntu-noble-core`'s: same final session prep,
+and it does **not** overwrite `/dockerstartup/custom_startup.sh` or remove
+`/etc/X11/xinit/Xclients`. Everything DinD adds on top is additive and lives outside
+Kasm-owned paths (`/usr/local/bin`, `/etc/apt`, `/etc/sudoers.d`, `/etc/xdg/autostart`,
+`/etc/subuid`, `/etc/subgid`).

@@ -101,20 +101,15 @@ RUN set -eux; \
       }; \
     done; \
     "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \
-    rm -f /etc/X11/xinit/Xclients; \
     chown 1000:0 "${HOME}"; \
     mkdir -p /home/kasm-user; \
     chown -R 1000:0 /home/kasm-user; \
     rm -rf "${INST_DIR}/ubuntu/install"
 
-# ############################################################################
-# ------------------------- RUNTIME STARTUP HOOK -------------------------- #
-# ############################################################################
-# Non-blocking: backgrounds the deferred dockerd launch and returns. The
-# install step also drops an equivalent XFCE autostart entry; a sentinel keeps
-# them to a single daemon start per session. See dind/autostart_dockerd.sh.
-COPY ./src/ubuntu/install/dind/custom_startup.sh /dockerstartup/custom_startup.sh
-RUN chmod 0755 /dockerstartup/custom_startup.sh
+# NOTE: this build stage deliberately mirrors ubuntu-noble-core's - same final
+# prep, no touching of /dockerstartup/* or /etc/X11/*. dockerd is started from
+# an /etc/xdg/autostart entry (dind/install_dind.sh), never Kasm's session
+# scripts.
 
 # ############################################################################
 # -------------------------- SECURITY METADATA LAYER ----------------------- #

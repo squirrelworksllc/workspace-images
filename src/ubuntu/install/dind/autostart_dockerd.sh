@@ -2,9 +2,10 @@
 ###############################################################################
 # autostart_dockerd.sh
 #
-# Installed to /usr/local/bin/dind-autostart-dockerd and launched from BOTH
-# /dockerstartup/custom_startup.sh and /etc/xdg/autostart/dind-dockerd.desktop.
-# A sentinel keeps it to one daemon start per session.
+# Installed to /usr/local/bin/dind-autostart-dockerd and launched from the XFCE
+# session via /etc/xdg/autostart/dind-dockerd.desktop - i.e. once the desktop
+# is up. It touches nothing that Kasm owns (no /dockerstartup, no session
+# scripts).
 #
 # By the time this runs Kasm has already created the container, generated its
 # nginx proxy config and handed the live session to the user - so starting
@@ -14,7 +15,8 @@
 #
 # Runs as the session user (uid 1000); dockerd is started through `sudo`
 # (see /etc/sudoers.d/dind-dockerd). The Kasm dockerd-entrypoint.sh execs
-# dockerd in the foreground, so it is backgrounded here.
+# dockerd in the foreground, so it is backgrounded here. A sentinel keeps it to
+# one start per session.
 #
 # Toggle:  DOCKERD_AUTOSTART=false  leaves the daemon stopped.
 ###############################################################################
@@ -26,8 +28,7 @@ ENTRYPOINT="/usr/local/bin/dockerd-entrypoint.sh"
 
 tag() { echo "[dind-autostart] $(date -Is) $*" >>"$LOG" 2>/dev/null || true; }
 
-# One start per session (custom_startup.sh and the XFCE autostart entry both
-# call this script).
+# One start per session.
 if ! ( set -o noclobber; : >"$SENTINEL" ) 2>/dev/null; then
     exit 0
 fi
@@ -47,9 +48,8 @@ if docker info >/dev/null 2>&1; then
     exit 0
 fi
 
-# Let the desktop finish coming up so the user is already 'in' the session.
-# (custom_startup.sh can fire before the session; the autostart entry fires
-# from within it, so xfce4-session already exists in that path.)
+# Belt-and-suspenders: the autostart entry fires from xfce4-session, so the
+# desktop already exists here; give it a moment to finish painting.
 for _ in $(seq 1 20); do
     pgrep -x xfce4-session >/dev/null 2>&1 && break
     pgrep -x xfwm4         >/dev/null 2>&1 && break
