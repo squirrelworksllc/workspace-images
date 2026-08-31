@@ -25,9 +25,12 @@ if [ -f "${SCRIPT_DIR}/configure_ui.sh" ]; then
 fi
 
 # 3. Generate Local HTML Documentation & Package Manifests
-# Make sure generate_desktop_docs.sh is saved in this same directory!
-if [ -f "${SCRIPT_DIR}/generate_desktop_docs.sh" ]; then
+# Skipped when GENERATE_DESKTOP_DOCS=false (e.g. the DinD image wants the
+# branding/panel fixes but no app catalog).
+if [ "${GENERATE_DESKTOP_DOCS:-true}" = "true" ] && [ -f "${SCRIPT_DIR}/generate_desktop_docs.sh" ]; then
     bash "${SCRIPT_DIR}/generate_desktop_docs.sh"
+else
+    log "Skipping documentation generation (GENERATE_DESKTOP_DOCS=${GENERATE_DESKTOP_DOCS:-true})."
 fi
 
 log "Desktop environment branding complete."

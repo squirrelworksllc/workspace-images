@@ -2,7 +2,7 @@
 
 This directory contains the workspace configuration and documentation for the **Ubuntu Noble "Docker in Docker" (DinD)** image. It inherits from our foundational `squirrelworksllc/ubuntu-noble-core` base image (not the upstream Kasm variant), keeping the base layer standardized across the registry.
 
-The image is deliberately minimal: **it is `ubuntu-noble-core` plus Chromium plus the Docker / Kubernetes tooling — nothing else.** No desktop-branding module, no extra apps, no generated documentation. It inherits the Kasm core XFCE session untouched.
+The image is deliberately minimal: **`ubuntu-noble-core` plus Chromium plus the Docker / Kubernetes tooling** — no extra apps. It runs the desktop-branding step for the wallpaper and XFCE panel/menu fixes only (`GENERATE_DESKTOP_DOCS=false` skips the app-catalog documentation).
 
 ## 🛠️ Complete Technical Tool Manifest
 
@@ -58,8 +58,10 @@ images/ubuntu-noble-dind/
 Build targets (shared across all images): `lint` → `build` → `develop` / `production`.
 The build context is always the **repo root**.
 
-The `build` stage deliberately mirrors `ubuntu-noble-core`'s: same final session prep,
-and it does **not** overwrite `/dockerstartup/custom_startup.sh` or remove
-`/etc/X11/xinit/Xclients`. Everything DinD adds on top is additive and lives outside
-Kasm-owned paths (`/usr/local/bin`, `/etc/apt`, `/etc/sudoers.d`, `/usr/share/applications`,
-`/etc/subuid`, `/etc/subgid`).
+The `build` stage keeps `ubuntu-noble-core`'s final session prep and — unlike the version
+that broke Kasm provisioning — does **not** overwrite `/dockerstartup/custom_startup.sh` or
+remove `/etc/X11/xinit/Xclients`. `desktop/install.sh` runs only for the wallpaper and XFCE
+panel/menu tidy-up (writes under the user profile, `/usr/share/desktop-directories`,
+`/etc/xdg/menus/*-merged`). Everything else DinD adds lives in additive, non-Kasm paths
+(`/usr/local/bin`, `/etc/apt`, `/etc/sudoers.d`, `/usr/share/applications`, `/etc/subuid`,
+`/etc/subgid`).

@@ -32,6 +32,7 @@ ENV HOME=/home/kasm-default-profile \
     INST_DIR=/dockerstartup/install \
     INSTALL_CHROME=false \
     SKIP_CHROMIUM=false \
+    GENERATE_DESKTOP_DOCS=false \
     DEBUG=false
 
 # Desktop-icon toggles. The nested Docker daemon is NOT auto-started; the user
@@ -72,10 +73,10 @@ COPY ./src/ubuntu/ ${INST_DIR}/ubuntu/
 RUN find "${INST_DIR}/ubuntu/install" -maxdepth 4 -type f -name '*.sh' -exec chmod +x {} \;
 
 # --- Global Build Orchestration ---
-# DinD is Core + Chromium + Docker/k8s tooling - no desktop-branding module and
-# no extra apps. dind/install_dind.sh drops the on-demand "Docker in Docker"
-# launcher (menu + Desktop). SCRIPTS run in order; Chromium is skipped when
-# SKIP_CHROMIUM=true.
+# DinD is Core + Chromium + Docker/k8s tooling + the on-demand "Docker in
+# Docker" launcher (dind/install_dind.sh). desktop/install.sh runs for the
+# wallpaper + XFCE panel/menu fixes only - GENERATE_DESKTOP_DOCS=false skips the
+# app catalog. SCRIPTS run in order; Chromium is skipped when SKIP_CHROMIUM=true.
 ARG APT_DEBUG=false
 
 RUN set -eux; \
@@ -85,12 +86,17 @@ RUN set -eux; \
       "/ubuntu/install/common/00_apt_helper.sh" \
       "/ubuntu/install/dind/install_dind.sh" \
       "/ubuntu/install/chromium/install_chromium.sh" \
+      "/ubuntu/install/desktop/install.sh" \
       "/ubuntu/install/common/01_cleanup.sh" \
     ); \
     for SCRIPT in "${SCRIPTS[@]}"; do \
       echo ">>> Executing Module: ${SCRIPT}"; \
       if [[ "${SCRIPT}" == *"chromium/install_chromium.sh" && "${SKIP_CHROMIUM}" == "true" ]]; then \
         echo "Skipping Chromium per ENV constraint..."; \
+        continue; \
+      fi; \
+      if [[ "${SCRIPT}" == *"desktop/install.sh" ]]; then \
+        bash "${INST_DIR}${SCRIPT}" noble || { rc=$?; echo "FAILED: ${SCRIPT} (rc=$rc)"; exit "$rc"; }; \
         continue; \
       fi; \
       bash "${INST_DIR}${SCRIPT}" || { \
@@ -106,9 +112,11 @@ RUN set -eux; \
     chown -R 1000:0 /home/kasm-user; \
     rm -rf "${INST_DIR}/ubuntu/install"
 
-# NOTE: this build stage deliberately mirrors ubuntu-noble-core's - same final
-# prep, no touching of /dockerstartup/* or /etc/X11/*. The nested Docker daemon
-# is never auto-started; the user launches it from the "Docker in Docker" icon.
+# NOTE: like ubuntu-noble-core, this stage does NOT overwrite
+# /dockerstartup/custom_startup.sh or remove /etc/X11/xinit/Xclients - those
+# were the DinD-only changes that broke Kasm session provisioning. The nested
+# Docker daemon is never auto-started; the user launches it from the "Docker in
+# Docker" icon.
 
 # ############################################################################
 # -------------------------- SECURITY METADATA LAYER ----------------------- #
