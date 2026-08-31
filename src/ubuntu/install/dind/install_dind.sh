@@ -75,10 +75,10 @@ main() {
     # Ensure the Kasm user is in the docker group
     usermod -aG docker kasm-user || true
 
-    log "Step 6: Deferred dockerd autostart (fires once the XFCE session is up)..."
+    log "Step 6: On-demand Docker daemon launcher (no session autostart)..."
     local here
     here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    install -m 0755 "${here}/autostart_dockerd.sh" /usr/local/bin/dind-autostart-dockerd
+    install -m 0755 "${here}/start_dockerd.sh" /usr/local/bin/dind-start-docker
 
     # Session user may start the Kasm dockerd entrypoint as root, nothing else.
     cat > /etc/sudoers.d/dind-dockerd <<'EOF'
@@ -86,19 +86,21 @@ kasm-user ALL=(root) NOPASSWD: /usr/local/bin/dockerd-entrypoint.sh
 EOF
     chmod 0440 /etc/sudoers.d/dind-dockerd
 
-    # XFCE runs this after the desktop loads.
-    install -d -m 0755 /etc/xdg/autostart
-    cat > /etc/xdg/autostart/dind-dockerd.desktop <<'EOF'
+    # "Docker in Docker" launcher - Applications menu + (via configure_ui.sh)
+    # the Desktop. Runs in a held-open terminal so the user sees the output.
+    install -d -m 0755 /usr/share/applications
+    cat > /usr/share/applications/dind-docker.desktop <<'EOF'
 [Desktop Entry]
 Type=Application
-Name=DinD Docker Daemon
-Comment=Start the nested Docker daemon after the desktop is ready
-Exec=/usr/local/bin/dind-autostart-dockerd
+Name=Docker in Docker
+Comment=Start the nested Docker daemon in this session
+Exec=xfce4-terminal --title="Docker in Docker" --hold --command="/usr/local/bin/dind-start-docker"
+Icon=utilities-terminal
 Terminal=false
-NoDisplay=true
-X-GNOME-Autostart-enabled=true
+Categories=System;Development;
+Keywords=docker;dind;daemon;
 EOF
-    chmod 0644 /etc/xdg/autostart/dind-dockerd.desktop
+    chmod 0644 /usr/share/applications/dind-docker.desktop
 
     # Shared log, writable by the docker group (kasm-user is a member).
     touch /var/log/dockerd.log

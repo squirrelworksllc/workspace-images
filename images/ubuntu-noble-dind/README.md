@@ -13,37 +13,35 @@ The image is deliberately minimal: **it is `ubuntu-noble-core` plus Chromium plu
 * **[k3d](https://k3d.io/) + [kubectl](https://kubernetes.io/docs/reference/kubectl/)** – lightweight Kubernetes-in-Docker tooling for local cluster work.
 * **DinD helpers** – Moby's `dind` script plus the Kasm `dockerd-entrypoint.sh`, installed to `/usr/local/bin`; SubUID/SubGID configured for rootless / nested operation. Requires the container to run **privileged**.
 
-### 🐋 Docker daemon auto-start
+### 🐳 Starting the Docker daemon
 
-`dockerd` is started **after the XFCE session comes up** — by which point Kasm has already
-provisioned the container, generated its nginx proxy config and handed the live session to
-the user, so the daemon's `docker0` bridge / iptables setup can't race Kasm's provisioning.
+The nested `dockerd` is **not** started automatically — nothing runs at session login. Start
+it when you need it from the **Docker in Docker** launcher (on the Desktop and under
+Applications → System). It opens a held-open terminal, starts `dockerd-entrypoint.sh` via
+`sudo`, waits for `/var/run/docker.sock`, and prints `docker version`.
 
-- Triggered purely from an `/etc/xdg/autostart` entry that runs when the XFCE session
-  starts. **Nothing Kasm owns is touched** — no `/dockerstartup/*`, no session scripts. A
-  sentinel (`/tmp/.dind-autostart-dockerd.done`) keeps it to one start per session.
-- The launcher (`/usr/local/bin/dind-autostart-dockerd`) waits for the desktop, then starts
-  `dockerd-entrypoint.sh` via `sudo` (one whitelisted command in `/etc/sudoers.d/dind-dockerd`)
-  and waits for `/var/run/docker.sock`. Log: `/var/log/dockerd.log`.
+- Launcher script: `/usr/local/bin/dind-start-docker`. Log: `/var/log/dockerd.log`.
+- `sudo` is scoped to exactly one command (`/etc/sudoers.d/dind-dockerd`).
 - `kasm-user` is in the `docker` group, so `docker` / `docker compose` work without `sudo`
   once the socket is up.
-- **Toggle:** set `DOCKERD_AUTOSTART=false` (Dockerfile `ENV` or the Kasm Workspace) to
-  leave the daemon stopped and start it by hand.
+- Requires the container to run **privileged** (the Kasm Workspace setting). If it isn't,
+  the launcher reports the failure and leaves the desktop untouched.
+- `DIND_DESKTOP_ICON=false` keeps the launcher in the menu only (no Desktop icon).
 
 ### 🌐 Web Browser
 * **[Chromium](https://www.chromium.org/Home)** – installed by default with a `--no-sandbox` wrapper for use inside the container. Can be skipped at build time with `SKIP_CHROMIUM=true`. (Google Chrome is **not** installed here — `INSTALL_CHROME=false`.)
 
 ---
 
-## 🖼️ Desktop Icon
+## 🖼️ Desktop Icons
 
-Chromium always appears in the XFCE **Applications menu**. A **Desktop** shortcut is opt-in:
+| Icon | Variable | Default |
+| --- | --- | --- |
+| **Docker in Docker** (starts the daemon) | `DIND_DESKTOP_ICON` | `true` |
+| **Chromium** | `CHROMIUM_DESKTOP_ICON` | `false` |
 
-| Variable | Default |
-| --- | --- |
-| `CHROMIUM_DESKTOP_ICON` | `false` |
-
-Set it to `true` (via `--build-arg` or the `ENV` block) to add the shortcut.
+Both apps are always in the Applications menu regardless; the toggle only controls the
+Desktop shortcut. Override via `--build-arg` or the Dockerfile `ENV` block.
 
 ---
 
@@ -63,5 +61,5 @@ The build context is always the **repo root**.
 The `build` stage deliberately mirrors `ubuntu-noble-core`'s: same final session prep,
 and it does **not** overwrite `/dockerstartup/custom_startup.sh` or remove
 `/etc/X11/xinit/Xclients`. Everything DinD adds on top is additive and lives outside
-Kasm-owned paths (`/usr/local/bin`, `/etc/apt`, `/etc/sudoers.d`, `/etc/xdg/autostart`,
+Kasm-owned paths (`/usr/local/bin`, `/etc/apt`, `/etc/sudoers.d`, `/usr/share/applications`,
 `/etc/subuid`, `/etc/subgid`).

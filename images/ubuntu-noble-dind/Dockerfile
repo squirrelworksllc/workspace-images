@@ -34,11 +34,11 @@ ENV HOME=/home/kasm-default-profile \
     SKIP_CHROMIUM=false \
     DEBUG=false
 
-# DOCKERD_AUTOSTART=true  -> an XFCE autostart entry starts the nested Docker
-#   daemon once the desktop is up (after Kasm has finished provisioning the
-#   session). Set to false to leave dockerd stopped and start it by hand.
-# CHROMIUM_DESKTOP_ICON=true -> also drop a Chromium icon on the Desktop.
-ENV DOCKERD_AUTOSTART=true \
+# Desktop-icon toggles. The nested Docker daemon is NOT auto-started; the user
+# launches it from the "Docker in Docker" icon (Desktop + Applications menu).
+#   DIND_DESKTOP_ICON=false     -> keep it in the menu only, no Desktop icon
+#   CHROMIUM_DESKTOP_ICON=true  -> also drop a Chromium icon on the Desktop
+ENV DIND_DESKTOP_ICON=true \
     CHROMIUM_DESKTOP_ICON=false
 
 WORKDIR ${HOME}
@@ -73,8 +73,8 @@ RUN find "${INST_DIR}/ubuntu/install" -maxdepth 4 -type f -name '*.sh' -exec chm
 
 # --- Global Build Orchestration ---
 # DinD is Core + Chromium + Docker/k8s tooling - no desktop-branding module and
-# no extra apps. The only runtime addition is the deferred dockerd launcher
-# wired further down. SCRIPTS run in order; Chromium is skipped when
+# no extra apps. dind/install_dind.sh drops the on-demand "Docker in Docker"
+# launcher (menu + Desktop). SCRIPTS run in order; Chromium is skipped when
 # SKIP_CHROMIUM=true.
 ARG APT_DEBUG=false
 
@@ -107,9 +107,8 @@ RUN set -eux; \
     rm -rf "${INST_DIR}/ubuntu/install"
 
 # NOTE: this build stage deliberately mirrors ubuntu-noble-core's - same final
-# prep, no touching of /dockerstartup/* or /etc/X11/*. dockerd is started from
-# an /etc/xdg/autostart entry (dind/install_dind.sh), never Kasm's session
-# scripts.
+# prep, no touching of /dockerstartup/* or /etc/X11/*. The nested Docker daemon
+# is never auto-started; the user launches it from the "Docker in Docker" icon.
 
 # ############################################################################
 # -------------------------- SECURITY METADATA LAYER ----------------------- #
