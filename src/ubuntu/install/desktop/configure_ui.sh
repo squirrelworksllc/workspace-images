@@ -64,10 +64,18 @@ if [ -f "$PANEL_CONF" ]; then
     sed -i '/value="pager"/d' "$PANEL_CONF"
 fi
 
-# Locate the Whisker Menu config and swap the broken 'X' for the standard Ubuntu Logo
+# Brand the Whisker Menu button so it is obviously NOT a stock Ubuntu spin.
+# Use the SquirrelWorks image; fall back to the Ubuntu logo if it is missing.
+MENU_ICON_SRC="${INST_DIR:-/dockerstartup/install}/ubuntu/resources/images/noble_numbat_bg.png"
+MENU_ICON="distributor-logo-ubuntu"
+if [ -f "$MENU_ICON_SRC" ]; then
+    install -D -m 0644 "$MENU_ICON_SRC" /usr/share/pixmaps/squirrelworks-menu.png
+    MENU_ICON="/usr/share/pixmaps/squirrelworks-menu.png"
+fi
+
 WHISKER_CONF=$(find "$KASM_HOME/.config/xfce4/panel" -name "whiskermenu-*.rc" 2>/dev/null | head -n 1 || true)
 if [ -n "$WHISKER_CONF" ] && [ -f "$WHISKER_CONF" ]; then
-    sed -i 's/^button-icon=.*/button-icon=distributor-logo-ubuntu/g' "$WHISKER_CONF"
+    sed -i "s|^button-icon=.*|button-icon=${MENU_ICON}|g" "$WHISKER_CONF"
 fi
 
 chown -R 1000:0 "$KASM_HOME/.config/xfce4" 2>/dev/null || true
