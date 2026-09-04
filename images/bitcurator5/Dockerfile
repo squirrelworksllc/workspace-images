@@ -62,55 +62,56 @@ COPY ./src/tools/runtime/runtime_validation.sh /dockerstartup/tools/runtime_vali
 RUN chmod 0755 /dockerstartup/tools/runtime_validation.sh
 
 # --- Global Build Orchestration ---
+# SquirrelWorks module registry, run in order: tools/apt-helper -> desktop
+# branding (bitcurator5 theme) -> the BitCurator 5 SaltStack installer. Then a
+# forced cleanup pass (shared SKIP_CLEAN=true only defers it in the Core base
+# layer), the kasm-user bashrc merge, and a prune that keeps common/** +
+# */startup.sh (the runtime module layer) so per-app runtime hooks survive.
 ARG APT_DEBUG=false
 
 RUN set -eux; \
+    GREEN=$(printf '\033[0;32m'); RED=$(printf '\033[0;31m'); NC=$(printf '\033[0m'); \
     apt-get update; \
-    \
-    # =========================================================================
-    # SQUIRRELWORKS MODULE REGISTRY
-    # =========================================================================
     SCRIPTS=( \
       "/ubuntu/install/tools/install_tools.sh" \
       "/ubuntu/install/common/00_apt_helper.sh" \
       "/ubuntu/install/desktop/install.sh" \
       "/ubuntu/install/bitcurator5/install_bitcurator5.sh" \
     ); \
-    \
-    # Execution Loop
     for SCRIPT in "${SCRIPTS[@]}"; do \
       echo ">>> Executing Module: ${SCRIPT}"; \
-      if [[ "${SCRIPT}" == *"desktop/install.sh" ]]; then \
-        bash "${INST_DIR}${SCRIPT}" bitcurator5; \
+      ARGS=(); \
+      [[ "${SCRIPT}" == *"desktop/install.sh" ]] && ARGS=("bitcurator5"); \
+      if bash "${INST_DIR}${SCRIPT}" "${ARGS[@]}"; then \
+        echo "${GREEN}>>> SUCCESS: ${SCRIPT} applied successfully${NC}"; \
       else \
-        bash "${INST_DIR}${SCRIPT}"; \
-      fi || { rc=$?; echo "FAILED: ${SCRIPT} (rc=$rc)"; exit "$rc"; }; \
+        rc=$?; \
+        echo "${RED}>>> FAILED: ${SCRIPT} (exit ${rc}) - see the module's own log output directly above for the failing step${NC}"; \
+        exit "$rc"; \
+      fi; \
     done; \
-    \
-    # Force the SquirrelWorks cleanup pass (shared SKIP_CLEAN=true only defers
-    # it in the Core base layer).
-    SKIP_CLEAN=false bash "${INST_DIR}/ubuntu/install/common/01_cleanup.sh"; \
-    \
-    # --- Final Session Preparation ---
+    echo "${GREEN}>>> All BitCurator 5 prerequisite modules applied successfully${NC}"; \
+    if SKIP_CLEAN=false bash "${INST_DIR}/ubuntu/install/common/01_cleanup.sh"; then \
+      echo "${GREEN}>>> SUCCESS: common/01_cleanup.sh applied successfully${NC}"; \
+    else \
+      rc=$?; \
+      echo "${RED}>>> FAILED: common/01_cleanup.sh (exit ${rc}) - see the log output directly above for the failing step${NC}"; \
+      exit "$rc"; \
+    fi; \
     if [ -f /home/kasm-user/.bashrc ]; then \
       cat /home/kasm-user/.bashrc >> "${HOME}/.bashrc"; \
       rm /home/kasm-user/.bashrc; \
     fi; \
     cp -a /home/kasm-user/. "${HOME}/" 2>/dev/null || true; \
     rm -rf /home/kasm-user; \
-    \
     "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \
     chown 1000:0 "${HOME}"; \
     mkdir -p /home/kasm-user; \
     chown -R 1000:0 /home/kasm-user; \
-    \
-    # Prune the ephemeral build-only installers, but KEEP the runtime layer:
-    #   common/**     -> master_startup.sh + shared helpers
-    #   */startup.sh  -> per-app runtime permission / daemon modules
-    find "${INST_DIR}/ubuntu/install" -type f \
-         ! -name 'startup.sh' ! -path '*/common/*' -delete; \
+    find "${INST_DIR}/ubuntu/install" -type f ! -name 'startup.sh' ! -path '*/common/*' -delete; \
     find "${INST_DIR}/ubuntu/install" -type d -empty -delete; \
-    rm -rf /tmp/* /var/cache/salt
+    rm -rf /tmp/* /var/cache/salt; \
+    echo "${GREEN}>>> BitCurator 5 workspace build complete${NC}"
 
 # ############################################################################
 # ------------------------- RUNTIME STARTUP HOOK -------------------------- #
@@ -127,10 +128,9 @@ RUN chmod 0755 /dockerstartup/custom_startup.sh
 RUN mkdir -p /opt/vex
 COPY images/vex_ubuntu_common.json /opt/vex/vex.json
 
-# Centralized Trivy ignore file for the workspace scanners
-COPY images/trivy_ubuntu_common.ignore /.trivyignore
-COPY images/trivy_ubuntu_common.ignore /app/.trivyignore
-ENV TRIVY_IGNOREFILE=/.trivyignore
+# NOTE: no embedded .trivyignore here - this image is never Trivy-scanned in
+# CI (only ubuntu-noble-core is; BitCurator 5 builds FROM that already-scanned
+# base). It also isn't in production yet (images.json .enabled = false).
 
 # ############################################################################
 # ------------------------------ FINALIZATION ------------------------------ #
