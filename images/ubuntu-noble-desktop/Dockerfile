@@ -94,25 +94,27 @@ COPY ./src/tools/runtime/runtime_validation.sh /dockerstartup/tools/runtime_vali
 RUN chmod 0755 /dockerstartup/tools/runtime_validation.sh
 
 # --- Global Build Orchestration ---
+# SquirrelWorks module registry, run in order:
+#   GROUP 1: core system tools & helpers
+#   GROUP 2: hardened browser stack (non-snap native) - Chrome, Firefox, Chromium
+#   GROUP 3: developer & productivity suite
+#   GROUP 4: InfoSec & malware-analysis modules
+#   GROUP 5: communication apps (autostart suppressed)
+#   GROUP 6: branding & final polish (desktop/install.sh, forced 01_cleanup.sh)
+#   GROUP 7: automated remediation & purge (common/02_remediation.sh - MUST BE LAST)
+# Prune afterward keeps common/** + */startup.sh (the runtime module layer) so
+# per-app runtime hooks (e.g. the VS Code profile-permission sync) survive.
 ARG APT_DEBUG=false
 
 RUN set -eux; \
+    GREEN=$(printf '\033[0;32m'); RED=$(printf '\033[0;31m'); NC=$(printf '\033[0m'); \
     apt-get update; \
-    \
-    # =========================================================================
-    # SQUIRRELWORKS MODULE REGISTRY
-    # =========================================================================
     SCRIPTS=( \
-      # GROUP 1: Core System Tools & Helpers
       "/ubuntu/install/tools/install_tools.sh" \
       "/ubuntu/install/common/00_apt_helper.sh" \
-      \
-      # GROUP 2: Hardened Browser Stack (Non-Snap Native)
       "/ubuntu/install/chrome/install_chrome.sh" \
       "/ubuntu/install/firefox/install_firefox.sh" \
       "/ubuntu/install/chromium/install_chromium.sh" \
-      \
-      # GROUP 3: Developer & Productivity Suite
       "/ubuntu/install/vs_code/install_vs_code.sh" \
       "/ubuntu/install/ansible/install_ansible.sh" \
       "/ubuntu/install/libre_office/install_libre_office.sh" \
@@ -120,8 +122,6 @@ RUN set -eux; \
       "/ubuntu/install/gimp/install_gimp.sh" \
       "/ubuntu/install/obsidian/install_obsidian.sh" \
       "/ubuntu/install/filezilla/install_filezilla.sh" \
-      \
-      # GROUP 4: InfoSec & Malware Analysis Modules
       "/ubuntu/install/infosec_yara/install_infosec_yara.sh" \
       "/ubuntu/install/tesseract_ocr/install_tesseract_ocr.sh" \
       "/ubuntu/install/tor_browser/install_tor_browser.sh" \
@@ -131,52 +131,41 @@ RUN set -eux; \
       "/ubuntu/install/origamindee/install_origamindee.sh" \
       "/ubuntu/install/iocextract/install_iocextract.sh" \
       "/ubuntu/install/zbar/install_zbar.sh" \
-      \
-      # GROUP 5: Communication (Autostart Suppressed)
       "/ubuntu/install/signal/install_signal.sh" \
       "/ubuntu/install/slack/install_slack.sh" \
       "/ubuntu/install/discord/install_discord.sh" \
       "/ubuntu/install/teams/install_teams.sh" \
       "/ubuntu/install/telegram/install_telegram.sh" \
       "/ubuntu/install/thunderbird/install_thunderbird.sh" \
-      \
-      # GROUP 6: Branding & Final Polish
       "/ubuntu/install/desktop/install.sh" \
       "/ubuntu/install/common/01_cleanup.sh" \
-      \
-      # GROUP 7: Automated Remediation & Purge (MUST BE LAST)
       "/ubuntu/install/common/02_remediation.sh" \
     ); \
-    \
-    # Execution Loop
     for SCRIPT in "${SCRIPTS[@]}"; do \
       echo ">>> Executing Module: ${SCRIPT}"; \
+      ARGS=(); \
+      RUN_ENV=(); \
       if [[ "${SCRIPT}" == *"desktop/install.sh" ]]; then \
-        bash "${INST_DIR}${SCRIPT}" noble; \
+        ARGS=("noble"); \
       elif [[ "${SCRIPT}" == *"common/01_cleanup.sh" ]]; then \
-        SKIP_CLEAN=false bash "${INST_DIR}${SCRIPT}"; \
+        RUN_ENV=("SKIP_CLEAN=false"); \
+      fi; \
+      if env "${RUN_ENV[@]}" bash "${INST_DIR}${SCRIPT}" "${ARGS[@]}"; then \
+        echo "${GREEN}>>> SUCCESS: ${SCRIPT} applied successfully${NC}"; \
       else \
-        bash "${INST_DIR}${SCRIPT}"; \
-      fi || { \
         rc=$?; \
-        echo "FAILED: ${SCRIPT} (rc=$rc)"; \
+        echo "${RED}>>> FAILED: ${SCRIPT} (exit ${rc}) - see the module's own log output directly above for the failing step${NC}"; \
         [ "${APT_DEBUG}" = "true" ] && tail -n 100 /var/log/apt/term.log || true; \
         exit "$rc"; \
-      }; \
+      fi; \
     done; \
-    \
-    # --- Final Session Preparation ---
+    echo "${GREEN}>>> All desktop modules applied successfully${NC}"; \
     "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \
     rm -f /etc/X11/xinit/Xclients; \
     chown 1000:0 "${HOME}"; \
     mkdir -p /home/kasm-user; \
     chown -R 1000:0 /home/kasm-user; \
-    \
-    # Prune the ephemeral build-only installers, but KEEP the runtime layer:
-    #   common/**     -> master_startup.sh + shared helpers (run/sourced at boot)
-    #   */startup.sh  -> per-app runtime permission / daemon modules
-    find "${INST_DIR}/ubuntu/install" -type f \
-         ! -name 'startup.sh' ! -path '*/common/*' -delete; \
+    find "${INST_DIR}/ubuntu/install" -type f ! -name 'startup.sh' ! -path '*/common/*' -delete; \
     find "${INST_DIR}/ubuntu/install" -type d -empty -delete
 
 # ############################################################################
@@ -195,10 +184,9 @@ RUN chmod 0755 /dockerstartup/custom_startup.sh
 RUN mkdir -p /opt/vex
 COPY images/vex_ubuntu_common.json /opt/vex/vex.json
 
-# Copy the centralized Trivy ignore file into standard system scanner paths
-COPY images/trivy_ubuntu_common.ignore /.trivyignore
-COPY images/trivy_ubuntu_common.ignore /app/.trivyignore
-ENV TRIVY_IGNOREFILE=/.trivyignore
+# NOTE: no embedded .trivyignore here - this image is never Trivy-scanned in
+# CI (only ubuntu-noble-core is; the desktop image builds FROM that
+# already-scanned base rather than being scanned itself).
 
 # ############################################################################
 # ------------------------------ FINALIZATION ------------------------------ #
