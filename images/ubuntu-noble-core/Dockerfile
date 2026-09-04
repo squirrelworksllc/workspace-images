@@ -66,29 +66,30 @@ RUN set -eux; \
     find "${INST_DIR}/ubuntu/install" -maxdepth 5 -type f -name '*.sh' -exec chmod +x {} \;
 
 # --- Baseline Execution ---
+# Intentionally tiny list for the Core image.
 RUN set -eux; \
+    GREEN=$(printf '\033[0;32m'); RED=$(printf '\033[0;31m'); NC=$(printf '\033[0m'); \
     apt-get update; \
-    \
-    # Intentionally tiny list for the Core image
     SCRIPTS=( \
       "/ubuntu/install/tools/install_tools.sh" \
       "/ubuntu/install/common/00_apt_helper.sh" \
       "/ubuntu/install/common/01_cleanup.sh" \
     ); \
-    \
     for SCRIPT in "${SCRIPTS[@]}"; do \
       echo ">>> Executing Base Module: ${SCRIPT}"; \
-      bash "${INST_DIR}${SCRIPT}" || { exit 1; }; \
+      if bash "${INST_DIR}${SCRIPT}"; then \
+        echo "${GREEN}>>> SUCCESS: ${SCRIPT} applied successfully${NC}"; \
+      else \
+        rc=$?; \
+        echo "${RED}>>> FAILED: ${SCRIPT} (exit ${rc}) - see the module's own log output directly above for the failing step${NC}"; \
+        exit "$rc"; \
+      fi; \
     done; \
-    \
-    # --- Final Foundation Prep ---
+    echo "${GREEN}>>> All Core modules applied successfully${NC}"; \
     "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \
     chown 1000:0 "${HOME}"; \
     mkdir -p /home/kasm-user; \
     chown -R 1000:0 /home/kasm-user; \
-    \
-    # We leave the common/ directory intact in the Core image 
-    # so child images (Desktop, REMNux, etc.) can source apt_helper.sh
     rm -rf "${INST_DIR}/ubuntu/install"
 
 # ----------------------------- FINALIZATION -----------------------------
