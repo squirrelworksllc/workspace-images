@@ -25,11 +25,6 @@ on:
         options:
           - develop
           - production
-      skip_scan:
-        description: 'Bypass Trivy Vulnerability Scan'
-        required: false
-        type: boolean
-        default: true # Default scanning disabled
 
 concurrency:
   group: build-remnux-${{ github.event.inputs.target_env || 'develop' }}
@@ -147,6 +142,8 @@ jobs:
           push: true
           pull: true
           no-cache: true
+          # This image is not Trivy-scanned in CI (only ubuntu-noble-core is -
+          # REMnux builds FROM that already-scanned base).
           sbom: false
           tags: ${{ steps.prep.outputs.tags }}
           build-args: |
@@ -162,19 +159,6 @@ jobs:
       image_path: "${{ needs.build-isolated-remnux.outputs.repo_path }}@${{ needs.build-isolated-remnux.outputs.digest }}"
       image_key: "remnux"
       runner: '["kasm-builder", "repo-remnux-kasm", "resources-large"]'
-    secrets:
-      HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
-      HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
-
-  security-scan:
-    name: REMnux Scan
-    needs: build-isolated-remnux
-    if: ${{ needs.build-isolated-remnux.outputs.digest != '' }}
-    uses: ./.forgejo/workflows/trivy-scan.yml
-    with:
-      image_path: "${{ needs.build-isolated-remnux.outputs.repo_path }}@${{ needs.build-isolated-remnux.outputs.digest }}"
-      image_key: "remnux"
-      skip_scan: ${{ github.event.inputs.skip_scan == 'true' }}
     secrets:
       HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
       HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}

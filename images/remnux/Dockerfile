@@ -64,87 +64,77 @@ COPY ./src/tools/runtime/runtime_validation.sh /dockerstartup/tools/runtime_vali
 RUN chmod 0755 /dockerstartup/tools/runtime_validation.sh
 
 # --- Global Build Orchestration ---
+# SquirrelWorks module registry (REMnux prerequisites), run in order:
+#   GROUP 1: core system + REMnux "Salt-fail" prevention (gnome-keyring stub)
+#   GROUP 2: forensic UI tools REMnux expects pre-installed (Firefox, VS Code,
+#            Wireshark)
+#   GROUP 3: Wine, for binary compatibility / analysis
+#   GROUP 4: desktop branding (remnux theme)
+# Then the REMnux SaltStack cloud installer, a PulseAudio restore Salt tends to
+# remove, and the shared cleanup pass. Prune keeps common/** + */startup.sh
+# (the runtime module layer) so per-app runtime hooks survive into the image.
 ARG APT_DEBUG=false
 
 RUN set -eux; \
+    GREEN=$(printf '\033[0;32m'); RED=$(printf '\033[0;31m'); YELLOW=$(printf '\033[0;33m'); NC=$(printf '\033[0m'); \
     apt-get update; \
-    \
-    # =========================================================================
-    # SQUIRRELWORKS MODULE REGISTRY (REMNux Prerequisites)
-    # =========================================================================
     SCRIPTS=( \
-      # GROUP 1: Core System & REMNux "Salt-Fail" Prevention
       "/ubuntu/install/tools/install_tools.sh" \
       "/ubuntu/install/common/00_apt_helper.sh" \
       "/ubuntu/install/gnome_keyring/install_gnome_keyring_stub.sh" \
-      \
-      # GROUP 2: Forensic UI Tools (REMNux expects these pre-installed)
       "/ubuntu/install/firefox/install_firefox.sh" \
       "/ubuntu/install/vs_code/install_vs_code.sh" \
       "/ubuntu/install/wireshark/install_wireshark.sh" \
-      \
-      # GROUP 3: Binary Compatibility & Analysis
       "/ubuntu/install/wine/install_wine.sh" \
-      \
-      # GROUP 4: Branding (Noble-native or REMNux themed)
       "/ubuntu/install/desktop/install.sh" \
     ); \
-    \
-    # Execution Loop for Prereqs
     for SCRIPT in "${SCRIPTS[@]}"; do \
       echo ">>> Executing Module: ${SCRIPT}"; \
-      if [[ "${SCRIPT}" == *"desktop/install.sh" ]]; then \
-        # Passing 'remnux' for the forensic theme, or 'noble' for standard numbat
-        bash "${INST_DIR}${SCRIPT}" remnux; \
+      ARGS=(); \
+      [[ "${SCRIPT}" == *"desktop/install.sh" ]] && ARGS=("remnux"); \
+      if bash "${INST_DIR}${SCRIPT}" "${ARGS[@]}"; then \
+        echo "${GREEN}>>> SUCCESS: ${SCRIPT} applied successfully${NC}"; \
       else \
-        bash "${INST_DIR}${SCRIPT}"; \
-      fi || { exit 1; }; \
+        rc=$?; \
+        echo "${RED}>>> FAILED: ${SCRIPT} (exit ${rc}) - see the module's own log output directly above for the failing step${NC}"; \
+        exit "$rc"; \
+      fi; \
     done; \
-    \
-    # =========================================================================
-    # THE REMNUX CORE INSTALLER
-    # =========================================================================
+    echo "${GREEN}>>> All REMnux prerequisite modules applied successfully${NC}"; \
     log() { echo "[REMNUX-INSTALLER] $*"; }; \
     ARCH="$(dpkg --print-architecture)"; \
-    if [ "${ARCH}" != "amd64" ]; then log "ERROR: amd64 only"; exit 1; fi; \
-    \
-    log "Downloading REMNux SaltStack Installer..."; \
+    if [ "${ARCH}" != "amd64" ]; then \
+      echo "${RED}>>> FAILED: the REMnux SaltStack installer is amd64-only (found ${ARCH})${NC}"; \
+      exit 1; \
+    fi; \
+    log "Downloading REMnux SaltStack Installer..."; \
     curl -fsSL -o /tmp/remnux-installer https://remnux.org/remnux; \
     chmod +x /tmp/remnux-installer; \
-    \
-    log "Running REMNux (Cloud Mode)... this will take time."; \
-    /tmp/remnux-installer install --mode=cloud --user=kasm-user || true; \
-    \
-    # =========================================================================
-    # POST-REMNUX REPAIR & CLEANUP
-    # =========================================================================
+    log "Running REMnux (Cloud Mode)... this will take time."; \
+    if /tmp/remnux-installer install --mode=cloud --user=kasm-user; then \
+      echo "${GREEN}>>> SUCCESS: REMnux SaltStack install completed${NC}"; \
+    else \
+      rc=$?; \
+      echo "${YELLOW}>>> WARNING: REMnux SaltStack install exited non-zero (rc=${rc}) - continuing; individual Salt states can report failure without the workstation being unusable${NC}"; \
+    fi; \
     log "Restoring Kasm-critical dependencies (PulseAudio)..."; \
     apt-get update && apt-get install -y --no-install-recommends pulseaudio; \
-    \
     log "Running Global SquirrelWorks Cleanup..."; \
     SKIP_CLEAN=false bash "${INST_DIR}/ubuntu/install/common/01_cleanup.sh"; \
-    \
-    # --- Final Session Preparation ---
-    # Merge REMNux-created bashrc into the default profile
     if [ -f /home/kasm-user/.bashrc ]; then \
       cat /home/kasm-user/.bashrc >> "${HOME}/.bashrc"; \
       rm /home/kasm-user/.bashrc; \
     fi; \
     cp -a /home/kasm-user/. "${HOME}/" || true; \
     rm -rf /home/kasm-user; \
-    \
     "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \
     chown 1000:0 "${HOME}"; \
     mkdir -p /home/kasm-user; \
     chown -R 1000:0 /home/kasm-user; \
-    \
-    # Deep cleanup of temporary build assets. Prune the ephemeral installers but
-    # KEEP the runtime layer: common/** (master_startup.sh + helpers) and every
-    # */startup.sh (per-app runtime permission / daemon modules).
-    find "${INST_DIR}/ubuntu/install" -type f \
-         ! -name 'startup.sh' ! -path '*/common/*' -delete; \
+    find "${INST_DIR}/ubuntu/install" -type f ! -name 'startup.sh' ! -path '*/common/*' -delete; \
     find "${INST_DIR}/ubuntu/install" -type d -empty -delete; \
-    rm -rf /tmp/* /var/cache/salt
+    rm -rf /tmp/* /var/cache/salt; \
+    echo "${GREEN}>>> REMnux workspace build complete${NC}"
 
 # ############################################################################
 # ------------------------- RUNTIME STARTUP HOOK -------------------------- #
