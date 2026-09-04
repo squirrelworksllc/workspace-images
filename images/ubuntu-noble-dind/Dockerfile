@@ -80,6 +80,7 @@ RUN find "${INST_DIR}/ubuntu/install" -maxdepth 4 -type f -name '*.sh' -exec chm
 ARG APT_DEBUG=false
 
 RUN set -eux; \
+    GREEN=$(printf '\033[0;32m'); RED=$(printf '\033[0;31m'); YELLOW=$(printf '\033[0;33m'); NC=$(printf '\033[0m'); \
     apt-get update; \
     SCRIPTS=( \
       "/ubuntu/install/tools/install_tools.sh" \
@@ -92,20 +93,21 @@ RUN set -eux; \
     for SCRIPT in "${SCRIPTS[@]}"; do \
       echo ">>> Executing Module: ${SCRIPT}"; \
       if [[ "${SCRIPT}" == *"chromium/install_chromium.sh" && "${SKIP_CHROMIUM}" == "true" ]]; then \
-        echo "Skipping Chromium per ENV constraint..."; \
+        echo "${YELLOW}>>> SKIPPED: ${SCRIPT} (SKIP_CHROMIUM=true)${NC}"; \
         continue; \
       fi; \
-      if [[ "${SCRIPT}" == *"desktop/install.sh" ]]; then \
-        bash "${INST_DIR}${SCRIPT}" noble || { rc=$?; echo "FAILED: ${SCRIPT} (rc=$rc)"; exit "$rc"; }; \
-        continue; \
-      fi; \
-      bash "${INST_DIR}${SCRIPT}" || { \
+      ARGS=(); \
+      [[ "${SCRIPT}" == *"desktop/install.sh" ]] && ARGS=("noble"); \
+      if bash "${INST_DIR}${SCRIPT}" "${ARGS[@]}"; then \
+        echo "${GREEN}>>> SUCCESS: ${SCRIPT} applied successfully${NC}"; \
+      else \
         rc=$?; \
-        echo "FAILED: ${SCRIPT} (rc=$rc)"; \
+        echo "${RED}>>> FAILED: ${SCRIPT} (exit ${rc}) - see the module's own log output directly above for the failing step${NC}"; \
         [ "${APT_DEBUG}" = "true" ] && tail -n 100 /var/log/apt/term.log || true; \
         exit "$rc"; \
-      }; \
+      fi; \
     done; \
+    echo "${GREEN}>>> All DinD modules applied successfully${NC}"; \
     "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \
     chown 1000:0 "${HOME}"; \
     mkdir -p /home/kasm-user; \
@@ -125,10 +127,8 @@ RUN set -eux; \
 RUN mkdir -p /opt/vex
 COPY images/vex_ubuntu_common.json /opt/vex/vex.json
 
-# Copy the centralized Trivy ignore file into standard system scanner paths
-COPY images/trivy_ubuntu_common.ignore /.trivyignore
-COPY images/trivy_ubuntu_common.ignore /app/.trivyignore
-ENV TRIVY_IGNOREFILE=/.trivyignore
+# NOTE: no embedded .trivyignore here - this image is never Trivy-scanned in
+# CI (only ubuntu-noble-core is; DinD builds FROM that already-scanned base).
 
 # ############################################################################
 # ------------------------------ FINALIZATION ------------------------------ #

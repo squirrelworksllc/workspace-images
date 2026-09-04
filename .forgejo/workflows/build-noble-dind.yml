@@ -25,11 +25,6 @@ on:
         options:
           - develop
           - production
-      skip_scan:
-        description: 'Bypass Trivy Vulnerability Scan'
-        required: false
-        type: boolean
-        default: false
 
 concurrency:
   group: build-dind-${{ github.event.inputs.target_env || 'develop' }}
@@ -148,7 +143,8 @@ jobs:
           pull: true
           no-cache: true
           # A full image's SPDX SBOM exceeds BuildKit's 40 MiB embedded
-          # attestation cap; vulnerability coverage comes from trivy-scan.yml.
+          # attestation cap. This image is not Trivy-scanned in CI (only
+          # ubuntu-noble-core is - DinD builds FROM that already-scanned base).
           sbom: false
           tags: ${{ steps.prep.outputs.tags }}
           build-args: |
@@ -164,19 +160,6 @@ jobs:
       image_path: "${{ needs.build-workspace.outputs.repo_path }}@${{ needs.build-workspace.outputs.digest }}"
       image_key: "ubuntu-noble-dind"
       runner: '["kasm-builder", "repo-squirrelworks", "resources-large"]'
-    secrets:
-      HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
-      HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
-
-  security-scan:
-    name: DinD Scan
-    needs: build-workspace
-    if: ${{ needs.build-workspace.outputs.digest != '' }}
-    uses: ./.forgejo/workflows/trivy-scan.yml
-    with:
-      image_path: "${{ needs.build-workspace.outputs.repo_path }}@${{ needs.build-workspace.outputs.digest }}"
-      image_key: "ubuntu-noble-dind"
-      skip_scan: ${{ github.event.inputs.skip_scan == 'true' }}
     secrets:
       HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
       HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
