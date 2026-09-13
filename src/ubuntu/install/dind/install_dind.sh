@@ -95,11 +95,17 @@ main() {
 
     # custom_startup.sh runs as kasm-user and needs root to start supervisord
     # (which then runs dockerd as root, same as bare-metal Docker). Scoped to
-    # exactly that one command.
+    # exactly that one command (Kasm's own dind image grants full passwordless
+    # sudo; we don't).
     cat > /etc/sudoers.d/dind-supervisord <<'EOF'
 kasm-user ALL=(root) NOPASSWD: /usr/bin/supervisord -n
 EOF
     chmod 0440 /etc/sudoers.d/dind-supervisord
+
+    # A passwordless/locked account can fail PAM's account-validity check for
+    # sudo on some base images regardless of NOPASSWD. Kasm's own dind image
+    # sets this same password; match it to remove that as a variable.
+    echo 'kasm-user:kasm-user' | chpasswd
 
     # Prefer /etc/hosts over DNS for name resolution inside the nested Docker
     # network namespace (Kasm's own dind image does the same).

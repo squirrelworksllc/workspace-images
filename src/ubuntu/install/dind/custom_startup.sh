@@ -8,10 +8,15 @@
 # session is confirmed ready via Kasm's own filter_ready/desktop_ready gates,
 # and is respawned automatically if it ever dies.
 #
+# Deliberately NOT `set -e`. This is an infinite watchdog loop that Kasm's own
+# session bring-up depends on; if it ever exits (a missing readiness binary,
+# a transient sudo/pgrep hiccup), Kasm treats the whole session as failed to
+# provision. Every external call below is guarded so a single bad check can
+# only skip an iteration, never kill the script.
+#
 # Kasm executes this at session start. DISABLE_CUSTOM_STARTUP=true skips the
 # watchdog loop entirely (e.g. while debugging a stuck session).
 ###############################################################################
-set -e
 
 log() { echo "[dind-startup] $*"; }
 
@@ -20,15 +25,23 @@ if [ -n "${DISABLE_CUSTOM_STARTUP:-}" ]; then
     exit 0
 fi
 
+# Best-effort: if Kasm's readiness binaries aren't present in this particular
+# base image, don't block (or crash) on them - just proceed.
+wait_for_desktop() {
+    if command -v filter_ready >/dev/null 2>&1; then
+        filter_ready || true
+    fi
+    if command -v desktop_ready >/dev/null 2>&1; then
+        desktop_ready || true
+    fi
+}
+
 log "Entering supervisord watchdog loop..."
 while true; do
     if ! pgrep -x supervisord >/dev/null 2>&1; then
-        /usr/bin/filter_ready
-        /usr/bin/desktop_ready
-        log "Desktop ready; starting supervisord (manages dockerd - see /etc/supervisor/conf.d/dockerd.conf)"
-        set +e
-        sudo /usr/bin/supervisord -n &
-        set -e
+        wait_for_desktop
+        log "Starting supervisord (manages dockerd - see /etc/supervisor/conf.d/dockerd.conf)"
+        sudo /usr/bin/supervisord -n >>/var/log/dind-supervisord-watchdog.log 2>&1 &
     fi
-    sleep 1
+    sleep 2
 done
