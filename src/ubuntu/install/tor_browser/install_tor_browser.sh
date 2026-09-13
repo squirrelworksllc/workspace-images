@@ -30,16 +30,22 @@ detect_arch() {
 }
 
 detect_latest_version() {
+  # torproject.org/download/ now redirects to a JS-rendered landing page with
+  # no plain-HTML download links, so curl no longer finds a version there.
+  # dist.torproject.org (the actual file server the tarball is fetched from,
+  # below) still serves a plain directory listing - scrape that instead. The
+  # numeric-only pattern naturally excludes alpha/beta dirs (e.g. "16.0a11").
   local html ver
-  html="$(curl -fsSL https://www.torproject.org/download/)"
+  html="$(curl -fsSL https://dist.torproject.org/torbrowser/)"
 
   ver="$(printf '%s' "$html" \
-    | grep -oE 'tor-browser-linux-[^"]+-([0-9]+\.[0-9]+(\.[0-9]+)?)\.tar\.xz' \
-    | head -n1 \
-    | sed -E 's/.*-([0-9]+\.[0-9]+(\.[0-9]+)?)\.tar\.xz/\1/')"
+    | grep -oE 'href="[0-9]+\.[0-9]+(\.[0-9]+)?/"' \
+    | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' \
+    | sort -V \
+    | tail -n1)"
 
   if [[ -z "${ver:-}" ]]; then
-    echo "ERROR: unable to auto-detect Tor Browser version" >&2
+    echo "ERROR: unable to auto-detect Tor Browser version from dist.torproject.org" >&2
     exit 1
   fi
 
@@ -60,7 +66,7 @@ main() {
         log "Using pinned version: ${version}"
     fi
     
-    local base_url="https://www.torproject.org/dist/torbrowser/${version}"
+    local base_url="https://dist.torproject.org/torbrowser/${version}"
     local tarball="tor-browser-linux-${arch}-${version}.tar.xz"
     local sig="${tarball}.asc"
 
