@@ -35,12 +35,11 @@ ENV HOME=/home/kasm-default-profile \
     GENERATE_DESKTOP_DOCS=false \
     DEBUG=false
 
-# Desktop-icon toggles. The nested Docker daemon is NOT auto-started; the user
-# launches it from the "Docker in Docker" icon (Desktop + Applications menu).
-#   DIND_DESKTOP_ICON=false     -> keep it in the menu only, no Desktop icon
-#   CHROMIUM_DESKTOP_ICON=true  -> also drop a Chromium icon on the Desktop
-ENV DIND_DESKTOP_ICON=true \
-    CHROMIUM_DESKTOP_ICON=false
+# Desktop-icon toggle. "true" places a Chromium icon on the Desktop; the app
+# stays in the Applications menu either way. The nested Docker daemon has no
+# icon - supervisord starts it automatically once the desktop is ready (see
+# dind/custom_startup.sh).
+ENV CHROMIUM_DESKTOP_ICON=false
 
 WORKDIR ${HOME}
 
@@ -73,10 +72,12 @@ COPY ./src/ubuntu/ ${INST_DIR}/ubuntu/
 RUN find "${INST_DIR}/ubuntu/install" -maxdepth 4 -type f -name '*.sh' -exec chmod +x {} \;
 
 # --- Global Build Orchestration ---
-# DinD is Core + Chromium + Docker/k8s tooling + the on-demand "Docker in
-# Docker" launcher (dind/install_dind.sh). desktop/install.sh runs for the
-# wallpaper + XFCE panel/menu fixes only - GENERATE_DESKTOP_DOCS=false skips the
-# app catalog. SCRIPTS run in order; Chromium is skipped when SKIP_CHROMIUM=true.
+# DinD is Core + Chromium + Docker/k8s tooling. dind/install_dind.sh wires the
+# nested Docker daemon into supervisord (autostart + auto-restart, matching
+# Kasm's own reference dind image) rather than a manual launcher.
+# desktop/install.sh runs for the wallpaper + XFCE panel/menu fixes only -
+# GENERATE_DESKTOP_DOCS=false skips the app catalog. SCRIPTS run in order;
+# Chromium is skipped when SKIP_CHROMIUM=true.
 ARG APT_DEBUG=false
 
 RUN set -eux; \
@@ -109,16 +110,22 @@ RUN set -eux; \
     done; \
     echo "${GREEN}>>> All DinD modules applied successfully${NC}"; \
     "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \
+    rm -f /etc/X11/xinit/Xclients; \
     chown 1000:0 "${HOME}"; \
     mkdir -p /home/kasm-user; \
     chown -R 1000:0 /home/kasm-user; \
     rm -rf "${INST_DIR}/ubuntu/install"
 
-# NOTE: like ubuntu-noble-core, this stage does NOT overwrite
-# /dockerstartup/custom_startup.sh or remove /etc/X11/xinit/Xclients - those
-# were the DinD-only changes that broke Kasm session provisioning. The nested
-# Docker daemon is never auto-started; the user launches it from the "Docker in
-# Docker" icon.
+# NOTE: dind/install_dind.sh (Step 6) does overwrite
+# /dockerstartup/custom_startup.sh, unlike every other image in this repo.
+# This is deliberate and matches Kasm's own reference dind image exactly
+# (kasmtech/workspaces-images: dind/custom_startup.sh + dockerd.conf +
+# daemon.json): the earlier session-provisioning failure traced back to an
+# unconditional master_startup.sh chain that tried to start dockerd
+# immediately at boot; Kasm's pattern instead gates supervisord on its own
+# filter_ready/desktop_ready checks before ever starting it, then supervises
+# and auto-restarts it via dockerd.conf. rm -f /etc/X11/xinit/Xclients is
+# also present in Kasm's own dind Dockerfile - it was never the problem.
 
 # ############################################################################
 # -------------------------- SECURITY METADATA LAYER ----------------------- #

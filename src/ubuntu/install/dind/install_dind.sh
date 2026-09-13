@@ -75,37 +75,35 @@ main() {
     # Ensure the Kasm user is in the docker group
     usermod -aG docker kasm-user || true
 
-    log "Step 6: On-demand Docker daemon launcher (no session autostart)..."
+    log "Step 6: Wiring dockerd into supervisord (matches Kasm's own dind reference)..."
     local here
     here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    install -m 0755 "${here}/start_dockerd.sh" /usr/local/bin/dind-start-docker
 
-    # Session user may start the Kasm dockerd entrypoint as root, nothing else.
-    cat > /etc/sudoers.d/dind-dockerd <<'EOF'
-kasm-user ALL=(root) NOPASSWD: /usr/local/bin/dockerd-entrypoint.sh
+    # storage-driver=fuse-overlayfs: the kernel's default overlay2 driver
+    # generally can't run on top of the container's own overlay rootfs.
+    install -D -m 0644 "${here}/daemon.json" /etc/docker/daemon.json
+
+    # Registers dockerd as a supervised, auto-restarting program (logs at
+    # /var/log/dockerd.{out,err}.log). supervisord's default config includes
+    # everything under /etc/supervisor/conf.d/ (the package we installed above
+    # ships that default), so nothing else has to reference this file.
+    install -D -m 0644 "${here}/dockerd.conf" /etc/supervisor/conf.d/dockerd.conf
+
+    # Kasm calls this once the session starts; it waits for the desktop to be
+    # ready, then starts (and, if it ever dies, restarts) supervisord.
+    install -m 0755 "${here}/custom_startup.sh" /dockerstartup/custom_startup.sh
+
+    # custom_startup.sh runs as kasm-user and needs root to start supervisord
+    # (which then runs dockerd as root, same as bare-metal Docker). Scoped to
+    # exactly that one command.
+    cat > /etc/sudoers.d/dind-supervisord <<'EOF'
+kasm-user ALL=(root) NOPASSWD: /usr/bin/supervisord -n
 EOF
-    chmod 0440 /etc/sudoers.d/dind-dockerd
+    chmod 0440 /etc/sudoers.d/dind-supervisord
 
-    # "Docker in Docker" launcher - Applications menu + (via configure_ui.sh)
-    # the Desktop. Runs in a held-open terminal so the user sees the output.
-    install -d -m 0755 /usr/share/applications
-    cat > /usr/share/applications/dind-docker.desktop <<'EOF'
-[Desktop Entry]
-Type=Application
-Name=Docker in Docker
-Comment=Start the nested Docker daemon in this session
-Exec=xfce4-terminal --title="Docker in Docker" --hold --command="/usr/local/bin/dind-start-docker"
-Icon=utilities-terminal
-Terminal=false
-Categories=System;Development;
-Keywords=docker;dind;daemon;
-EOF
-    chmod 0644 /usr/share/applications/dind-docker.desktop
-
-    # Shared log, writable by the docker group (kasm-user is a member).
-    touch /var/log/dockerd.log
-    chgrp docker /var/log/dockerd.log 2>/dev/null || true
-    chmod 0664 /var/log/dockerd.log
+    # Prefer /etc/hosts over DNS for name resolution inside the nested Docker
+    # network namespace (Kasm's own dind image does the same).
+    echo 'hosts: files dns' > /etc/nsswitch.conf
 
     run_configure_ui
 }
