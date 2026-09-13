@@ -75,32 +75,56 @@ main() {
     # Ensure the Kasm user is in the docker group
     usermod -aG docker kasm-user || true
 
-    log "Step 6: Wiring dockerd into supervisord (matches Kasm's own dind reference)..."
+    log "Step 6: On-demand Docker daemon launcher, backed by supervisord..."
     local here
     here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
     # storage-driver=fuse-overlayfs: the kernel's default overlay2 driver
-    # generally can't run on top of the container's own overlay rootfs.
+    # generally can't run on top of the container's own overlay rootfs. We
+    # were already installing the package but never actually telling dockerd
+    # to use it.
     install -D -m 0644 "${here}/daemon.json" /etc/docker/daemon.json
 
     # Registers dockerd as a supervised, auto-restarting program (logs at
-    # /var/log/dockerd.{out,err}.log). supervisord's default config includes
-    # everything under /etc/supervisor/conf.d/ (the package we installed above
-    # ships that default), so nothing else has to reference this file.
+    # /var/log/dockerd.{out,err}.log): once started, supervisord brings
+    # dockerd back if it ever dies. supervisord's default config includes
+    # everything under /etc/supervisor/conf.d/ (the package we installed
+    # above ships that default), so nothing else has to reference this file.
     install -D -m 0644 "${here}/dockerd.conf" /etc/supervisor/conf.d/dockerd.conf
 
-    # Kasm calls this once the session starts; it waits for the desktop to be
-    # ready, then starts (and, if it ever dies, restarts) supervisord.
-    install -m 0755 "${here}/custom_startup.sh" /dockerstartup/custom_startup.sh
+    # NOTE: we deliberately do NOT install a /dockerstartup/custom_startup.sh
+    # here. Overriding that file to auto-start supervisord (Kasm's own
+    # pattern, gated on filter_ready/desktop_ready) reproducibly broke Kasm
+    # session provisioning ("Nginx failed to reload... no host in upstream")
+    # even after the script itself was made crash-proof - something about
+    # overriding that specific file is fatal to container bring-up in ways we
+    # can't see from outside (it's invoked by the vendor base image's own
+    # entrypoint chain, which we don't ship). The user starts dockerd instead,
+    # from the "Docker in Docker" launcher below.
+    install -m 0755 "${here}/start_dockerd.sh" /usr/local/bin/dind-start-docker
 
-    # custom_startup.sh runs as kasm-user and needs root to start supervisord
-    # (which then runs dockerd as root, same as bare-metal Docker). Scoped to
-    # exactly that one command (Kasm's own dind image grants full passwordless
-    # sudo; we don't).
+    # Session user may start supervisord as root, nothing else. supervisord
+    # then runs dockerd as root itself, same as bare-metal Docker.
     cat > /etc/sudoers.d/dind-supervisord <<'EOF'
 kasm-user ALL=(root) NOPASSWD: /usr/bin/supervisord -n
 EOF
     chmod 0440 /etc/sudoers.d/dind-supervisord
+
+    # "Docker in Docker" launcher - Applications menu + (via configure_ui.sh)
+    # the Desktop. Runs in a held-open terminal so the user sees the output.
+    install -d -m 0755 /usr/share/applications
+    cat > /usr/share/applications/dind-docker.desktop <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Docker in Docker
+Comment=Start the nested Docker daemon in this session
+Exec=xfce4-terminal --title="Docker in Docker" --hold --command="/usr/local/bin/dind-start-docker"
+Icon=utilities-terminal
+Terminal=false
+Categories=System;Development;
+Keywords=docker;dind;daemon;
+EOF
+    chmod 0644 /usr/share/applications/dind-docker.desktop
 
     # A passwordless/locked account can fail PAM's account-validity check for
     # sudo on some base images regardless of NOPASSWD. Kasm's own dind image
