@@ -108,8 +108,16 @@ EOF
     echo 'kasm-user:kasm-user' | chpasswd
 
     # Prefer /etc/hosts over DNS for name resolution inside the nested Docker
-    # network namespace (Kasm's own dind image does the same).
-    echo 'hosts: files dns' > /etc/nsswitch.conf
+    # network namespace (Kasm's own dind image does the same). Edited in
+    # place rather than overwriting the whole file - nsswitch.conf also
+    # carries the passwd/group/shadow database lines everything from `sudo`
+    # to `getent` relies on, and there's no reason to gamble on glibc's
+    # fallback-to-files behavior for lines we don't actually need to touch.
+    if grep -q '^hosts:' /etc/nsswitch.conf 2>/dev/null; then
+        sed -i 's/^hosts:.*/hosts: files dns/' /etc/nsswitch.conf
+    else
+        echo 'hosts: files dns' >> /etc/nsswitch.conf
+    fi
 
     run_configure_ui
 }
