@@ -4,6 +4,12 @@ on:
   pull_request:
     branches:
       - main
+    paths:
+      - 'images/**'
+      - 'src/**'
+      - 'tools/**'
+      - 'images.json'
+      - '.github/workflows/ci.yml'
 
 concurrency:
   group: ci-pr-${{ github.head_ref }}
