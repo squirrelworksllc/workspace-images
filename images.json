@@ -54,7 +54,7 @@
     },
     {
       "key": "bitcurator5",
-      "enabled": false,
+      "enabled": true,
       "dockerfile": "images/bitcurator5/Dockerfile",
       "repo": "squirrelworksllc/bitcurator5",
       "repo_forge": "bitcurator/bitcurator5",
