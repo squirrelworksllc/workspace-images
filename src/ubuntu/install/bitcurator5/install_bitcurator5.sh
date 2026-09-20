@@ -229,6 +229,33 @@ main() {
     log "WARNING: some BitCurator tools are missing - inspect ${BC_LOG}"
   fi
 
+  # --- Set Firefox as the default browser -------------------------------
+  # Bitcurator5-specific (not part of the shared firefox module - other
+  # images that install Firefox alongside Chrome/Chromium shouldn't have it
+  # silently forced as default). xdg-settings needs a real session to run
+  # reliably, so write the mimeapps.list it would produce directly instead.
+  if command -v firefox >/dev/null 2>&1; then
+    log "Setting Firefox as the default browser..."
+    mkdir -p "${kasm_home}/.config"
+    cat > "${kasm_home}/.config/mimeapps.list" <<'EOF'
+[Default Applications]
+text/html=firefox.desktop
+x-scheme-handler/http=firefox.desktop
+x-scheme-handler/https=firefox.desktop
+x-scheme-handler/about=firefox.desktop
+x-scheme-handler/unknown=firefox.desktop
+
+[Added Associations]
+text/html=firefox.desktop;
+x-scheme-handler/http=firefox.desktop;
+x-scheme-handler/https=firefox.desktop;
+EOF
+    chown -R 1000:0 "${kasm_home}/.config/mimeapps.list"
+    update-alternatives --set x-www-browser /usr/bin/firefox >/dev/null 2>&1 || true
+  else
+    log "WARNING: Firefox not found - skipping default-browser configuration."
+  fi
+
   # --- Cleanup salt artefacts, the scratch account, and a stray panel plugin
   userdel -r "${BC_USER}" >/dev/null 2>&1 || true
   rm -rf /var/cache/salt /srv/salt /srv/pillar 2>/dev/null || true

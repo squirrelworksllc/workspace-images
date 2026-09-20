@@ -63,7 +63,8 @@ RUN chmod 0755 /dockerstartup/tools/runtime_validation.sh
 
 # --- Global Build Orchestration ---
 # SquirrelWorks module registry, run in order: tools/apt-helper -> desktop
-# branding (bitcurator5 theme) -> the BitCurator 5 SaltStack installer. Then a
+# branding (bitcurator5 theme) -> Firefox (set as the default browser by the
+# BitCurator step below) -> the BitCurator 5 SaltStack installer. Then a
 # forced cleanup pass (shared SKIP_CLEAN=true only defers it in the Core base
 # layer), the kasm-user bashrc merge, and a prune that keeps common/** +
 # */startup.sh (the runtime module layer) so per-app runtime hooks survive.
@@ -76,6 +77,7 @@ RUN set -eux; \
       "/ubuntu/install/tools/install_tools.sh" \
       "/ubuntu/install/common/00_apt_helper.sh" \
       "/ubuntu/install/desktop/install.sh" \
+      "/ubuntu/install/firefox/install_firefox.sh" \
       "/ubuntu/install/bitcurator5/install_bitcurator5.sh" \
     ); \
     for SCRIPT in "${SCRIPTS[@]}"; do \
