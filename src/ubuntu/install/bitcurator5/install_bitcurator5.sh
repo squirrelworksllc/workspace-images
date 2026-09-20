@@ -69,6 +69,18 @@ EOF
 exit 101
 EOF
   chmod 0755 /usr/sbin/policy-rc.d
+
+  # bitcurator-cli's own privilege check appears to look for evidence of a
+  # real `sudo` invocation (e.g. SUDO_USER) rather than just EUID==0 - direct
+  # root with no sudo layer (as in a Dockerfile RUN) trips "Warning: You are
+  # running as root." immediately followed by "Error! You must be root to
+  # execute this." in --mode=addon. It may also internally drop to --user and
+  # need to sudo back up. Grant bcadmin passwordless sudo for the salt run
+  # only; torn down in remove_shims so it never reaches the shipped image.
+  cat > /etc/sudoers.d/bitcurator-bcadmin <<'EOF'
+%bcadmin ALL=(ALL) NOPASSWD: ALL
+EOF
+  chmod 0440 /etc/sudoers.d/bitcurator-bcadmin
 }
 
 remove_shims() {
@@ -79,6 +91,7 @@ remove_shims() {
     mv "${SYSTEMCTL_REAL}.real" "$SYSTEMCTL_REAL"
   fi
   rm -rf /run/systemd/system
+  rm -f /etc/sudoers.d/bitcurator-bcadmin
 }
 
 main() {
@@ -121,7 +134,9 @@ main() {
   export HOME=/root
   local rc=0
   log "Applying BitCurator SaltStack states - go get coffee, this is slow..."
-  bitcurator install --mode="${BC_MODE}" --user="${BC_USER}" </dev/null 2>&1 \
+  # Wrapped in `sudo` (not called directly) even though we are already root -
+  # see the bcadmin sudoers note in install_shims() above.
+  sudo -E bitcurator install --mode="${BC_MODE}" --user="${BC_USER}" </dev/null 2>&1 \
     | tee "${BC_LOG}" || rc="${PIPESTATUS[0]}"
 
   if [ "$rc" -ne 0 ]; then
