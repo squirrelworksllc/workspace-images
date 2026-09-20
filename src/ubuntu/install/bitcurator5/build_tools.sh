@@ -19,7 +19,7 @@ try() { "$@" || log "WARNING: '$*' failed - continuing (best-effort build)."; }
 
 build_bulk_extractor() {
   log "Building bulk_extractor v2.1.1..."
-  apt_install build-essential libssl-dev flex libewf libewf-dev \
+  apt_install build-essential libssl-dev flex libewf2 libewf-dev \
     libexpat1-dev libre2-dev libxml2-utils libtool pkg-config zlib1g-dev \
     make git
   rm -rf /usr/local/src/bulk_extractor

@@ -62,7 +62,7 @@ main() {
   apt_refresh_after_repo_change
 
   # --- Disk/image format tools --------------------------------------------
-  install_batch xmount afflib-tools ewf-tools libewf libewf-dev libbde-utils \
+  install_batch xmount afflib-tools ewf-tools libewf2 libewf-dev libbde-utils \
     libvhdi-dev libvmdk-dev libvshadow-utils vmfs-tools xfsprogs hfsplus \
     hfsprogs hfsutils hfsutils-tcltk ntfs-3g qemu-utils squashfs-tools \
     mtd-utils avfs disktype bchunk cdrdao icedax syslinux-utils sleuthkit \

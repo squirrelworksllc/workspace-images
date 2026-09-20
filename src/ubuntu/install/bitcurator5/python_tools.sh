@@ -89,7 +89,7 @@ install_bitcurator_python_tools() {
 
 install_imagemounter() {
   log "Installing imagemounter..."
-  apt_install afflib-tools avfs disktype libbde-utils libewf libewf-dev \
+  apt_install afflib-tools avfs disktype libbde-utils libewf2 libewf-dev \
     libvshadow-utils ntfs-3g python3-tsk qemu-utils sleuthkit testdisk \
     vmfs-tools xfsprogs xmount libguestfs-tools mtd-utils squashfs-tools \
     git build-essential python3-dev
