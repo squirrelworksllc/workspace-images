@@ -75,12 +75,13 @@ EOF
   # root with no sudo layer (as in a Dockerfile RUN) trips "Warning: You are
   # running as root." immediately followed by "Error! You must be root to
   # execute this." in --mode=addon. It may also internally drop to --user and
-  # need to sudo back up. Grant bcadmin passwordless sudo for the salt run
-  # only; torn down in remove_shims so it never reaches the shipped image.
-  cat > /etc/sudoers.d/bitcurator-bcadmin <<'EOF'
-%bcadmin ALL=(ALL) NOPASSWD: ALL
+  # need to sudo back up. Grant both accounts passwordless sudo for the salt
+  # run only; torn down in remove_shims so it never reaches the shipped image.
+  cat > /etc/sudoers.d/bitcurator-install <<EOF
+${KASM_USER} ALL=(ALL) NOPASSWD: ALL
+${BC_USER} ALL=(ALL) NOPASSWD: ALL
 EOF
-  chmod 0440 /etc/sudoers.d/bitcurator-bcadmin
+  chmod 0440 /etc/sudoers.d/bitcurator-install
 }
 
 remove_shims() {
@@ -91,7 +92,7 @@ remove_shims() {
     mv "${SYSTEMCTL_REAL}.real" "$SYSTEMCTL_REAL"
   fi
   rm -rf /run/systemd/system
-  rm -f /etc/sudoers.d/bitcurator-bcadmin
+  rm -f /etc/sudoers.d/bitcurator-install
 }
 
 main() {
@@ -112,10 +113,18 @@ main() {
     useradd -o -u 1000 -g "${kasm_gid}" -M -d "${kasm_home}" -s /bin/bash "${BC_USER}"
   fi
 
-  getent group bcadmin >/dev/null 2>&1 || groupadd bcadmin
+  # BitCurator's own docs (bitcurator/bitcurator-salt README) recommend
+  # creating a user named "bcadmin" during Ubuntu's install and note it
+  # "will be needed for sudo commands" - bcadmin is their example ACCOUNT
+  # NAME, not a group. There is no BitCurator-specific group anywhere in
+  # their docs (an earlier version of this script invented one - removed).
+  # `sudo` is the one group membership they actually document as required.
+  # The rest of this list is Ubuntu Desktop's own long-standing
+  # installer-assigned default-user group set (not BitCurator-specific);
+  # any that don't exist on this base image are skipped, not created.
   for user in "${KASM_USER}" "${BC_USER}"; do
     getent passwd "$user" >/dev/null 2>&1 || continue
-    for grp in sudo bcadmin; do
+    for grp in sudo adm cdrom dip plugdev lpadmin lxd sambashare; do
       if getent group "$grp" >/dev/null 2>&1; then
         usermod -aG "$grp" "$user" || true
       fi
@@ -135,7 +144,7 @@ main() {
   local rc=0
   log "Applying BitCurator SaltStack states - go get coffee, this is slow..."
   # Wrapped in `sudo` (not called directly) even though we are already root -
-  # see the bcadmin sudoers note in install_shims() above.
+  # see the sudoers note in install_shims() above.
   sudo -E bitcurator install --mode="${BC_MODE}" --user="${BC_USER}" </dev/null 2>&1 \
     | tee "${BC_LOG}" || rc="${PIPESTATUS[0]}"
 
