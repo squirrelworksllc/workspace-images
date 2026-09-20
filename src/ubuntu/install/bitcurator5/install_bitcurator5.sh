@@ -13,13 +13,26 @@
 #   * policy-rc.d blocks package post-install service starts.
 #   * --mode=addon keeps salt from pulling a full GNOME/MATE desktop + display
 #     manager that would collide with Kasm's XFCE/KasmVNC stack.
-#   * BitCurator's SaltStack templates expect an underscore username, so we
-#     create `kasm_user` as an ALIAS of the real Kasm account (same uid 1000,
-#     same group 0, same home /home/kasm-user). Anything Salt configures for
-#     kasm_user therefore lands in the running session's home automatically.
+#   * BitCurator's salt states manage --user's account/home themselves
+#     (creating dotfiles, nautilus scripts, vim config, etc. under it). We
+#     install as a plain, independent scratch account (`bcadmin` - their own
+#     documented example name) rather than aliasing the real Kasm session
+#     account (`kasm-user`, uid 1000): an earlier version of this script
+#     created that alias by sharing uid 1000 (`useradd -o -u 1000 ...`), but
+#     with two usernames pointing at one uid, any salt state that reverse-
+#     looks-up "who owns this uid" (pwd.getpwuid) can get back the WRONG
+#     name (kasm-user, since it's created earlier in the base image), which
+#     lines up with the "Failed to change user to kasm_user" failures seen
+#     for exactly the states doing that kind of ownership bookkeeping
+#     (dotfiles, nautilus scripts, vim config) while simpler states worked
+#     fine. Giving the scratch account its own unique uid removes the
+#     ambiguity. We then copy the useful results into the real session home
+#     (/home/kasm-user, confirmed via `whoami` in a running Kasm session)
+#     ourselves afterward - see merge_into_kasm_home().
 #   * The salt run is best-effort: a handful of service states WILL report
 #     failure in a container; that is expected. Full log at
-#     /var/log/bitcurator-install.log.
+#     /var/log/bitcurator-install.log (and bitcurator-cli's own detailed
+#     saltstack.log, copied to /var/log/bitcurator-saltstack.log).
 ###############################################################################
 set -euo pipefail
 : "${INST_DIR:=/dockerstartup/install}"
@@ -30,8 +43,9 @@ log() { echo "[BITCURATOR-INSTALL] $*"; }
 
 BC_CLI_VERSION="${BC_CLI_VERSION:-v3.0.0}"
 BC_CLI_URL="https://github.com/BitCurator/bitcurator-cli/releases/download/${BC_CLI_VERSION}/bitcurator-cli-linux"
-KASM_USER="kasm-user"          # the real Kasm session account (uid 1000)
-BC_USER="${BC_USER:-kasm_user}" # underscore alias BitCurator's salt prefers
+KASM_USER="kasm-user"        # the real Kasm session account (uid 1000)
+BC_USER="${BC_USER:-bcadmin}" # independent scratch account, own uid/home
+BC_HOME="/home/${BC_USER}"
 BC_MODE="${BC_MODE:-addon}"
 BC_LOG="/var/log/bitcurator-install.log"
 
@@ -109,6 +123,23 @@ remove_shims() {
   rm -f /etc/sudoers.d/bitcurator-install
 }
 
+# Copies whatever BitCurator's salt states actually configured under the
+# scratch account's home into the real Kasm session home, so it is present
+# when a workspace actually starts (which always runs as kasm-user, never
+# ${BC_USER}). Existing files in the destination win (cp -n): this only
+# fills in what BitCurator added, it never clobbers the base desktop image.
+merge_into_kasm_home() {
+  local kasm_home="$1"
+  if [ ! -d "$BC_HOME" ]; then
+    log "WARNING: ${BC_HOME} doesn't exist - nothing to merge (salt-created"
+    log "         config may have failed entirely; check ${BC_LOG})."
+    return
+  fi
+  log "Merging BitCurator's user-env config from ${BC_HOME} into ${kasm_home}..."
+  cp -a -n "${BC_HOME}/." "${kasm_home}/" 2>/dev/null || true
+  chown -R 1000:0 "${kasm_home}"
+}
+
 main() {
   log "======= Installing BitCurator ${BC_CLI_VERSION} (mode=${BC_MODE}, user=${BC_USER}) ======="
 
@@ -117,32 +148,30 @@ main() {
   apt_install sudo wget curl gnupg ca-certificates git \
               python3 python3-pip build-essential perl
 
-  # --- User / group setup (idempotent) -----------------------------------
-  # kasm_user = alias of the real Kasm account: same uid/gid, same home.
-  local kasm_home kasm_gid
+  local kasm_home
   kasm_home="$(getent passwd 1000 | cut -d: -f6 || echo /home/kasm-user)"
-  kasm_gid="$(getent passwd 1000 | cut -d: -f4 || echo 0)"
-  if ! getent passwd "${BC_USER}" >/dev/null 2>&1; then
-    log "Creating '${BC_USER}' as an alias of uid 1000 (gid ${kasm_gid}, home ${kasm_home})..."
-    useradd -o -u 1000 -g "${kasm_gid}" -M -d "${kasm_home}" -s /bin/bash "${BC_USER}"
-  fi
 
-  # BitCurator's own docs (bitcurator/bitcurator-salt README) recommend
-  # creating a user named "bcadmin" during Ubuntu's install and note it
-  # "will be needed for sudo commands" - bcadmin is their example ACCOUNT
-  # NAME, not a group. There is no BitCurator-specific group anywhere in
-  # their docs (an earlier version of this script invented one - removed).
-  # `sudo` is the one group membership they actually document as required.
-  # The rest of this list is Ubuntu Desktop's own long-standing
-  # installer-assigned default-user group set (not BitCurator-specific);
-  # any that don't exist on this base image are skipped, not created.
-  for user in "${KASM_USER}" "${BC_USER}"; do
-    getent passwd "$user" >/dev/null 2>&1 || continue
-    for grp in sudo adm cdrom dip plugdev lpadmin lxd sambashare; do
-      if getent group "$grp" >/dev/null 2>&1; then
-        usermod -aG "$grp" "$user" || true
-      fi
-    done
+  # --- Scratch account (idempotent) ---------------------------------------
+  # A plain, independent account with its own uid/home - not an alias of
+  # kasm-user's uid 1000 (see header comment for why that broke salt's own
+  # ownership bookkeeping). BitCurator's own docs (bitcurator/bitcurator-salt
+  # README) walk through creating a user named "bcadmin" during Ubuntu's
+  # install and note `sudo` "will be needed for sudo commands" - bcadmin is
+  # their example ACCOUNT NAME; sudo is the one group membership they
+  # actually document as required.
+  if ! getent passwd "${BC_USER}" >/dev/null 2>&1; then
+    log "Creating scratch account '${BC_USER}'..."
+    useradd -m -s /bin/bash "${BC_USER}"
+  fi
+  usermod -aG sudo "${BC_USER}"
+
+  # kasm-user (the real session account) needs the same desktop-usable
+  # groups a normal BitCurator install would grant its user, so mounting/
+  # analyzing disk images works once the config is merged into its home.
+  for grp in sudo adm cdrom dip plugdev lpadmin lxd sambashare; do
+    if getent group "$grp" >/dev/null 2>&1; then
+      usermod -aG "$grp" "${KASM_USER}" || true
+    fi
   done
 
   # --- Fetch the official CLI (release binary, renamed to `bitcurator`) ---
@@ -170,9 +199,10 @@ main() {
   # bitcurator-cli's own summary only prints the first 10 failures and
   # points at this file for the rest ("Pay particular attention to lines
   # that start with [ERROR]") - copy it out before cleanup wipes
-  # /var/cache/salt, since it's the only way to root-cause failures
-  # (e.g. "Failed to change user to kasm_user") beyond the summary.
+  # /var/cache/salt.
   cp -f /var/cache/bitcurator/cli/*/saltstack.log /var/log/bitcurator-saltstack.log 2>/dev/null || true
+
+  merge_into_kasm_home "$kasm_home"
 
   # --- Desktop-collision repair (safety net; addon mode should avoid it) --
   # Shims still in place so the purge/reinstall does not trip over systemd.
@@ -199,7 +229,8 @@ main() {
     log "WARNING: some BitCurator tools are missing - inspect ${BC_LOG}"
   fi
 
-  # --- Cleanup salt artefacts + a stray panel plugin --------------------
+  # --- Cleanup salt artefacts, the scratch account, and a stray panel plugin
+  userdel -r "${BC_USER}" >/dev/null 2>&1 || true
   rm -rf /var/cache/salt /srv/salt /srv/pillar 2>/dev/null || true
   rm -f /usr/share/xfce4/panel/plugins/power-manager-plugin.desktop 2>/dev/null || true
 
