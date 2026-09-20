@@ -11,6 +11,10 @@ SCAN_DIRS=(
 
 EXCLUDES=(
   "*/custom_startup.sh"
+  # Vendored, unmodified third-party BitCurator scripts (GPLv3, see
+  # src/ubuntu/install/bitcurator5/vendor/NOTICE.md) - not ours to fix,
+  # and several are #!/usr/bin/expect scripts shellcheck can't parse as sh.
+  "*/bitcurator5/vendor/*"
 )
 
 # Build find exclusion args
