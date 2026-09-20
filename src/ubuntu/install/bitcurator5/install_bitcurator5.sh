@@ -53,6 +53,20 @@ exit 0
 EOF
   cat > /usr/local/sbin/timedatectl <<'EOF'
 #!/bin/sh
+# Bare `timedatectl` / `status` / `show` all need to print parseable
+# status text - salt's timezone.get_hwclock() regexes for "RTC in local
+# TZ" and hard-fails with "Failed to parse timedatectl output" (not just
+# a soft skip) when the output is empty, since /run/systemd/system makes
+# salt.utils.systemd.booted() true and take this codepath.
+cat <<'STATUS'
+               Local time: Thu 2026-01-01 00:00:00 UTC
+           Universal time: Thu 2026-01-01 00:00:00 UTC
+                 RTC time: Thu 2026-01-01 00:00:00
+                Time zone: Etc/UTC (UTC, +0000)
+System clock synchronized: yes
+              NTP service: n/a
+          RTC in local TZ: no
+STATUS
 exit 0
 EOF
   chmod 0755 /usr/local/sbin/systemctl /usr/local/sbin/timedatectl
@@ -152,6 +166,13 @@ main() {
     log "WARNING: 'bitcurator install' exited ${rc}. Service/systemd states"
     log "         fail inside a container - review ${BC_LOG}. Continuing."
   fi
+
+  # bitcurator-cli's own summary only prints the first 10 failures and
+  # points at this file for the rest ("Pay particular attention to lines
+  # that start with [ERROR]") - copy it out before cleanup wipes
+  # /var/cache/salt, since it's the only way to root-cause failures
+  # (e.g. "Failed to change user to kasm_user") beyond the summary.
+  cp -f /var/cache/bitcurator/cli/*/saltstack.log /var/log/bitcurator-saltstack.log 2>/dev/null || true
 
   # --- Desktop-collision repair (safety net; addon mode should avoid it) --
   # Shims still in place so the purge/reinstall does not trip over systemd.
