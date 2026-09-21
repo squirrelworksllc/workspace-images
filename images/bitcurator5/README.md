@@ -49,6 +49,12 @@ for exactly what's vendored from upstream vs. reimplemented, and why.
 * **[ClamAV](https://www.clamav.net/)** – Open-source antivirus engine.
 * **[Hashdeep](https://github.com/jessek/hashdeep)** – Computing and verifying cryptographic hashes (also provides `md5deep`).
 
+### ⚠️ Deliberate Deviations from Upstream
+* **No `openssh-server`.** Upstream's package list installs it for bare-metal/VM
+  remote access; a Kasm session is already reached over the web UI, so baking
+  a running-capable sshd plus static host keys into a shared image would just
+  be unnecessary attack surface.
+
 ### 🖥️ Desktop Integration
 * The BitCurator application menu (Forensics and Reporting, Imaging and
   Recovery, Packaging and Transfer, Documentation and Help, Additional

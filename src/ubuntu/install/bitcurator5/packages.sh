@@ -109,7 +109,11 @@ main() {
   install_batch python3-icu
 
   # --- Networking / system ---------------------------------------------------
-  install_batch openssh-server openssh-client cifs-utils dbus-x11 dconf-cli \
+  # openssh-server deliberately excluded (upstream installs it for bare-metal
+  # remote access; a Kasm session is already reached over the web UI, and
+  # baking sshd + static host keys into a shared image is an unnecessary
+  # attack surface).
+  install_batch openssh-client cifs-utils dbus-x11 dconf-cli \
     dconf-editor xdg-utils mysql-client sudo
 
   # --- Nautilus/file-manager scripts support (harmless if Thunar is the
