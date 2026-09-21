@@ -36,7 +36,7 @@ for exactly what's vendored from upstream vs. reimplemented, and why.
 * **[HFSExplorer](https://github.com/unsound/hfsexplorer)** – Read HFS/HFS+ filesystem images.
 
 ### 🧠 Data Identification & Analysis
-* **[Bulk Extractor](https://github.com/simsong/bulk_extractor)** – High-performance feature extraction (PII, emails, etc.) from disk images.
+* **[Bulk Extractor](https://github.com/simsong/bulk_extractor)** – High-performance feature extraction (PII, emails, etc.) from disk images, built with both RE2 and PCRE regex scanner support.
 * **[Brunnhilde](https://github.com/tw4l/brunnhilde)** – Characterizes directories/disk images using Siegfried.
 * **[Siegfried](https://www.itforarchivists.com/siegfried/)** – Signature-based file format identification.
 * **[analyzeMFT](https://github.com/rowingdude/analyzemft)** – Parses NTFS Master File Table records.

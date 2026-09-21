@@ -19,9 +19,11 @@ try() { "$@" || log "WARNING: '$*' failed - continuing (best-effort build)."; }
 
 build_bulk_extractor() {
   log "Building bulk_extractor v2.1.1..."
+  # libpcre3-dev (not libpcre2-dev) - configure checks explicitly for the
+  # legacy pcre.h/-lpcre symbols, not PCRE2's pcre2.h/-lpcre2-8.
   apt_install build-essential libssl-dev flex libewf2 libewf-dev \
     libexpat1-dev libre2-dev libxml2-utils libtool pkg-config zlib1g-dev \
-    make git
+    make git libpcre3-dev
   rm -rf /usr/local/src/bulk_extractor
   git clone --branch v2.1.1 --recurse-submodules --depth 1 \
     https://github.com/simsong/bulk_extractor /usr/local/src/bulk_extractor
