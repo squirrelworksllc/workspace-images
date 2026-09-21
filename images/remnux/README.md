@@ -51,7 +51,7 @@ A selection of what the REMnux catalog installs. Click any tool name for its pro
 ## 🧬 Architectural Lineage
 
 ```text
-kasmweb/core-ubuntu-noble:1.18.0-rolling-weekly      (upstream Kasm base)
+kasmweb/core-ubuntu-noble:1.19.0-rolling-weekly      (upstream Kasm base)
    └── squirrelworksllc/ubuntu-noble-core            (our immutable base layer)
          └── images/remnux/Dockerfile                (pre-conditioning + REMnux cloud install)
 ```

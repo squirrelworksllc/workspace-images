@@ -70,7 +70,7 @@ for exactly what's vendored from upstream vs. reimplemented, and why.
 ## 🏗️ Architectural Lineage
 
 ```text
-kasmweb/core-ubuntu-noble:1.18.0-rolling-weekly (Upstream Kasm Registry Layer)
+kasmweb/core-ubuntu-noble:1.19.0-rolling-weekly (Upstream Kasm Registry Layer)
    └── squirrelworksllc/ubuntu-noble-core (Our Immutable Base Layer)
          └── images/bitcurator5/Dockerfile (This Blueprint)
                └── src/ubuntu/install/bitcurator5/*.sh (Native package/build/desktop steps)
