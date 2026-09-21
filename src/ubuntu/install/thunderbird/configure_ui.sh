@@ -8,7 +8,8 @@ set -euo pipefail
 
 log() { echo "[THUNDERBIRD-UI] $*"; }
 
-KASM_HOME="/home/kasm-default-profile"
+# shellcheck source=/dev/null
+source "${INST_DIR:-/dockerstartup/install}/ubuntu/install/common/10_desktop_icon.sh"
 
 log "Step 1: Hardening Thunderbird (Disabling Telemetry & Noise)..."
 # Enterprise policies are placed in the distribution folder to apply globally
@@ -50,5 +51,8 @@ if [ -f /usr/share/applications/thunderbird.desktop ]; then
   fi
   log "Start Menu entry configured."
 fi
+
+# Desktop icon (opt-in via THUNDERBIRD_DESKTOP_ICON=true; default off)
+desktop_icon thunderbird /usr/share/applications/thunderbird.desktop false
 
 log "Thunderbird UI configuration complete."

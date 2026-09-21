@@ -4,23 +4,10 @@
 # Purpose: Installs and configures the Tor daemon for Kasm 1.18+
 ###############################################################################
 set -euo pipefail
-IFS=$'\n\t'
-
-# Standard SquirrelWorks logging
-log() { echo "[tor-daemon] $*"; }
-
-# Use existing apt helpers if available
+LOG_TAG="TOR-DAEMON"
 : "${INST_DIR:=/dockerstartup/install}"
-if [ -f "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh" ]; then
-    source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
-fi
-
-require_root() {
-  if [ "$(id -u)" -ne 0 ]; then
-    log "ERROR: must be run as root" >&2
-    exit 1
-  fi
-}
+# shellcheck source=/dev/null
+source "${INST_DIR}/ubuntu/install/common/03_scaffold.sh"
 
 maybe_write_torrc() {
   local torrc_path="$1"
@@ -50,7 +37,7 @@ EOF
   mkdir -p /var/log/tor /var/lib/tor /run/tor
   chown -R debian-tor:debian-tor /var/log/tor /var/lib/tor /run/tor
   chmod 0700 /var/lib/tor /var/log/tor
-  
+
   chmod 0644 "$torrc_path"
 }
 
@@ -65,12 +52,8 @@ main() {
   local torrc_path="${TOR_TORRC_PATH:-/etc/tor/torrc}"
 
   # Step 1: Install
-  if command -v apt_update_if_needed >/dev/null 2>&1; then
-      apt_update_if_needed
-      apt_install tor tor-geoipdb
-  else
-      apt-get update && apt-get install -y tor tor-geoipdb
-  fi
+  apt_update_if_needed
+  apt_install tor tor-geoipdb
 
   # Step 2: Configure
   maybe_write_torrc "$torrc_path" "$socks_port" "$control_port" "true" "$log_level"

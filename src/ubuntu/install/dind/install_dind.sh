@@ -5,10 +5,10 @@
 #          Script is designed to fetch latest "Go" ON PURPOSE.
 ###############################################################################
 set -euo pipefail
+LOG_TAG="DIND-INSTALL"
 : "${INST_DIR:=/dockerstartup/install}"
-source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
-
-log() { echo "[DIND-INSTALL] $*"; }
+# shellcheck source=/dev/null
+source "${INST_DIR}/ubuntu/install/common/03_scaffold.sh"
 
 main() {
     log "======= Installing Docker-In-Docker (DinD) ======="
@@ -71,15 +71,79 @@ main() {
     useradd -U dockremap || true
     echo "dockremap:165536:65536" >> /etc/subuid
     echo "dockremap:165536:65536" >> /etc/subgid
-    
+
     # Ensure the Kasm user is in the docker group
     usermod -aG docker kasm-user || true
 
-    log "Triggering UI/Config configuration..."
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    if [ -f "${SCRIPT_DIR}/configure_ui.sh" ]; then
-        bash "${SCRIPT_DIR}/configure_ui.sh"
+    log "Step 6: On-demand Docker daemon launcher, backed by supervisord..."
+    local here
+    here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+    # storage-driver=fuse-overlayfs: the kernel's default overlay2 driver
+    # generally can't run on top of the container's own overlay rootfs. We
+    # were already installing the package but never actually telling dockerd
+    # to use it.
+    install -D -m 0644 "${here}/daemon.json" /etc/docker/daemon.json
+
+    # Registers dockerd as a supervised, auto-restarting program (logs at
+    # /var/log/dockerd.{out,err}.log): once started, supervisord brings
+    # dockerd back if it ever dies. supervisord's default config includes
+    # everything under /etc/supervisor/conf.d/ (the package we installed
+    # above ships that default), so nothing else has to reference this file.
+    install -D -m 0644 "${here}/dockerd.conf" /etc/supervisor/conf.d/dockerd.conf
+
+    # NOTE: we deliberately do NOT install a /dockerstartup/custom_startup.sh
+    # here. Overriding that file to auto-start supervisord (Kasm's own
+    # pattern, gated on filter_ready/desktop_ready) reproducibly broke Kasm
+    # session provisioning ("Nginx failed to reload... no host in upstream")
+    # even after the script itself was made crash-proof - something about
+    # overriding that specific file is fatal to container bring-up in ways we
+    # can't see from outside (it's invoked by the vendor base image's own
+    # entrypoint chain, which we don't ship). The user starts dockerd instead,
+    # from the "Docker in Docker" launcher below.
+    install -m 0755 "${here}/start_dockerd.sh" /usr/local/bin/dind-start-docker
+
+    # Session user may start supervisord as root, nothing else. supervisord
+    # then runs dockerd as root itself, same as bare-metal Docker.
+    cat > /etc/sudoers.d/dind-supervisord <<'EOF'
+kasm-user ALL=(root) NOPASSWD: /usr/bin/supervisord -n
+EOF
+    chmod 0440 /etc/sudoers.d/dind-supervisord
+
+    # "Docker in Docker" launcher - Applications menu + (via configure_ui.sh)
+    # the Desktop. Runs in a held-open terminal so the user sees the output.
+    install -d -m 0755 /usr/share/applications
+    cat > /usr/share/applications/dind-docker.desktop <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Docker in Docker
+Comment=Start the nested Docker daemon in this session
+Exec=xfce4-terminal --title="Docker in Docker" --hold --command="/usr/local/bin/dind-start-docker"
+Icon=utilities-terminal
+Terminal=false
+Categories=System;Development;
+Keywords=docker;dind;daemon;
+EOF
+    chmod 0644 /usr/share/applications/dind-docker.desktop
+
+    # A passwordless/locked account can fail PAM's account-validity check for
+    # sudo on some base images regardless of NOPASSWD. Kasm's own dind image
+    # sets this same password; match it to remove that as a variable.
+    echo 'kasm-user:kasm-user' | chpasswd
+
+    # Prefer /etc/hosts over DNS for name resolution inside the nested Docker
+    # network namespace (Kasm's own dind image does the same). Edited in
+    # place rather than overwriting the whole file - nsswitch.conf also
+    # carries the passwd/group/shadow database lines everything from `sudo`
+    # to `getent` relies on, and there's no reason to gamble on glibc's
+    # fallback-to-files behavior for lines we don't actually need to touch.
+    if grep -q '^hosts:' /etc/nsswitch.conf 2>/dev/null; then
+        sed -i 's/^hosts:.*/hosts: files dns/' /etc/nsswitch.conf
+    else
+        echo 'hosts: files dns' >> /etc/nsswitch.conf
     fi
+
+    run_configure_ui
 }
 
 main "$@"

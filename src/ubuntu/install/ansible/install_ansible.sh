@@ -4,10 +4,10 @@
 # Purpose: Installs Ansible and Linting tools for SquirrelWorks 1.1
 ###############################################################################
 set -euo pipefail
+LOG_TAG="ANSIBLE-INSTALL"
 : "${INST_DIR:=/dockerstartup/install}"
-source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
-
-log() { echo "[ANSIBLE-INSTALL] $*"; }
+# shellcheck source=/dev/null
+source "${INST_DIR}/ubuntu/install/common/03_scaffold.sh"
 
 main() {
     log "======= Installing Ansible Automation Suite ======="
@@ -35,12 +35,7 @@ main() {
             ;;
     esac
 
-    log "Triggering environment configuration..."
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    if [ -f "${SCRIPT_DIR}/configure_ui.sh" ]; then
-        bash "${SCRIPT_DIR}/configure_ui.sh"
-    fi
-
+    run_configure_ui
     log "Ansible installation complete."
 }
 

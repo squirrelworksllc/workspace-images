@@ -4,32 +4,22 @@
 # Purpose: Installs Recoll for SquirrelWorks 1.1 (Noble/Debian)
 ###############################################################################
 set -euo pipefail
+LOG_TAG="RECOLL-INSTALL"
 : "${INST_DIR:=/dockerstartup/install}"
-source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
-
-log() { echo "[RECOLL-INSTALL] $*"; }
+# shellcheck source=/dev/null
+source "${INST_DIR}/ubuntu/install/common/03_scaffold.sh"
 
 main() {
-  log "======= Installing Recoll Full-Text Search ======="
+    log "======= Installing Recoll Full-Text Search ======="
 
-  . /etc/os-release
-  apt_update_if_needed
+    apt_update_if_needed
 
-  if [ "${ID}" = "ubuntu" ]; then
-    log "Ubuntu detected."
-    # ARCHITECT NOTE: Ubuntu 24.04 (Noble) natively hosts Recoll 1.37+ in the universe repository.
-  fi
+    # Ubuntu 24.04 (Noble) natively hosts Recoll 1.37+ in the universe repo -
+    # indexing engine, GUI, CLI tooling, and the Python bindings.
+    apt_install recoll recollgui recollcmd python3-recoll
 
-  # Install core indexing engine, GUI, CLI tooling, and Python bindings
-  apt_install recoll recollgui recollcmd python3-recoll
-
-  log "Triggering UI and Environment configuration..."
-  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  if [ -f "${SCRIPT_DIR}/configure_ui.sh" ]; then
-    bash "${SCRIPT_DIR}/configure_ui.sh"
-  fi
-
-  log "Recoll installation complete."
+    run_configure_ui
+    log "Recoll installation complete."
 }
 
 main "$@"

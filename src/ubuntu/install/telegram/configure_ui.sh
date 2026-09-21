@@ -2,7 +2,7 @@
 ###############################################################################
 # configure_ui.sh
 #
-# Purpose: Configures UI, prevents duplicates, and REMOVES desktop shortcut.
+# Purpose: Single menu entry, autostart suppression, opt-in Desktop icon.
 # Optimized for: Kasm 1.18+ / Ubuntu Noble
 ###############################################################################
 set -euo pipefail
@@ -11,13 +11,13 @@ log() { echo "[TELEGRAM-UI] $*"; }
 
 # Kasm 1.18+ Dynamic Home Detection
 KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile")
+# shellcheck source=/dev/null
+source "${INST_DIR:-/dockerstartup/install}/ubuntu/install/common/10_desktop_icon.sh"
 
-# --- Step 0: Nuclear Duplicate & Desktop Cleanup ---
-log "Cleaning up duplicate menu entries and desktop shortcuts..."
+# --- Step 0: De-duplicate the packaged menu entries ---
+log "Cleaning up duplicate menu entries..."
 rm -f /usr/share/applications/telegram-desktop.desktop
 rm -f /usr/share/applications/org.telegram.desktop.desktop
-# Nuclear: Remove the shortcut from the desktop if it exists
-rm -f "$KASM_HOME/Desktop/telegram.desktop"
 
 # 1. Determine Binary Path
 if [ -f "/opt/Telegram/Telegram" ]; then
@@ -36,12 +36,14 @@ else
 fi
 
 log "Writing single source-of-truth: /usr/share/applications/telegram.desktop"
+# No -workdir: Telegram defaults to ~/.local/share/TelegramDesktop at runtime.
+# Baking $KASM_HOME here would pin it to the build-time home.
 cat >/usr/share/applications/telegram.desktop <<EOL
 [Desktop Entry]
 Version=1.0
 Name=Telegram Desktop
 Comment=Official desktop version of Telegram messaging app
-Exec=$EXEC_PATH -workdir $KASM_HOME/.local/share/TelegramDesktop -- %u
+Exec=$EXEC_PATH -- %u
 Icon=$ICON_PATH
 Terminal=false
 StartupWMClass=TelegramDesktop
@@ -70,14 +72,18 @@ cat <<EOF > "$AUTOSTART_DIR/telegramdesktop.desktop"
 [Desktop Entry]
 Type=Application
 Name=Telegram Desktop
-Exec=$EXEC_PATH -workdir $KASM_HOME/.local/share/TelegramDesktop -startintray
+Exec=$EXEC_PATH -startintray
 X-GNOME-Autostart-enabled=false
 Hidden=true
 NoDisplay=true
 EOF
 
 # Ensure the Kasm user owns their config/local directories
-chown -R 1000:1000 "$KASM_HOME/.config"
-chown -R 1000:1000 "$KASM_HOME/.local"
+# (Noble runs the session user with primary group 0)
+mkdir -p "$KASM_HOME/.local/share/TelegramDesktop"
+chown -R 1000:0 "$KASM_HOME/.config" "$KASM_HOME/.local" 2>/dev/null || true
 
-log "Telegram UI configuration complete. Menu entry created; Desktop clean."
+# Desktop icon (opt-in via TELEGRAM_DESKTOP_ICON=true; default off)
+desktop_icon telegram /usr/share/applications/telegram.desktop false
+
+log "Telegram UI configuration complete."

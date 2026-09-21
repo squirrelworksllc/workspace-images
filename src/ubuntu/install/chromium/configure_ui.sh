@@ -7,6 +7,9 @@ set -euo pipefail
 
 log() { echo "[CHROMIUM-UI] $*"; }
 
+# shellcheck source=/dev/null
+source "${INST_DIR:-/dockerstartup/install}/ubuntu/install/common/10_desktop_icon.sh"
+
 # 1. Managed Policies (Hardening)
 log "Step 1: Injecting Managed Policies..."
 mkdir -p /etc/chromium/policies/managed/
@@ -29,7 +32,10 @@ CHROME_ARGS="--password-store=basic --no-sandbox --ignore-gpu-blocklist --user-d
 REAL_BIN="chromium"
 [ -f /usr/bin/chromium-browser ] && REAL_BIN="chromium-browser"
 
-mv "/usr/bin/${REAL_BIN}" "/usr/bin/${REAL_BIN}-orig"
+# Idempotent: only shift the real binary aside once
+if [ -f "/usr/bin/${REAL_BIN}" ] && [ ! -f "/usr/bin/${REAL_BIN}-orig" ]; then
+    mv "/usr/bin/${REAL_BIN}" "/usr/bin/${REAL_BIN}-orig"
+fi
 
 cat <<EOF > "/usr/bin/${REAL_BIN}"
 #!/usr/bin/env bash
@@ -50,14 +56,5 @@ EOF
 
 chmod +x "/usr/bin/${REAL_BIN}"
 
-# 3. Desktop Shortcut
-log "Step 3: Deploying Desktop Shortcut..."
-KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile")
-SRC_DESKTOP="/usr/share/applications/${REAL_BIN}.desktop"
-
-if [ -f "$SRC_DESKTOP" ]; then
-    mkdir -p "$KASM_HOME/Desktop"
-    cp "$SRC_DESKTOP" "$KASM_HOME/Desktop/Chromium.desktop"
-    chmod +x "$KASM_HOME/Desktop/Chromium.desktop"
-    chown -R 1000:1000 "$KASM_HOME/Desktop"
-fi
+# 3. Desktop icon (opt-in via CHROMIUM_DESKTOP_ICON=true; default off)
+desktop_icon chromium "/usr/share/applications/${REAL_BIN}.desktop" false Chromium.desktop

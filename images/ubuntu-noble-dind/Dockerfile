@@ -32,7 +32,15 @@ ENV HOME=/home/kasm-default-profile \
     INST_DIR=/dockerstartup/install \
     INSTALL_CHROME=false \
     SKIP_CHROMIUM=false \
+    GENERATE_DESKTOP_DOCS=false \
     DEBUG=false
+
+# Desktop-icon toggles. The nested Docker daemon is NOT auto-started; the user
+# launches it from the "Docker in Docker" icon (Desktop + Applications menu).
+#   DIND_DESKTOP_ICON=false     -> keep it in the menu only, no Desktop icon
+#   CHROMIUM_DESKTOP_ICON=true  -> also drop a Chromium icon on the Desktop
+ENV DIND_DESKTOP_ICON=true \
+    CHROMIUM_DESKTOP_ICON=false
 
 WORKDIR ${HOME}
 
@@ -58,69 +66,68 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # --- Context Guard ---
 COPY ./src/ubuntu/install/ ./__context_check__/ubuntu_install/
-COPY ./images/ubuntu-noble-dind/README.md /src/README.md
 RUN rm -rf ./__context_check__
 
 # --- Stage Resources ---
 COPY ./src/ubuntu/ ${INST_DIR}/ubuntu/
 RUN find "${INST_DIR}/ubuntu/install" -maxdepth 4 -type f -name '*.sh' -exec chmod +x {} \;
 
-# --- Runtime Validation Tools ---
-RUN mkdir -p /dockerstartup/tools
-COPY ./src/tools/runtime/runtime_validation.sh /dockerstartup/tools/runtime_validation.sh
-RUN chmod 0755 /dockerstartup/tools/runtime_validation.sh
-
 # --- Global Build Orchestration ---
+# DinD is Core + Chromium + Docker/k8s tooling + the on-demand "Docker in
+# Docker" launcher (dind/install_dind.sh) that starts supervisord (which then
+# manages dockerd, auto-restarting it if it dies). desktop/install.sh runs for
+# the wallpaper + XFCE panel/menu fixes only - GENERATE_DESKTOP_DOCS=false
+# skips the app catalog. SCRIPTS run in order; Chromium is skipped when
+# SKIP_CHROMIUM=true.
 ARG APT_DEBUG=false
 
 RUN set -eux; \
+    GREEN=$(printf '\033[0;32m'); RED=$(printf '\033[0;31m'); YELLOW=$(printf '\033[0;33m'); NC=$(printf '\033[0m'); \
     apt-get update; \
-    \
-    # =========================================================================
-    # SQUIRRELWORKS MODULE REGISTRY
-    # =========================================================================
     SCRIPTS=( \
       "/ubuntu/install/tools/install_tools.sh" \
       "/ubuntu/install/common/00_apt_helper.sh" \
       "/ubuntu/install/dind/install_dind.sh" \
       "/ubuntu/install/chromium/install_chromium.sh" \
-      "/ubuntu/install/vs_code/install_vs_code.sh" \
       "/ubuntu/install/desktop/install.sh" \
       "/ubuntu/install/common/01_cleanup.sh" \
     ); \
-    \
-    # Execution Loop
     for SCRIPT in "${SCRIPTS[@]}"; do \
       echo ">>> Executing Module: ${SCRIPT}"; \
-      \
-      # Handle conditional Chromium install
       if [[ "${SCRIPT}" == *"chromium/install_chromium.sh" && "${SKIP_CHROMIUM}" == "true" ]]; then \
-        echo "Skipping Chromium per ENV constraint..."; \
+        echo "${YELLOW}>>> SKIPPED: ${SCRIPT} (SKIP_CHROMIUM=true)${NC}"; \
         continue; \
       fi; \
-      \
-      # Handle branded desktop install
-      if [[ "${SCRIPT}" == *"desktop/install.sh" ]]; then \
-        bash "${INST_DIR}${SCRIPT}" noble; \
+      ARGS=(); \
+      [[ "${SCRIPT}" == *"desktop/install.sh" ]] && ARGS=("noble"); \
+      if bash "${INST_DIR}${SCRIPT}" "${ARGS[@]}"; then \
+        echo "${GREEN}>>> SUCCESS: ${SCRIPT} applied successfully${NC}"; \
       else \
-        bash "${INST_DIR}${SCRIPT}"; \
-      fi || { \
         rc=$?; \
-        echo "FAILED: ${SCRIPT} (rc=$rc)"; \
+        echo "${RED}>>> FAILED: ${SCRIPT} (exit ${rc}) - see the module's own log output directly above for the failing step${NC}"; \
         [ "${APT_DEBUG}" = "true" ] && tail -n 100 /var/log/apt/term.log || true; \
         exit "$rc"; \
-      }; \
+      fi; \
     done; \
-    \
-    # --- Final Session Preparation ---
+    echo "${GREEN}>>> All DinD modules applied successfully${NC}"; \
     "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \
     rm -f /etc/X11/xinit/Xclients; \
     chown 1000:0 "${HOME}"; \
     mkdir -p /home/kasm-user; \
     chown -R 1000:0 /home/kasm-user; \
-    \
-    # Cleanup only the ephemeral build scripts
     rm -rf "${INST_DIR}/ubuntu/install"
+
+# NOTE: like ubuntu-noble-core, this stage does NOT overwrite
+# /dockerstartup/custom_startup.sh. We tried matching Kasm's own reference
+# dind image exactly (which does override it, gated on its own
+# filter_ready/desktop_ready readiness binaries) and it reproducibly broke
+# session provisioning ("Nginx failed to reload... no host in upstream") even
+# after the override script itself was made crash-proof - something about
+# overriding that specific file is fatal here in a way we can't see from
+# outside (it's invoked by the vendor base image's own entrypoint chain,
+# which this repo doesn't ship). daemon.json and dockerd.conf are still
+# wired in (see dind/install_dind.sh); the user starts dockerd manually from
+# the "Docker in Docker" icon instead of it auto-starting.
 
 # ############################################################################
 # -------------------------- SECURITY METADATA LAYER ----------------------- #
@@ -129,10 +136,8 @@ RUN set -eux; \
 RUN mkdir -p /opt/vex
 COPY images/vex_ubuntu_common.json /opt/vex/vex.json
 
-# Copy the centralized Trivy ignore file into standard system scanner paths
-COPY images/trivy_ubuntu_common.ignore /.trivyignore
-COPY images/trivy_ubuntu_common.ignore /app/.trivyignore
-ENV TRIVY_IGNOREFILE=/.trivyignore
+# NOTE: no embedded .trivyignore here - this image is never Trivy-scanned in
+# CI (only ubuntu-noble-core is; DinD builds FROM that already-scanned base).
 
 # ############################################################################
 # ------------------------------ FINALIZATION ------------------------------ #

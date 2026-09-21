@@ -12,14 +12,18 @@ log() { echo "[SLACK-UI] $*"; }
 
 # Kasm 1.18+ Dynamic Home Detection
 KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile")
+# shellcheck source=/dev/null
+source "${INST_DIR:-/dockerstartup/install}/ubuntu/install/common/10_desktop_icon.sh"
 
 DESKTOP_FILE="/usr/share/applications/slack.desktop"
 SYSTEM_AUTOSTART="/etc/xdg/autostart/slack.desktop"
 
 if [ -f "$DESKTOP_FILE" ]; then
     log "Step 1: Applying --no-sandbox fix for Kasm compatibility..."
-    # Slack is an Electron app; needs no-sandbox in restricted containers
-    sed -i 's@Exec=/usr/bin/slack@Exec=/usr/bin/slack --no-sandbox@' "$DESKTOP_FILE"
+    # Slack is an Electron app; needs no-sandbox in restricted containers (idempotent)
+    if ! grep -q -- '--no-sandbox' "$DESKTOP_FILE"; then
+        sed -i 's@Exec=/usr/bin/slack@Exec=/usr/bin/slack --no-sandbox@' "$DESKTOP_FILE"
+    fi
 
     log "Step 2: Categorizing Start Menu entry..."
     sed -i 's/Categories=.*/Categories=Network;InstantMessaging;Chat;/g' "$DESKTOP_FILE"
@@ -28,11 +32,6 @@ if [ -f "$DESKTOP_FILE" ]; then
         update-desktop-database /usr/share/applications/
     fi
 
-    # Step 3: Clean Desktop Policy
-    # We remove any existing shortcuts to keep the workspace professional.
-    log "Step 3: Removing desktop shortcut to maintain clean workspace..."
-    rm -f "$KASM_HOME/Desktop/slack.desktop"
-    
     # Step 4: Nuclear Option - Remove System Autostart
     # Prevents Electron from firing up on session start.
     if [ -f "$SYSTEM_AUTOSTART" ]; then
@@ -58,10 +57,13 @@ Hidden=true
 NoDisplay=true
 EOF
 
-    # Ensure ownership is correct for the Kasm default profile UID 1000
-    chown -R 1000:1000 "$KASM_HOME/.config"
+    # Ensure ownership is correct for the Kasm default profile (UID 1000, group 0)
+    chown -R 1000:0 "$KASM_HOME/.config" 2>/dev/null || true
 
     log "Slack UI configuration (Nuclear/Clean-Desktop) complete."
 else
     log "WARNING: slack.desktop not found at $DESKTOP_FILE. Check installation."
 fi
+
+# Desktop icon (opt-in via SLACK_DESKTOP_ICON=true; default off)
+desktop_icon slack "$DESKTOP_FILE" false

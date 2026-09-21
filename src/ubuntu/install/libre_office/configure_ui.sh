@@ -27,10 +27,13 @@ EOF
 log "Step 2: Start Menu Integration..."
 SRC_DESKTOP="/usr/share/applications/libreoffice-startcenter.desktop"
 
-# Fix LD_LIBRARY_PATH in all LibreOffice desktop files to prevent crashes
+# Fix LD_LIBRARY_PATH in all LibreOffice desktop files to prevent crashes.
+# .desktop Exec lines do not do command substitution, so the multiarch triplet
+# must be resolved here at build time (not left as a literal "$(arch)").
 log "Applying LD_LIBRARY_PATH fix to LibreOffice shortcuts..."
+MULTIARCH="$(dpkg-architecture -qDEB_HOST_MULTIARCH 2>/dev/null || echo "$(arch)-linux-gnu")"
 if ls /usr/share/applications/libreoffice-*.desktop 1> /dev/null 2>&1; then
-    sed -i "s@Exec=libreoffice@Exec=env LD_LIBRARY_PATH=:/usr/lib/libreoffice/program:/usr/lib/\$(arch)-linux-gnu/ libreoffice@g" /usr/share/applications/libreoffice-*.desktop
+    sed -i "s@Exec=libreoffice@Exec=env LD_LIBRARY_PATH=/usr/lib/libreoffice/program:/usr/lib/${MULTIARCH}/ libreoffice@g" /usr/share/applications/libreoffice-*.desktop
 fi
 
 if [ -f "$SRC_DESKTOP" ]; then
@@ -38,7 +41,7 @@ if [ -f "$SRC_DESKTOP" ]; then
     sed -i 's/Icon=libreoffice-startcenter/Icon=libreoffice-main/g' "$SRC_DESKTOP"
 fi
 
-# Ownership sync
-chown -R 1000:1000 "$KASM_HOME/.config/libreoffice"
+# Ownership sync (Noble runs the session user with primary group 0)
+chown -R 1000:0 "$KASM_HOME/.config/libreoffice" 2>/dev/null || true
 
 log "LibreOffice UI configuration complete."

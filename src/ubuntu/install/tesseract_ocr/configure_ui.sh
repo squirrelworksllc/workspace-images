@@ -8,11 +8,13 @@ set -euo pipefail
 
 log() { echo "[TESSERACT-UI] $*"; }
 
-KASM_HOME="/home/kasm-default-profile"
+KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile")
 # Use INST_DIR or fallback to the standard SquirrelWorks path
 SOURCE_DIR="${INST_DIR:-/dockerstartup/install}/ubuntu/install/tesseract_ocr"
 
 log "Configuring Tesseract Environment UI..."
+
+mkdir -p "$KASM_HOME/Desktop"
 
 # 1. Tesseract CLI Shortcut (The custom .desktop you provided)
 if [ -f "${SOURCE_DIR}/tesseract.desktop" ]; then
@@ -59,8 +61,8 @@ EOF
 
 # 4. Final Permissions and Database Refresh
 log "Finalizing permissions and refreshing Start Menu..."
-# Ensure kasm user owns everything on the desktop
-chown -R 1000:1000 "$KASM_HOME/Desktop/"
+# Ensure kasm user owns everything on the desktop (group 0 on Noble)
+chown -R 1000:0 "$KASM_HOME/Desktop/" 2>/dev/null || true
 # Make shortcuts executable (essential for XFCE/Ubuntu 'Allow Launching')
 chmod +x "$KASM_HOME/Desktop/"*.desktop 2>/dev/null || true
 

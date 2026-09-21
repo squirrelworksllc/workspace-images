@@ -21,8 +21,9 @@ KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile
 # 1. Permission Sync
 if [ -d "$KASM_HOME/.mozilla" ]; then
     log "Syncing Firefox profile permissions..."
-    chown -R 1000:1000 "$KASM_HOME/.mozilla"
-    
+    # best-effort: custom_startup.sh may run unprivileged
+    chown -R 1000:0 "$KASM_HOME/.mozilla" 2>/dev/null || true
+
     # 2. Lock Cleanup
     # Find and remove any stale lock files in any profile directory
     find "$KASM_HOME/.mozilla/firefox" -name "parent.lock" -delete 2>/dev/null || true

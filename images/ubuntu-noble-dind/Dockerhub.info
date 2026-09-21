@@ -4,9 +4,11 @@ A lightweight Ubuntu Noble 24.04 desktop environment built on top of our immutab
 
 ## ✔️ Included Tools
 
-* **Core Containerization:** Docker Engine, Docker Compose, CLI Plugins
-* **Web Browsers:** Google Chrome (Enterprise-stable, container-optimized)
-* **Developer Suite:** Visual Studio Code (VSCode) with optimized host-mount permissions
+* **Core Containerization:** Docker Engine, Docker Compose, Buildx
+* **Kubernetes:** k3d + kubectl
+* **Web Browser:** Chromium (container-optimized, `--no-sandbox` wrapper)
+
+This image is `ubuntu-noble-core` + Chromium + the Docker/Kubernetes tooling — nothing else.
 
 ## 🎯 Purpose
 

@@ -11,12 +11,15 @@ KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile
 
 log "Configuring Wine environment for Kasm user..."
 
-# 1. Environment Variables for Wine (PEP 668 & Multi-user safe)
-# We set these globally so they persist in the Kasm session
-cat >> /etc/environment <<EOF
-WINEPREFIX=${KASM_HOME}/.wine
+# 1. Environment Variables for Wine, set globally so they persist in the Kasm
+# session. /etc/environment is not shell-expanded (pam_env), so the prefix must
+# be a literal runtime path - never the build-time $KASM_HOME. Idempotent.
+if ! grep -q '^WINEPREFIX=' /etc/environment 2>/dev/null; then
+    cat >> /etc/environment <<'EOF'
+WINEPREFIX=/home/kasm-user/.wine
 WINEDEBUG=-all
 EOF
+fi
 
 # 2. Cleanup "Wine Pollution" in the Start Menu
 # WineHQ adds many shortcuts; we only want 'Wine Configuration' to show up
@@ -33,7 +36,7 @@ if [ -f "${WINE_APPS_DIR}/winecfg.desktop" ]; then
   mkdir -p "${KASM_HOME}/Desktop"
   cp "${WINE_APPS_DIR}/winecfg.desktop" "${KASM_HOME}/Desktop/Wine Config.desktop"
   chmod +x "${KASM_HOME}/Desktop/Wine Config.desktop"
-  chown 1000:1000 "${KASM_HOME}/Desktop/Wine Config.desktop"
+  chown 1000:0 "${KASM_HOME}/Desktop/Wine Config.desktop" 2>/dev/null || true
 fi
 
 # 4. Pre-configuring Wine Registry for better Kasm compatibility
@@ -54,7 +57,7 @@ WINE REGISTRY Version 2
 "Default"="1024x768"
 EOF
 
-chown -R 1000:1000 "${KASM_HOME}/.wine"
+chown -R 1000:0 "${KASM_HOME}/.wine" 2>/dev/null || true
 
 if command -v update-desktop-database > /dev/null; then
     update-desktop-database /usr/share/applications/

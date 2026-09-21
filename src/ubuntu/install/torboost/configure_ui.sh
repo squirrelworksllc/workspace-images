@@ -30,7 +30,7 @@ chmod +x /usr/share/applications/torboost.desktop
 mkdir -p "$KASM_HOME/Desktop"
 cp /usr/share/applications/torboost.desktop "$KASM_HOME/Desktop/"
 chmod +x "$KASM_HOME/Desktop/torboost.desktop"
-chown 1000:1000 "$KASM_HOME/Desktop/torboost.desktop"
+chown 1000:0 "$KASM_HOME/Desktop/torboost.desktop" 2>/dev/null || true
 
 # Refresh Menu
 if command -v update-desktop-database > /dev/null; then

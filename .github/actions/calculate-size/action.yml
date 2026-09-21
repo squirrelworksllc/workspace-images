@@ -1,0 +1,63 @@
+name: Calculate Image Size
+description: >-
+  Pulls an immutable image ref and reports its true uncompressed size
+  (docker image inspect .Size) as step outputs plus a job-summary row.
+  Assumes the caller has already logged in to the registry the image lives
+  in (this runs as a plain step, not a separate job, so it inherits the
+  calling job's Docker session).
+
+inputs:
+  image_path:
+    description: "Immutable image ref to measure (repo@sha256:...)"
+    required: true
+  image_key:
+    description: "Workspace image key (matches images.json .key), for the summary label"
+    required: true
+
+outputs:
+  size_bytes:
+    description: "Uncompressed on-disk size in bytes"
+    value: ${{ steps.calc.outputs.size_bytes }}
+  size_mb:
+    description: "Uncompressed size in MB, 2dp (Kasm registry uncompressed_size_mb)"
+    value: ${{ steps.calc.outputs.size_mb }}
+
+runs:
+  using: composite
+  steps:
+    - name: Measure image
+      id: calc
+      shell: bash
+      env:
+        IMAGE_PATH: ${{ inputs.image_path }}
+      run: |
+        set -euo pipefail
+        echo "::group::Uncompressed size (pull + inspect)"
+        docker pull "$IMAGE_PATH"
+        SIZE_BYTES=$(docker image inspect "$IMAGE_PATH" --format='{{.Size}}')
+        docker image rm "$IMAGE_PATH" >/dev/null 2>&1 || true
+        echo "::endgroup::"
+
+        SIZE_MB=$(awk -v b="$SIZE_BYTES" 'BEGIN { printf "%.2f", b / 1024 / 1024 }')
+        {
+          echo "size_bytes=${SIZE_BYTES}"
+          echo "size_mb=${SIZE_MB}"
+        } >> "$GITHUB_OUTPUT"
+        echo "Uncompressed size: ${SIZE_BYTES} bytes (${SIZE_MB} MB)"
+
+    - name: Job summary
+      shell: bash
+      env:
+        IMAGE_KEY: ${{ inputs.image_key }}
+        IMAGE_PATH: ${{ inputs.image_path }}
+        SIZE_MB: ${{ steps.calc.outputs.size_mb }}
+      run: |
+        set -euo pipefail
+        {
+          echo "### 📊 Image Size — \`${IMAGE_KEY}\`"
+          echo ""
+          echo "| Metric | Value |"
+          echo "| --- | --- |"
+          echo "| Ref | \`${IMAGE_PATH}\` |"
+          echo "| Uncompressed (Kasm \`uncompressed_size_mb\`) | **${SIZE_MB} MB** |"
+        } >> "$GITHUB_STEP_SUMMARY"

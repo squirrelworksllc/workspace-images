@@ -16,4 +16,4 @@ This workstation provides a standardized, immutable, and completely isolated san
 
 *   Executing interactive disk imaging and legacy data curation safely inside container boundaries.
 *   Conducting metadata extraction, PII identification, and digital preservation workflows.
-*   Serving as a reproducible remote forensics and archival workstation within the Kasm 1.18 platform architecture.
+*   Serving as a reproducible remote forensics and archival workstation within the Kasm 1.19 platform architecture.

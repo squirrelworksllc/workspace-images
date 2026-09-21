@@ -1,47 +1,42 @@
 #!/usr/bin/env bash
 ###############################################################################
 # install_edge.sh
-# Purpose: Installs Microsoft Edge with Dynamic Repo Detection
+# Purpose: Installs Microsoft Edge Stable via the Microsoft production repo.
 ###############################################################################
 set -euo pipefail
+LOG_TAG="EDGE-INSTALL"
 : "${INST_DIR:=/dockerstartup/install}"
-source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
-
-log() { echo "[EDGE-INSTALL] $*"; }
+# shellcheck source=/dev/null
+source "${INST_DIR}/ubuntu/install/common/03_scaffold.sh"
 
 main() {
     log "======= Installing Microsoft Edge Stable ======="
 
     apt_update_if_needed
-    apt_install curl ca-certificates gnupg
-
     . /etc/os-release
-    
-    # Identify the correct Microsoft Production repo for the OS
+
+    local cfg
     case "${ID}" in
-        ubuntu) MSCFG_URL="https://packages.microsoft.com/config/ubuntu/${VERSION_ID}/packages-microsoft-prod.deb" ;;
-        debian|kali) 
-            DEB_MAJOR="${VERSION_ID:-12}"
-            DEB_MAJOR="${DEB_MAJOR%%.*}"
-            MSCFG_URL="https://packages.microsoft.com/config/debian/${DEB_MAJOR}/packages-microsoft-prod.deb" 
+        ubuntu)
+            cfg="https://packages.microsoft.com/config/ubuntu/${VERSION_ID}/packages-microsoft-prod.deb"
             ;;
-        *) log "ERROR: Unsupported distro: ${ID}"; exit 1 ;;
+        debian|kali)
+            local major="${VERSION_ID:-12}"
+            major="${major%%.*}"
+            cfg="https://packages.microsoft.com/config/debian/${major}/packages-microsoft-prod.deb"
+            ;;
+        *)
+            log "ERROR: Unsupported distro: ${ID}" >&2
+            exit 1
+            ;;
     esac
 
-    log "Step 1: Installing Microsoft Repository Config..."
-    curl -fsSL -o /tmp/microsoft.deb "${MSCFG_URL}"
-    dpkg -i /tmp/microsoft.deb
-    rm -f /tmp/microsoft.deb
-
+    log "Installing the Microsoft repo config package..."
+    install_deb "$cfg"
     apt_refresh_after_repo_change
     apt_install microsoft-edge-stable
 
-    log "Step 2: Triggering Advanced UI and Policy configuration..."
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    if [ -f "${SCRIPT_DIR}/configure_ui.sh" ]; then
-        bash "${SCRIPT_DIR}/configure_ui.sh"
-    fi
-
+    run_configure_ui
     log "Edge installation complete."
 }
 

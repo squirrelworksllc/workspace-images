@@ -26,3 +26,11 @@
 set -e
 # Call the actual logic sitting in your install folder
 bash /dockerstartup/install/ubuntu/install/common/master_startup.sh
+
+# Runtime validation - runs the modular validators after the per-app startup
+# modules (daemons) have had a chance to come up. Soft by default; export
+# VALIDATE_MODE=hard to make a failing check abort session startup.
+# (Harmless if a Kasm workspace.json exec hook also invokes it - it is read-only.)
+if [ -x /dockerstartup/tools/runtime_validation.sh ]; then
+  bash /dockerstartup/tools/runtime_validation.sh
+fi

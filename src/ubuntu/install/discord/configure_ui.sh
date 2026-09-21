@@ -10,15 +10,19 @@ log() { echo "[DISCORD-UI] $*"; }
 
 # Kasm 1.18+ Dynamic Home Detection
 KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile")
+# shellcheck source=/dev/null
+source "${INST_DIR:-/dockerstartup/install}/ubuntu/install/common/10_desktop_icon.sh"
 
 DESKTOP_FILE="/usr/share/applications/discord.desktop"
 SYSTEM_AUTOSTART="/etc/xdg/autostart/discord.desktop"
 
 log "Patching Discord for Container Sandboxing..."
 if [ -f "$DESKTOP_FILE" ]; then
-    # Step 1: Inject --no-sandbox into the system-wide desktop entry
+    # Step 1: Inject --no-sandbox into the system-wide desktop entry (idempotent).
     # Electron apps in Kasm containers require this to initialize correctly.
-    sed -i 's@Exec=/usr/share/discord/Discord@Exec=/usr/share/discord/Discord --no-sandbox@g' "$DESKTOP_FILE"
+    if ! grep -q -- '--no-sandbox' "$DESKTOP_FILE"; then
+        sed -i 's@Exec=/usr/share/discord/Discord@Exec=/usr/share/discord/Discord --no-sandbox@g' "$DESKTOP_FILE"
+    fi
 
     # Step 2: Categorizing for Start Menu
     sed -i 's/Categories=.*/Categories=Network;InstantMessaging;Chat;/g' "$DESKTOP_FILE"
@@ -26,11 +30,6 @@ if [ -f "$DESKTOP_FILE" ]; then
     if command -v update-desktop-database > /dev/null; then
         update-desktop-database /usr/share/applications/
     fi
-
-    # Step 3: Clean Desktop Policy
-    # Removing shortcut from $KASM_HOME/Desktop to keep the workspace professional.
-    log "Step 3: Removing desktop shortcut..."
-    rm -f "$KASM_HOME/Desktop/discord.desktop"
 
     # Step 4: Nuclear Option - Remove System Autostart
     # Discord is notorious for auto-launching; we purge the entry from /etc/xdg.
@@ -55,10 +54,13 @@ Hidden=true
 NoDisplay=true
 EOF
 
-    # Ensure ownership is correct for the Kasm default profile (UID 1000)
-    chown -R 1000:1000 "$KASM_HOME/.config"
+    # Ensure ownership is correct for the Kasm default profile (UID 1000, group 0)
+    chown -R 1000:0 "$KASM_HOME/.config" 2>/dev/null || true
 
     log "Discord UI configuration (Nuclear/Clean-Desktop) complete."
 else
     log "WARNING: discord.desktop not found at $DESKTOP_FILE. Check installation."
 fi
+
+# Desktop icon (opt-in via DISCORD_DESKTOP_ICON=true; default off)
+desktop_icon discord "$DESKTOP_FILE" false

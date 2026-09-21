@@ -1,53 +1,101 @@
 #!/usr/bin/env bash
-# This script installs Bitcurator onto the system under the kasm-user user. 
-# It is meant to be run/installed into a pre-configured Kasm workspace's
-# Dockerfile and was not developed to work as standalone. 
-# For official documentation see "https://github.com/BitCurator/bitcurator-distro/wiki/BitCurator-Quick-Start-Guide"
+###############################################################################
+# install_bitcurator5.sh
+#
+# Installs the BitCurator 5 forensics toolset onto the SquirrelWorks Kasm
+# Noble base. This is SquirrelWorks' own reimplementation of BitCurator's
+# package list, tool builds, and desktop integration as plain bash - not a
+# run of BitCurator's own bitcurator-cli/SaltStack installer.
+#
+# Why: BitCurator is not officially supported in containers, and its
+# installer assumes a full, dedicated Ubuntu Desktop with systemd and a real
+# login session. Repeated attempts to bridge that gap (systemd/timedatectl
+# shims, a root/sudo detection workaround, a uid-shared scratch account to
+# satisfy Salt's own user-management states) kept surfacing new failures
+# because each fix only patched the specific incompatibility that had just
+# been found. bitcurator-salt's actual package list, tool-build steps, and
+# desktop assets (menu, icons, nautilus scripts, dotfiles) are mostly plain
+# apt/build-from-source/static-file work under the SaltStack wrapper - see
+# vendor/NOTICE.md for exactly what's vendored from upstream, under what
+# license (GPLv3), and what's SquirrelWorks' own code.
+#
+# Orchestrates, in order:
+#   1. packages.sh            - apt package batches (+ universe/multiverse)
+#   2. build_tools.sh         - build-from-source / pinned-release tools
+#   3. python_tools.sh        - pip tools, each in its own /opt/<tool> venv
+#   4. desktop_integration.sh - BitCurator's menu, icons, mounter app,
+#                               dotfiles, guymager config, documentation,
+#                               and Thunar custom actions
+# then Firefox-as-default-browser and a final tool sanity check.
+###############################################################################
 set -euo pipefail
+: "${INST_DIR:=/dockerstartup/install}"
+# shellcheck source=/dev/null
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
-echo "======= Installing Bitcurator 5 Environment ======="
+log() { echo "[BITCURATOR-INSTALL] $*"; }
 
-# Step 1: Installing depencencies
-echo "Step 1: Installing dependencies..."
-apt_update_if_needed
-apt upgrade -y
-apt install nano build-essential gcc make perl curl gnupg -y
-apt install --reinstall ca-certificates -y
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+KASM_USER="kasm-user" # the real Kasm session account (uid 1000)
 
-# Step 2: Downloading and prepping the Bitcurator CLI
-echo "Step 2: Downloading and prepping the Bitcurator CLI..."
-cd /tmp
-wget https://github.com/BitCurator/bitcurator-cli/releases/download/v3.0.0/bitcurator-cli-linux
-chmod +x /tmp/bitcurator-cli-linux
-groupadd bcadmin && usermod -aG sudo,bcadmin,docker kasm-user
+main() {
+  log "======= Installing BitCurator 5 (SquirrelWorks native build) ======="
 
-# Step 3: Installing Bitcurator (this will take some time)
-echo "Step 3: Installing Bitcurator. This will take a while, go get some coffee..."
-sudo /tmp/bitcurator-cli-linux install --mode=addon --user=kasm-user
+  local kasm_home
+  kasm_home="$(getent passwd 1000 | cut -d: -f6 || echo /home/kasm-user)"
 
-# Step 4: Cleaning up
-echo "Step 4: Cleaning up..."
-rm -f /usr/share/xfce4/panel/plugins/power-manager-plugin.desktop
-rm -rf /tmp/*
+  bash "${SCRIPT_DIR}/packages.sh"
+  bash "${SCRIPT_DIR}/build_tools.sh"
+  bash "${SCRIPT_DIR}/python_tools.sh"
+  bash "${SCRIPT_DIR}/desktop_integration.sh" "$kasm_home"
 
-# Reset HOME **after** Bitcurator installation
-export HOME=/home/kasm-default-profile
+  # kasm-user needs the same desktop-usable groups a stock BitCurator
+  # account would have, for mounting/analyzing disk images.
+  for grp in sudo adm cdrom dip plugdev lpadmin lxd sambashare; do
+    if getent group "$grp" >/dev/null 2>&1; then
+      usermod -aG "$grp" "${KASM_USER}" || true
+    fi
+  done
 
-if [ -z "${SKIP_CLEAN+x}" ]; then
-  apt-get autoclean
-  rm -rf \
-    /var/lib/apt/lists/* \
-    /var/tmp/*
-fi
+  # --- Set Firefox as the default browser -------------------------------
+  if command -v firefox >/dev/null 2>&1; then
+    log "Setting Firefox as the default browser..."
+    mkdir -p "${kasm_home}/.config"
+    cat > "${kasm_home}/.config/mimeapps.list" <<'EOF'
+[Default Applications]
+text/html=firefox.desktop
+x-scheme-handler/http=firefox.desktop
+x-scheme-handler/https=firefox.desktop
+x-scheme-handler/about=firefox.desktop
+x-scheme-handler/unknown=firefox.desktop
 
-echo "Bitcurator 5 is successfully installed!"
+[Added Associations]
+text/html=firefox.desktop;
+x-scheme-handler/http=firefox.desktop;
+x-scheme-handler/https=firefox.desktop;
+EOF
+    chown -R 1000:0 "${kasm_home}/.config/mimeapps.list"
+    update-alternatives --set x-www-browser /usr/bin/firefox >/dev/null 2>&1 || true
+  else
+    log "WARNING: Firefox not found - skipping default-browser configuration."
+  fi
 
+  # --- Sanity check: did the core forensic tools actually land? ----------
+  local missing=0 tool
+  for tool in bulk_extractor disktype fiwalk md5deep rip.pl imount \
+              nsrllookup deark sf; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+      log "MISSING: ${tool}"
+      missing=1
+    fi
+  done
+  if [ "$missing" -eq 0 ]; then
+    log "Core BitCurator tools present."
+  else
+    log "WARNING: one or more BitCurator tools are missing - review the build log above."
+  fi
 
-#Keep getting "timedatectl failed: System has not been booted with systemd as init system (PID 1). Can't operate.
-# 1740.3 Failed to connect to bus: Host is down"
+  log "BitCurator install stage complete."
+}
 
-#Let's try this...
-# Do "Manual Builds of the BitCurator Environment" (https://github.com/BitCurator/bitcurator-salt/blob/main/BUILD.md):
-#-set the username to "kasm_user"
-#-should  I use dedicated or addon? Try dedicated first and see if all Kasm functionality works properly...
+main "$@"
