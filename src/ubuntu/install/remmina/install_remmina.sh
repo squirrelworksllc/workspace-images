@@ -4,10 +4,13 @@
 # Purpose: Installs Remmina + RDP, VNC, and SPICE for Kasm 1.18+
 ###############################################################################
 set -euo pipefail
+LOG_TAG="REMMINA-INSTALL"
 : "${INST_DIR:=/dockerstartup/install}"
-source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
+# shellcheck source=/dev/null
+source "${INST_DIR}/ubuntu/install/common/03_scaffold.sh"
 
-log() { echo "[REMMINA-INSTALL] $*"; }
+REMMINA_PKGS=(remmina remmina-plugin-rdp remmina-plugin-vnc
+              remmina-plugin-spice remmina-plugin-secret xdotool)
 
 main() {
     log "======= Installing Remmina (Full Plugin Suite) ======="
@@ -17,22 +20,15 @@ main() {
 
     case "${ID}" in
         ubuntu)
-            if [ "${VERSION_CODENAME:-}" = "noble" ]; then
-                log "Installing Noble native suite..."
-                # Added VNC and SPICE for broader compatibility
-                apt_install remmina remmina-plugin-rdp remmina-plugin-vnc \
-                            remmina-plugin-spice remmina-plugin-secret xdotool
-            else
-                log "Applying PPA for legacy Ubuntu..."
+            if [ "${VERSION_CODENAME:-}" != "noble" ]; then
+                log "Legacy Ubuntu - adding the remmina-next PPA..."
                 add-apt-repository -y ppa:remmina-ppa-team/remmina-next
                 apt_refresh_after_repo_change
-                apt_install remmina remmina-plugin-rdp remmina-plugin-vnc \
-                            remmina-plugin-spice remmina-plugin-secret xdotool
             fi
+            apt_install "${REMMINA_PKGS[@]}"
             ;;
         debian|kali)
-            apt_install remmina remmina-plugin-rdp remmina-plugin-vnc \
-                        remmina-plugin-spice remmina-plugin-secret xdotool
+            apt_install "${REMMINA_PKGS[@]}"
             ;;
         *)
             log "ERROR: Unsupported distro: ${ID}" >&2
@@ -40,12 +36,7 @@ main() {
             ;;
     esac
 
-    log "Step 2: Triggering UI and Profile configuration..."
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    if [ -f "${SCRIPT_DIR}/configure_ui.sh" ]; then
-        bash "${SCRIPT_DIR}/configure_ui.sh"
-    fi
-
+    run_configure_ui
     log "Remmina installation complete!"
 }
 

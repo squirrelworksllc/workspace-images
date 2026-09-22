@@ -4,19 +4,10 @@
 # Optimized for SquirrelWorks Kasm 1.18+
 ###############################################################################
 set -euo pipefail
-IFS=$'\n\t'
-
+LOG_TAG="TORSOCKS-INSTALL"
 : "${INST_DIR:=/dockerstartup/install}"
-source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
-
-log() { echo "[torsocks-install] $*"; }
-
-require_root() {
-  if [ "$(id -u)" -ne 0 ]; then
-    echo "[torsocks] ERROR: must be run as root" >&2
-    exit 1
-  fi
-}
+# shellcheck source=/dev/null
+source "${INST_DIR}/ubuntu/install/common/03_scaffold.sh"
 
 install_guard_helper() {
   local path="$1"
@@ -67,8 +58,9 @@ EOF
 }
 
 main() {
+  require_root
   log "======= Installing torsocks Environment ======="
-  
+
   apt_update_if_needed
   apt_install torsocks
   
@@ -85,10 +77,17 @@ main() {
   # Deploy the Guard Helper
   install_guard_helper "/usr/local/bin/torsocks-guard"
 
-  # Trigger UI Integration
-  if [ -f "${script_dir}/configure_ui.sh" ]; then
-    bash "${script_dir}/configure_ui.sh"
+  # Register the runtime validator so runtime_validation.sh picks it up at
+  # session start (kept out of the ephemeral install tree on purpose).
+  if [ -f "${script_dir}/validate_torsocks.sh" ]; then
+    install -d -m 0755 /dockerstartup/tools/validators
+    install -m 0755 "${script_dir}/validate_torsocks.sh" \
+      /dockerstartup/tools/validators/torsocks.sh
+    log "Registered torsocks runtime validator"
   fi
+
+  # Trigger UI Integration
+  run_configure_ui
 
   log "torsocks installation complete."
 }

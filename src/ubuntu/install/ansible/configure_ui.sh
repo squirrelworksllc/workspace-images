@@ -20,10 +20,19 @@ else
 fi
 
 log "Step 2: Pre-installing VS Code Ansible Extensions..."
-# We use the RedHat Ansible extension for YAML validation and Linting
+# We use the RedHat Ansible extension for YAML validation and Linting.
+# Runs as root at build time, so pin HOME + the data/extension dirs at the
+# Kasm profile (otherwise the extension lands in /root/.vscode and is lost),
+# then hand ownership back to the session user.
 if command -v code >/dev/null 2>&1; then
-    # Note: Using --no-sandbox because we are running inside the container build phase
-    code --no-sandbox --user-data-dir "${KASM_HOME}/.config/Code" --install-extension redhat.ansible || true
+    CODE_USER_DIR="${KASM_HOME}/.config/Code"
+    CODE_EXT_DIR="${KASM_HOME}/.vscode/extensions"
+    mkdir -p "${CODE_USER_DIR}" "${CODE_EXT_DIR}"
+    HOME="${KASM_HOME}" code --no-sandbox \
+        --user-data-dir "${CODE_USER_DIR}" \
+        --extensions-dir "${CODE_EXT_DIR}" \
+        --install-extension redhat.ansible || true
+    chown -R 1000:0 "${KASM_HOME}/.vscode" "${CODE_USER_DIR}" 2>/dev/null || true
 fi
 
 log "Step 3: Creating User Templates..."
@@ -36,7 +45,7 @@ host_key_checking = False
 stdout_callback = yaml
 EOF
 
-# Final permission sync
-chown -R 1000:1000 "$KASM_HOME/.ansible" "$KASM_HOME/.ansible.cfg" 2>/dev/null || true
+# Final permission sync (Kasm Noble runs the session user with primary group 0)
+chown -R 1000:0 "$KASM_HOME/.ansible" "$KASM_HOME/.ansible.cfg" 2>/dev/null || true
 
 log "Ansible UI and CLI environment configured."

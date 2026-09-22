@@ -1,6 +1,6 @@
 # 🐿️ Ubuntu Noble Core (`ubuntu-noble-core`)
 
-This directory maintains the structural configuration for the foundational `ubuntu-noble-core` base image. This project functions as our immutable upstream foundation, built directly on top of the authoritative `kasmweb/core-ubuntu-noble:1.18.0-rolling-weekly` layer. All corporate workspace variations (such as `ubuntu-noble-desktop` and `ubuntu-noble-dind`) derive their system settings from this single target.
+This directory maintains the structural configuration for the foundational `ubuntu-noble-core` base image. This project functions as our immutable upstream foundation, built directly on top of the authoritative `kasmweb/core-ubuntu-noble:1.19.0-rolling-weekly` layer. All corporate workspace variations (such as `ubuntu-noble-desktop` and `ubuntu-noble-dind`) derive their system settings from this single target.
 
 ## 🔧 Platform Provisioning & Capabilities
 
@@ -17,7 +17,7 @@ This core image isolates the underlying Kasm runtime requirements from user-faci
 
 ```text
 images/ubuntu-noble-core/
-├── Dockerfile          # Foundation layer (FROM kasmweb/core-ubuntu-noble:1.18.0-rolling-weekly)
+├── Dockerfile          # Foundation layer (FROM kasmweb/core-ubuntu-noble:1.19.0-rolling-weekly)
 ├── .dockerignore       # Global build-context exclusion filter
 ├── Dockerhub.info      # Clean overview documentation for Docker Hub
 └── README.md           # This primary technical architecture document

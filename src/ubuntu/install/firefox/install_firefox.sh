@@ -1,28 +1,24 @@
 #!/usr/bin/env bash
 ###############################################################################
 # install_firefox.sh
-# Purpose: Installs Firefox via Mozilla APT (Non-Snap) for SquirrelWorks 1.1
+# Purpose: Installs Firefox from the Mozilla apt repo (never the snap).
 ###############################################################################
 set -euo pipefail
+LOG_TAG="FIREFOX-INSTALL"
 : "${INST_DIR:=/dockerstartup/install}"
-source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
-
-log() { echo "[FIREFOX-INSTALL] $*"; }
+# shellcheck source=/dev/null
+source "${INST_DIR}/ubuntu/install/common/03_scaffold.sh"
 
 main() {
-    log "======= Installing Firefox (Mozilla Repo) ======="
+    log "======= Installing Firefox (Mozilla repo) ======="
 
-    . /etc/os-release
     apt_update_if_needed
+    add_apt_repo firefox \
+        "https://packages.mozilla.org/apt/repo-signing-key.gpg" \
+        "https://packages.mozilla.org/apt" "mozilla" "main"
 
-    log "Step 1: Configuring Mozilla APT Repository..."
-    install -m 0755 -d /etc/apt/keyrings
-    wget -qO- https://packages.mozilla.org/apt/repo-signing-key.gpg | gpg --dearmor -o /etc/apt/keyrings/mozilla.gpg
-    
-    echo "deb [signed-by=/etc/apt/keyrings/mozilla.gpg] https://packages.mozilla.org/apt mozilla main" > /etc/apt/sources.list.d/mozilla.firefox.list
-
-    # Priority 1001 allows APT to cleanly overwrite Ubuntu's snap stub 
-    cat > /etc/apt/preferences.d/mozilla-firefox <<EOF
+    # Pin so the Mozilla build wins over Ubuntu's snap transitional package.
+    cat > /etc/apt/preferences.d/mozilla-firefox <<'EOF'
 Package: *
 Pin: release o=LP-PPA-mozillateam
 Pin-Priority: 1001
@@ -32,20 +28,10 @@ Pin: origin packages.mozilla.org
 Pin-Priority: 1001
 EOF
 
-    apt_refresh_after_repo_change
-    
-    log "Step 2: Installing and locking the Firefox package..."
     apt_install firefox
-    
-    # Lock the package so 02_remediation.sh ignores it during dist-upgrade
-    apt-mark hold firefox
+    apt-mark hold firefox   # keep 02_remediation's dist-upgrade off it
 
-    log "Step 3: Triggering Hardening and UI configuration..."
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    if [ -f "${SCRIPT_DIR}/configure_ui.sh" ]; then
-        bash "${SCRIPT_DIR}/configure_ui.sh"
-    fi
-
+    run_configure_ui
     log "Firefox installation complete."
 }
 

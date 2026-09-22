@@ -11,11 +11,11 @@ log() { echo "[TEAMS-UI] $*"; }
 
 # Kasm 1.18+ Dynamic Home Detection
 KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile")
+# shellcheck source=/dev/null
+source "${INST_DIR:-/dockerstartup/install}/ubuntu/install/common/10_desktop_icon.sh"
 
 log "Configuring teams-for-linux UI elements..."
 
-# Ensure directories exist
-mkdir -p "$KASM_HOME/Desktop" 
 mkdir -p "$KASM_HOME/.config/teams-for-linux"
 
 DESKTOP_FILE="/usr/share/applications/teams-for-linux.desktop"
@@ -23,8 +23,10 @@ DESKTOP_FILE="/usr/share/applications/teams-for-linux.desktop"
 if [ -f "$DESKTOP_FILE" ]; then
     # 1. Start Menu Registration & Sandbox Fix
     log "Applying Start Menu categorization and sandbox fix..."
-    # Fix the Exec line for Kasm/Docker compatibility
-    sed -i 's@Exec=/usr/bin/teams-for-linux@Exec=/usr/bin/teams-for-linux --no-sandbox@' "$DESKTOP_FILE"
+    # Fix the Exec line for Kasm/Docker compatibility (idempotent)
+    if ! grep -q -- '--no-sandbox' "$DESKTOP_FILE"; then
+        sed -i 's@Exec=/usr/bin/teams-for-linux@Exec=/usr/bin/teams-for-linux --no-sandbox@' "$DESKTOP_FILE"
+    fi
     # Ensure it appears in 'Internet' and 'Communication'
     sed -i 's/Categories=.*/Categories=Network;Chat;InstantMessaging;VideoConference;/g' "$DESKTOP_FILE"
     
@@ -52,11 +54,13 @@ Hidden=true
 NoDisplay=true
 EOF
 
-    # 4. Global Permissions Sync
-    chown -R 1000:1000 "$KASM_HOME/Desktop"
-    chown -R 1000:1000 "$KASM_HOME/.config"
-    
+    # 4. Global Permissions Sync (Noble runs the session user with primary group 0)
+    chown -R 1000:0 "$KASM_HOME/.config" 2>/dev/null || true
+
     log "Teams UI configuration successfully applied."
 else
     log "WARNING: Source desktop file not found at $DESKTOP_FILE."
 fi
+
+# Desktop icon (opt-in via TEAMS_DESKTOP_ICON=true; default off)
+desktop_icon teams "$DESKTOP_FILE" false

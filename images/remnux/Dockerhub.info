@@ -16,4 +16,4 @@ This workstation provides a standardized, immutable, and completely isolated san
 
 *   Executing interactive behavioral analysis on untrusted samples safely inside container boundaries.
 *   Conducting static code dissection and automated unpacking workflows.
-*   Serving as a reproducible remote forensics workstation within the Kasm 1.18 platform architecture.
+*   Serving as a reproducible remote forensics workstation within the Kasm 1.19 platform architecture.

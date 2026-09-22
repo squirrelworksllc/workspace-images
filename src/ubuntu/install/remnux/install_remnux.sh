@@ -24,6 +24,7 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+: "${INST_DIR:=/dockerstartup/install}"
 source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
 
 log() { echo "[remnux] $*"; }
@@ -82,12 +83,8 @@ trap 'rm -rf "${tmpdir}"' EXIT
 
 cd "${tmpdir}"
 
-# Use the exact URL you used successfully (case-insensitive on host, but keep canonical)
-log "temp - wget"
-curl -O https://REMnux.org/remnux
-log "temp - chmod"
+curl -fsSL --retry 3 -O https://REMnux.org/remnux
 chmod +x remnux
-log "temp - mv"
 mv remnux /usr/local/bin/remnux
 
 log "Step 3: Run REMnux installer for user ${TARGET_USER} ..."

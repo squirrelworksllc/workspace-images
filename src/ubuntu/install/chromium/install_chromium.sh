@@ -4,10 +4,10 @@
 # Purpose: Installs native Chromium (non-snap) via Debian repo pinning.
 ###############################################################################
 set -euo pipefail
+LOG_TAG="CHROMIUM-INSTALL"
 : "${INST_DIR:=/dockerstartup/install}"
-source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
-
-log() { echo "[CHROMIUM-INSTALL] $*"; }
+# shellcheck source=/dev/null
+source "${INST_DIR}/ubuntu/install/common/03_scaffold.sh"
 
 main() {
     log "======= Installing Chromium (Native DEB) ======="
@@ -51,12 +51,7 @@ EOF
         apt_install chromium
     fi
 
-    log "Triggering UI and Wrapper configuration..."
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    if [ -f "${SCRIPT_DIR}/configure_ui.sh" ]; then
-        bash "${SCRIPT_DIR}/configure_ui.sh"
-    fi
-
+    run_configure_ui
     log "Chromium installation complete."
 }
 

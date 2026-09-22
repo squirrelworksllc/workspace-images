@@ -8,9 +8,12 @@
 ###############################################################################
 # Installs common tools used by all squirrelworksllc base docker images.
 set -euo pipefail
-source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
+LOG_TAG="TOOLS-INSTALL"
+: "${INST_DIR:=/dockerstartup/install}"
+# shellcheck source=/dev/null
+source "${INST_DIR}/ubuntu/install/common/03_scaffold.sh"
 
-echo "======= Installing Common Tools ======="
+log "======= Installing Common Tools ======="
 
 . /etc/os-release
 case "${ID}" in

@@ -6,23 +6,18 @@
 # Note: pdfwalker is explicitly excluded due to GTK2/Ruby 3.2 incompatibility.
 ###############################################################################
 set -euo pipefail
+LOG_TAG="ORIGAMINDEE-INSTALL"
 : "${INST_DIR:=/dockerstartup/install}"
-source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
-
-log() { echo "[ORIGAMINDEE-INSTALL] $*"; }
+# shellcheck source=/dev/null
+source "${INST_DIR}/ubuntu/install/common/03_scaffold.sh"
 
 main() {
     log "======= Installing Origamindee (Ruby PDF Library) ======="
 
-    # 1. Update the APT cache using our core helper
     apt_update_if_needed
-
-    # 2. Install Ruby and essential build tools for native extensions
-    log "Installing Ruby and build dependencies..."
     apt_install ruby-full build-essential
 
-    # 3. Pull the gem globally (CLI tools: pdfcop, pdfdecompress)
-    log "Installing origamindee gem..."
+    # Global gem -> CLI tools pdfcop, pdfdecompress.
     gem install origamindee
 
     log "Origamindee CLI tools installed successfully."

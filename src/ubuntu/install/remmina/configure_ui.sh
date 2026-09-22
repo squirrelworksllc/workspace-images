@@ -9,6 +9,8 @@ log() { echo "[REMMINA-UI] $*"; }
 
 KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile")
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+source "${INST_DIR:-/dockerstartup/install}/ubuntu/install/common/10_desktop_icon.sh"
 
 log "Step 1: Applying global preferences..."
 PREF_DIR="$KASM_HOME/.config/remmina"
@@ -18,12 +20,12 @@ mkdir -p "$PREF_DIR"
 if [ -f "$SCRIPT_DIR/remmina.pref" ]; then
     cp "$SCRIPT_DIR/remmina.pref" "$PREF_DIR/remmina.pref"
 else
-    # Fallback: Create the silent prefs if file is missing
+    # Fallback: Create the silent prefs if file is missing.
+    # Leave datadir/screenshot paths unset so Remmina uses its own ~-relative
+    # defaults at runtime (baking $KASM_HOME here points at the build-time home).
     cat <<EOF > "$PREF_DIR/remmina.pref"
 [remmina_pref]
 disable_tray_icon=true
-datadir_path=$KASM_HOME/.local/share/remmina
-screenshot_path=$KASM_HOME/Pictures
 [usage_stats]
 periodic_usage_stats_permitted=false
 [remmina_news]
@@ -57,6 +59,9 @@ if [ -f "$DESKTOP_FILE" ]; then
     sed -i 's/Categories=.*/Categories=Network;RemoteAccess;/g' "$DESKTOP_FILE"
 fi
 
+# Desktop icon (opt-in via REMMINA_DESKTOP_ICON=true; default off)
+desktop_icon remmina "$DESKTOP_FILE" false remmina.desktop
+
 # Step 4: Disable Autostart (Remmina loves to linger in the background)
 log "Disabling background autostart..."
 mkdir -p "$KASM_HOME/.config/autostart"
@@ -69,6 +74,7 @@ X-GNOME-Autostart-enabled=false
 NoDisplay=true
 EOF
 
-chown -R 1000:1000 "$KASM_HOME/.config" "$KASM_HOME/.local"
+# Noble runs the session user with primary group 0
+chown -R 1000:0 "$KASM_HOME/.config" "$KASM_HOME/.local" 2>/dev/null || true
 
 log "Remmina UI configuration complete."

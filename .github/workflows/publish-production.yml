@@ -4,14 +4,23 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'images/**'
+      - 'src/**'
+      - 'tools/**'
+      - 'images.json'
+      - '.github/workflows/publish-production.yml'
+      - '.github/actions/calculate-size/**'
 
 concurrency:
   group: publish-prod-${{ github.ref }}
-  cancel-in-progress: true
+  # Image builds are expensive and push to the registry - let a running build
+  # finish rather than killing it mid-push (surfaces as a corrupted/partial
+  # push on the registry side). Matches every Forgejo build workflow.
+  cancel-in-progress: false
 
 permissions:
   contents: read
-  packages: write
   attestations: write  # <-- Required for buildx v6 attestation handling
   id-token: write      # <-- Required for OIDC signing of the VEX statement
 
@@ -37,7 +46,7 @@ jobs:
           echo "skip=false" >> "$GITHUB_OUTPUT"
           echo "dockerfile=$(echo "$CORE_CONFIG" | jq -r '.dockerfile')" >> "$GITHUB_OUTPUT"
           echo "lintTarget=$(echo "$CORE_CONFIG" | jq -r '.lintTarget')" >> "$GITHUB_OUTPUT"
-      
+
       - uses: docker/setup-buildx-action@v3
       - name: Lint – ubuntu-noble-core
         if: steps.core-config.outputs.skip == 'false'
@@ -67,10 +76,10 @@ jobs:
           echo "skip=false" >> "$GITHUB_OUTPUT"
           echo "dockerfile=$(echo "$CORE_CONFIG" | jq -r '.dockerfile')" >> "$GITHUB_OUTPUT"
           echo "prodTarget=$(echo "$CORE_CONFIG" | jq -r '.prodTarget')" >> "$GITHUB_OUTPUT"
-          
+
           REPO=$(echo "$CORE_CONFIG" | jq -r '.repo')
           echo "repo=$REPO" >> "$GITHUB_OUTPUT"
-          
+
           TAGS=$(echo "$CORE_CONFIG" | jq -r '.prodTags[]')
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "tags<<$EOF" >> "$GITHUB_OUTPUT"
@@ -95,24 +104,11 @@ jobs:
           tags: ${{ steps.core-config.outputs.tags }}
 
       - name: Calculate and Report True Uncompressed Size
-        id: calculate_size
         if: steps.core-config.outputs.skip == 'false' && steps.build_core.outcome == 'success'
-        shell: bash
-        run: |
-          echo "======= Calculating True Uncompressed Image Size ======="
-          TARGET_IMAGE="${{ steps.core-config.outputs.repo }}@${{ steps.build_core.outputs.digest }}"
-          echo "Pulling $TARGET_IMAGE to runner..."
-          docker pull "$TARGET_IMAGE"
-          SIZE_BYTES=$(docker image inspect "$TARGET_IMAGE" --format='{{.Size}}')
-          SIZE_MB=$(echo "$SIZE_BYTES" | awk '{printf "%.2f", $1 / 1024 / 1024}')
-          echo "uncompressed_size_mb=${SIZE_MB}" >> "$GITHUB_OUTPUT"
-          
-          echo "### 📊 Kasm 1.1 Image Size Analysis: ubuntu-noble-core" >> $GITHUB_STEP_SUMMARY
-          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Target Key** | \`ubuntu-noble-core\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Digest** | \`${{ steps.build_core.outputs.digest }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **True Uncompressed Size** | **${SIZE_MB} MB** |" >> $GITHUB_STEP_SUMMARY
+        uses: ./.github/actions/calculate-size
+        with:
+          image_path: ${{ steps.core-config.outputs.repo }}@${{ steps.build_core.outputs.digest }}
+          image_key: ubuntu-noble-core
 
   matrix-others:
     name: Build matrix (non-core)
@@ -164,7 +160,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [matrix-others, validate-others, publish-core]
     if: |
-      always() && 
+      always() &&
       needs.matrix-others.outputs.has_entries == 'true' &&
       (needs.validate-others.result == 'success' || needs.validate-others.result == 'skipped') &&
       (needs.publish-core.result == 'success' || needs.publish-core.result == 'skipped')
@@ -173,7 +169,7 @@ jobs:
       matrix: ${{ fromJson(needs.matrix-others.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Format Tags
         id: tags
         shell: bash
@@ -184,6 +180,18 @@ jobs:
             echo "${{ matrix.repo }}:${TAG}" >> "$GITHUB_OUTPUT"
           done
           echo "$EOF" >> "$GITHUB_OUTPUT"
+
+      # A full SPDX SBOM exceeds BuildKit's 40 MiB embedded attestation cap
+      # often enough across this matrix (desktop, dind, bitcurator5, ...)
+      # that it's disabled for every non-core image rather than chasing it
+      # one image at a time. ubuntu-noble-core is unaffected - it's built in
+      # the separate publish-core job above, not this matrix.
+      - name: Determine attestation settings
+        id: attest
+        shell: bash
+        run: |
+          echo "sbom=false" >> "$GITHUB_OUTPUT"
+          echo "attests=" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
@@ -198,16 +206,15 @@ jobs:
           context: .
           file: ${{ matrix.dockerfile }}
           # Aligns with the target key extracted in the matrix-others job
-          target: ${{ matrix.devTarget }} 
+          target: ${{ matrix.prodTarget }}
           # Hardcoded to explicitly target x86/x64 architecture
           platforms: linux/amd64
           push: true
           # Correctly pulls the formatted multi-line string array from tags step
           tags: ${{ steps.tags.outputs.list }}
           provenance: true
-          sbom: true
-          attests: |
-            type=sbom,generator=docker/buildkit-syft-scanner,vulnerability-vulnerabilities=@images/vex_ubuntu_common.json
+          sbom: ${{ steps.attest.outputs.sbom }}
+          attests: ${{ steps.attest.outputs.attests }}
           cache-from: type=gha,scope=pubprod-${{ matrix.key }}
           cache-to: type=gha,mode=max,scope=pubprod-${{ matrix.key }}
 
@@ -219,21 +226,8 @@ jobs:
           echo "Push outcome: ${{ steps.push.outcome || 'skipped' }}"
 
       - name: Calculate and Report True Uncompressed Size
-        id: calculate_size
         if: steps.push.outcome == 'success'
-        shell: bash
-        run: |
-          echo "======= Calculating True Uncompressed Image Size ======="
-          TARGET_IMAGE="${{ matrix.repo }}@${{ steps.push.outputs.digest }}"
-          echo "Pulling $TARGET_IMAGE to runner..."
-          docker pull "$TARGET_IMAGE"
-          SIZE_BYTES=$(docker image inspect "$TARGET_IMAGE" --format='{{.Size}}')
-          SIZE_MB=$(echo "$SIZE_BYTES" | awk '{printf "%.2f", $1 / 1024 / 1024}')
-          echo "uncompressed_size_mb=${SIZE_MB}" >> "$GITHUB_OUTPUT"
-          
-          echo "### 📊 Kasm 1.1 Image Size Analysis: ${{ matrix.key }}" >> $GITHUB_STEP_SUMMARY
-          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Target Key** | \`${{ matrix.key }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Digest** | \`${{ steps.push.outputs.digest }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **True Uncompressed Size** | **${SIZE_MB} MB** |" >> $GITHUB_STEP_SUMMARY
+        uses: ./.github/actions/calculate-size
+        with:
+          image_path: ${{ matrix.repo }}@${{ steps.push.outputs.digest }}
+          image_key: ${{ matrix.key }}

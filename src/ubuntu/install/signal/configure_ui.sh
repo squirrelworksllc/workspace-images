@@ -11,14 +11,18 @@ log() { echo "[SIGNAL-UI] $*"; }
 
 # Kasm 1.18+ Dynamic Home Detection
 KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile")
+# shellcheck source=/dev/null
+source "${INST_DIR:-/dockerstartup/install}/ubuntu/install/common/10_desktop_icon.sh"
 
 DESKTOP_FILE="/usr/share/applications/signal-desktop.desktop"
 SYSTEM_AUTOSTART="/etc/xdg/autostart/signal-desktop.desktop"
 
 if [ -f "$DESKTOP_FILE" ]; then
     log "Step 1: Applying --no-sandbox fix for Kasm compatibility..."
-    # Mandatory for Signal (Electron) in most Kasm/Docker environments
-    sed -i 's@Exec=/opt/Signal/signal-desktop@Exec=/opt/Signal/signal-desktop --no-sandbox@' "$DESKTOP_FILE"
+    # Mandatory for Signal (Electron) in most Kasm/Docker environments (idempotent)
+    if ! grep -q -- '--no-sandbox' "$DESKTOP_FILE"; then
+        sed -i 's@Exec=/opt/Signal/signal-desktop@Exec=/opt/Signal/signal-desktop --no-sandbox@' "$DESKTOP_FILE"
+    fi
 
     log "Step 2: Categorizing Start Menu entry..."
     sed -i 's/Categories=.*/Categories=Network;InstantMessaging;Chat;/g' "$DESKTOP_FILE"
@@ -26,10 +30,6 @@ if [ -f "$DESKTOP_FILE" ]; then
     if command -v update-desktop-database > /dev/null; then
         update-desktop-database /usr/share/applications/
     fi
-
-    # Step 3: Clean Desktop Policy
-    log "Step 3: Removing desktop shortcut to maintain clean workspace..."
-    rm -f "$KASM_HOME/Desktop/signal-desktop.desktop"
 
     # Step 4: Nuclear Option - Remove System Autostart
     if [ -f "$SYSTEM_AUTOSTART" ]; then
@@ -55,10 +55,13 @@ Hidden=true
 NoDisplay=true
 EOF
 
-    # Ensure permissions are correct for the Kasm default profile (UID 1000)
-    chown -R 1000:1000 "$KASM_HOME/.config"
+    # Ensure permissions are correct for the Kasm default profile (UID 1000, group 0)
+    chown -R 1000:0 "$KASM_HOME/.config" 2>/dev/null || true
 
     log "Signal UI configuration (Nuclear/Clean-Desktop) complete."
 else
     log "WARNING: signal-desktop.desktop not found at $DESKTOP_FILE."
 fi
+
+# Desktop icon (opt-in via SIGNAL_DESKTOP_ICON=true; default off)
+desktop_icon signal "$DESKTOP_FILE" false

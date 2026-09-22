@@ -62,82 +62,77 @@ COPY ./src/tools/runtime/runtime_validation.sh /dockerstartup/tools/runtime_vali
 RUN chmod 0755 /dockerstartup/tools/runtime_validation.sh
 
 # --- Global Build Orchestration ---
+# SquirrelWorks module registry, run in order: tools/apt-helper -> desktop
+# branding (bitcurator5 theme) -> Firefox (set as the default browser by the
+# BitCurator step below) -> the BitCurator 5 SaltStack installer. Then a
+# forced cleanup pass (shared SKIP_CLEAN=true only defers it in the Core base
+# layer), the kasm-user bashrc merge, and a prune that keeps common/** +
+# */startup.sh (the runtime module layer) so per-app runtime hooks survive.
 ARG APT_DEBUG=false
 
 RUN set -eux; \
+    GREEN=$(printf '\033[0;32m'); RED=$(printf '\033[0;31m'); NC=$(printf '\033[0m'); \
     apt-get update; \
-    \
-    # =========================================================================
-    # SQUIRRELWORKS MODULE REGISTRY
-    # =========================================================================
     SCRIPTS=( \
       "/ubuntu/install/tools/install_tools.sh" \
       "/ubuntu/install/common/00_apt_helper.sh" \
       "/ubuntu/install/desktop/install.sh" \
+      "/ubuntu/install/firefox/install_firefox.sh" \
+      "/ubuntu/install/bitcurator5/install_bitcurator5.sh" \
     ); \
-    \
-    # Execution Loop for Prereqs
     for SCRIPT in "${SCRIPTS[@]}"; do \
       echo ">>> Executing Module: ${SCRIPT}"; \
-      if [[ "${SCRIPT}" == *"desktop/install.sh" ]]; then \
-        # Passing 'bitcurator5' to trigger specific branding & desktop overrides
-        bash "${INST_DIR}${SCRIPT}" bitcurator5; \
+      ARGS=(); \
+      [[ "${SCRIPT}" == *"desktop/install.sh" ]] && ARGS=("bitcurator5"); \
+      if bash "${INST_DIR}${SCRIPT}" "${ARGS[@]}"; then \
+        echo "${GREEN}>>> SUCCESS: ${SCRIPT} applied successfully${NC}"; \
       else \
-        bash "${INST_DIR}${SCRIPT}"; \
-      fi || { exit 1; }; \
-    done; \ 
-    \
-    # =========================================================================
-    # THE BITCURATOR V5 CORE INSTALLER
-    # =========================================================================
-    log() { echo -e "\n\033[1;34m[BITCURATOR-INSTALLER]\033[0m $*"; }; \
-    \
-    log "Fetching prerequisites and BitCurator CLI..."; \
-    apt-get install -y --no-install-recommends curl wget git python3 python3-pip sudo ca-certificates; \
-    wget -qO- https://raw.githubusercontent.com/BitCurator/bitcurator-cli/main/install.sh | bash; \
-    \
-    log "Executing BitCurator SaltStack States (Expected service warnings)..."; \
-    bitcurator-cli install bitcurator --user kasm-user || log "Salt applied. Expected Docker service warnings bypassed."; \
-    \
-    # =========================================================================
-    # DESKTOP OVERRIDE REPAIR
-    # =========================================================================
-    log "Purging overlapping Desktop Environments installed by Salt..."; \
-    # Added '|| true' to safeguard against package-not-found or partial install crashes under set -e
-    apt-get purge -y ubuntu-desktop gnome-shell gdm3 lightdm ubuntu-session || true; \
-    apt-get autoremove -y; \
-    \
-    log "Restoring Kasm XFCE & Critical Dependencies..."; \
-    update-alternatives --set x-session-manager /usr/bin/xfce4-session || true; \
-    apt-get update && apt-get install -y --no-install-recommends pulseaudio; \
-    \
-    # =========================================================================
-    # POST-INSTALL POLISH & CLEANUP
-    # =========================================================================
-    log "Running Global SquirrelWorks Cleanup..."; \
-    SKIP_CLEAN=false bash "${INST_DIR}/ubuntu/install/common/01_cleanup.sh"; \
-    \
-    # --- Final Session Preparation ---
+        rc=$?; \
+        echo "${RED}>>> FAILED: ${SCRIPT} (exit ${rc}) - see the module's own log output directly above for the failing step${NC}"; \
+        exit "$rc"; \
+      fi; \
+    done; \
+    echo "${GREEN}>>> All BitCurator 5 prerequisite modules applied successfully${NC}"; \
+    if SKIP_CLEAN=false bash "${INST_DIR}/ubuntu/install/common/01_cleanup.sh"; then \
+      echo "${GREEN}>>> SUCCESS: common/01_cleanup.sh applied successfully${NC}"; \
+    else \
+      rc=$?; \
+      echo "${RED}>>> FAILED: common/01_cleanup.sh (exit ${rc}) - see the log output directly above for the failing step${NC}"; \
+      exit "$rc"; \
+    fi; \
     if [ -f /home/kasm-user/.bashrc ]; then \
       cat /home/kasm-user/.bashrc >> "${HOME}/.bashrc"; \
       rm /home/kasm-user/.bashrc; \
     fi; \
-    cp -a /home/kasm-user/. "${HOME}/" || true; \
+    cp -a /home/kasm-user/. "${HOME}/" 2>/dev/null || true; \
     rm -rf /home/kasm-user; \
-    \
     "${STARTUPDIR}/set_user_permission.sh" "${HOME}"; \
     chown 1000:0 "${HOME}"; \
     mkdir -p /home/kasm-user; \
     chown -R 1000:0 /home/kasm-user; \
-    \
-    # Deep cleanup of temporary build assets
-    rm -rf "${INST_DIR}/ubuntu/install" /tmp/* /var/cache/salt
+    find "${INST_DIR}/ubuntu/install" -type f ! -name 'startup.sh' ! -path '*/common/*' -delete; \
+    find "${INST_DIR}/ubuntu/install" -type d -empty -delete; \
+    rm -rf /tmp/* /var/cache/salt; \
+    echo "${GREEN}>>> BitCurator 5 workspace build complete${NC}"
+
+# ############################################################################
+# ------------------------- RUNTIME STARTUP HOOK -------------------------- #
+# ############################################################################
+# Kasm executes ${STARTUPDIR}/custom_startup.sh at session start. This is the
+# only entrypoint into the per-app runtime module chain (master_startup.sh ->
+# */startup.sh).
+COPY ./src/ubuntu/startup/custom_startup.sh /dockerstartup/custom_startup.sh
+RUN chmod 0755 /dockerstartup/custom_startup.sh
 
 # ############################################################################
 # -------------------------- SECURITY METADATA LAYER ----------------------- #
 # ############################################################################
 RUN mkdir -p /opt/vex
 COPY images/vex_ubuntu_common.json /opt/vex/vex.json
+
+# NOTE: no embedded .trivyignore here - this image is never Trivy-scanned in
+# CI (only ubuntu-noble-core is; BitCurator 5 builds FROM that already-scanned
+# base). It also isn't in production yet (images.json .enabled = false).
 
 # ############################################################################
 # ------------------------------ FINALIZATION ------------------------------ #

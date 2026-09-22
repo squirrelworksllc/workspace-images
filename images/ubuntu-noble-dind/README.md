@@ -1,21 +1,59 @@
-# 🐧 Ubuntu Noble 24.04 Desktop DinD Workspace Image (`ubuntu-noble-dind`)
+# 🐧 Ubuntu Noble Docker-in-Docker Workspace Image (`ubuntu-noble-dind`)
 
-This directory contains the workspace configuration, installation assets, and documentation for the **Ubuntu Noble Desktop "Docker in Docker" (DinD)** image. It inherits directly from our foundational `squirrelworksllc/ubuntu-noble-core` base image rather than the upstream Kasm variant, ensuring baseline standardization across our registry.
+This directory contains the workspace configuration and documentation for the **Ubuntu Noble "Docker in Docker" (DinD)** image. It inherits from our foundational `squirrelworksllc/ubuntu-noble-core` base image (not the upstream Kasm variant), keeping the base layer standardized across the registry.
+
+The image is deliberately minimal: **`ubuntu-noble-core` plus Chromium plus the Docker / Kubernetes tooling** — no extra apps. It runs the desktop-branding step for the wallpaper and XFCE panel/menu fixes only (`GENERATE_DESKTOP_DOCS=false` skips the app-catalog documentation).
 
 ## 🛠️ Complete Technical Tool Manifest
 
-Below is the comprehensive listing of all software and containerization runtimes pre-baked into this workspace image. Click any tool name to visit its official project documentation.
+### 🐳 Containerization & Orchestration
+* **[Docker Engine](https://docs.docker.com/engine/)** – `docker-ce`, `docker-ce-cli`, `containerd.io` from Docker's official APT repository, configured for nested containerization.
+* **[Docker Compose](https://docs.docker.com/compose/)** – v2 CLI plugin, fetched at the latest upstream release (Go binary, for cleaner vulnerability posture).
+* **[Docker Buildx](https://docs.docker.com/build/)** – latest upstream release, installed as a CLI plugin.
+* **[k3d](https://k3d.io/) + [kubectl](https://kubernetes.io/docs/reference/kubectl/)** – lightweight Kubernetes-in-Docker tooling for local cluster work.
+* **DinD helpers** – Moby's `dind` script plus the Kasm `dockerd-entrypoint.sh`, installed to `/usr/local/bin`; SubUID/SubGID configured for rootless / nested operation. Requires the container to run **privileged**.
 
-### 🐳 Containerization Runtime (Docker in Docker)
-* **[Docker Engine](https://docs.docker.com/engine/)** – Full community edition daemon setup optimized for nested containerization inside unprivileged or semi-privileged container pods.
-* **[Docker Compose](https://docs.docker.com/compose/)** – Multi-container orchestration CLI plugin for local application stacking.
-* **Storage Driver Context** – Configured to leverage performance-optimized storage drivers (such as `overlay2`) compatible with the host kernel namespace layers.
+### 🐳 Starting the Docker daemon
 
-### 🌐 Web Browsers
-* **[Google Chrome](https://chromeenterprise.google/)** – Enterprise-stable release pre-configured with flags to bypass sandboxing restrictions typically encountered within containerized environments (`--no-sandbox` wrapper integration).
+The nested `dockerd` is **not** started automatically — nothing runs at session login. Start
+it when you need it from the **Docker in Docker** launcher (on the Desktop and under
+Applications → System). It opens a held-open terminal and starts `supervisord`, which then
+manages `dockerd-entrypoint.sh` as a supervised, auto-restarting child (`/etc/supervisor/conf.d/dockerd.conf`)
+— if dockerd ever dies later in the session, supervisord brings it back without you
+re-running the launcher.
 
-### 💼 Developer Suite
-* **[Visual Studio Code (VSCode)](https://code.visualstudio.com/)** – Integrated development environment with workspace-level permissions optimized for the `kasm_user` context (UID 1000). Pre-wired to support extension environments such as Docker and Dev Containers.
+- `/etc/docker/daemon.json` sets `storage-driver: fuse-overlayfs` — the kernel's default
+  `overlay2` driver generally can't run on top of the container's own overlay rootfs.
+- Launcher script: `/usr/local/bin/dind-start-docker`. Log: `/var/log/dind-supervisord.log`.
+- `sudo` is scoped to exactly one command (`/etc/sudoers.d/dind-supervisord`: `supervisord -n`).
+- `kasm-user` is in the `docker` group, so `docker` / `docker compose` work without `sudo`
+  once the socket is up.
+- Requires the container to run **privileged** (the Kasm Workspace setting). If it isn't,
+  the launcher reports the failure and leaves the desktop untouched.
+- `DIND_DESKTOP_ICON=false` keeps the launcher in the menu only (no Desktop icon).
+
+**Why not auto-start it?** Overriding Kasm's own `/dockerstartup/custom_startup.sh` to start
+supervisord once the desktop is ready — the pattern Kasm's own reference DinD image uses —
+reproducibly broke session provisioning ("Nginx failed to reload... no host in upstream")
+even after the override script was made crash-proof. Something about overriding that
+specific file is fatal here in a way we can't see from outside (it's invoked by the vendor
+base image's own entrypoint chain, which this repo doesn't ship), so this image intentionally
+leaves it alone.
+
+### 🌐 Web Browser
+* **[Chromium](https://www.chromium.org/Home)** – installed by default with a `--no-sandbox` wrapper for use inside the container. Can be skipped at build time with `SKIP_CHROMIUM=true`. (Google Chrome is **not** installed here — `INSTALL_CHROME=false`.)
+
+---
+
+## 🖼️ Desktop Icons
+
+| Icon | Variable | Default |
+| --- | --- | --- |
+| **Docker in Docker** (starts the daemon) | `DIND_DESKTOP_ICON` | `true` |
+| **Chromium** | `CHROMIUM_DESKTOP_ICON` | `false` |
+
+Both apps are always in the Applications menu regardless; the toggle only controls the
+Desktop shortcut. Override via `--build-arg` or the Dockerfile `ENV` block.
 
 ---
 
@@ -23,7 +61,19 @@ Below is the comprehensive listing of all software and containerization runtimes
 
 ```text
 images/ubuntu-noble-dind/
-├── Dockerfile          # Image definition layer (FROM squirrelworksllc/ubuntu-noble-core)
+├── Dockerfile          # Image definition (FROM squirrelworksllc/ubuntu-noble-core)
 ├── .dockerignore       # Build context safety filters
-├── Dockerhub.info      # Clean overview copy-paste for Docker Hub
-└── README.md           # This comprehensive documentation file
+├── Dockerhub.info      # Short overview for the Docker Hub description
+└── README.md           # This file
+```
+
+Build targets (shared across all images): `lint` → `build` → `develop` / `production`.
+The build context is always the **repo root**.
+
+`dind/install_dind.sh` does **not** overwrite `/dockerstartup/custom_startup.sh`, unlike
+Kasm's own reference dind image - see "Why not auto-start it?" above. `daemon.json` and
+`dockerd.conf` are still wired in; `desktop/install.sh` runs only for the wallpaper and XFCE
+panel/menu tidy-up (writes under the user profile, `/usr/share/desktop-directories`,
+`/etc/xdg/menus/*-merged`). Everything DinD adds lives in additive, non-Kasm paths
+(`/usr/local/bin`, `/etc/apt`, `/etc/docker`, `/etc/supervisor`, `/etc/sudoers.d`,
+`/usr/share/applications`, `/etc/subuid`, `/etc/subgid`).

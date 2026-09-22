@@ -5,21 +5,10 @@
 # Purpose: Installs torboost and configures the Tor Control Port for Kasm 1.18+
 ###############################################################################
 set -euo pipefail
-
-log() { echo "[torboost-install] $*"; }
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd) "
-
-# Source Kasm apt helpers
+LOG_TAG="TORBOOST-INSTALL"
 : "${INST_DIR:=/dockerstartup/install}"
-source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
-
-require_root() {
-  if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
-    log "ERROR: must run as root" >&2
-    exit 1
-  fi
-}
+# shellcheck source=/dev/null
+source "${INST_DIR}/ubuntu/install/common/03_scaffold.sh"
 
 main() {
   require_root
@@ -54,25 +43,25 @@ EOF
   chmod 0755 /usr/local/bin/torboost
 
   log "Step 5: Configuring Tor for Control Port access (Required for TorBoost)..."
-  # TorBoost needs to talk to Tor. We enable the ControlPort without a password 
-  # for the local container environment.
-  cat >>/etc/tor/torrc <<EOF
+  # TorBoost needs to talk to Tor. We enable the ControlPort without a password
+  # for the local container environment. Idempotent - only append once.
+  if ! grep -q '^ControlPort 9051' /etc/tor/torrc 2>/dev/null; then
+    cat >>/etc/tor/torrc <<EOF
 ControlPort 9051
 CookieAuthentication 0
 DataDirectory /var/lib/tor
 EOF
+  fi
   
   # Ensure the tor user/group can actually write to its data dir in the container
   mkdir -p /var/lib/tor
   chown -R debian-tor:debian-tor /var/lib/tor
 
   log "Step 6: Setting ownership for Kasm user..."
-  chown -R 1000:1000 "$venv_dir"
+  chown -R 1000:0 "$venv_dir"
 
   log "Step 7: Creating UI Configuration (Start Menu)..."
-  if [[ -x "${SCRIPT_DIR}/configure_ui.sh" ]]; then
-      bash "${SCRIPT_DIR}/configure_ui.sh"
-  fi
+  run_configure_ui
 
   log "torboost installation complete!"
 }

@@ -22,22 +22,25 @@ KASM_HOME=$(getent passwd 1000 | cut -d: -f6 || echo "/home/kasm-default-profile
 
 # 1. Permission Sync
 # If ~/.recoll was created by root during a build or volume mount, the indexer fails.
+# (best-effort: custom_startup.sh may run unprivileged)
 if [ -d "$KASM_HOME/.recoll" ]; then
     log "Syncing permissions for Recoll database..."
-    chown -R 1000:1000 "$KASM_HOME/.recoll"
+    chown -R 1000:0 "$KASM_HOME/.recoll" 2>/dev/null || true
 fi
 
 # 2. Start Background Indexing Monitor
 # -m: Monitor mode (real-time indexing via inotify)
 # -D: Run as a background daemon
-if command -v recollindex > /dev/null; then
-    # We check if it's already running to avoid duplicate processes on reconnect
-    if ! pgrep -x "recollindex" > /dev/null; then
-        log "Starting Recoll real-time indexer daemon..."
-        # We run this as the Kasm user (1000) specifically
-        sudo -u "$(id -un 1000)" recollindex -m -D
+if command -v recollindex > /dev/null && ! pgrep -x "recollindex" > /dev/null; then
+    log "Starting Recoll real-time indexer daemon..."
+    RECOLL_USER="$(id -un 1000 2>/dev/null || echo kasm-user)"
+    if [ "$(id -u)" -eq 0 ] && command -v runuser >/dev/null 2>&1; then
+        runuser -u "$RECOLL_USER" -- recollindex -m -D || log "WARNING: indexer failed to start."
+    elif [ "$(id -u)" -eq 0 ] && command -v sudo >/dev/null 2>&1; then
+        sudo -u "$RECOLL_USER" recollindex -m -D || log "WARNING: indexer failed to start."
     else
-        log "Recoll indexer is already running."
+        # Already unprivileged (or no sudo/runuser) - just run it directly
+        recollindex -m -D || log "WARNING: indexer failed to start."
     fi
 fi
 

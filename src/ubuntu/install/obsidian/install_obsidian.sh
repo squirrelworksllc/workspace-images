@@ -1,46 +1,42 @@
 #!/usr/bin/env bash
 ###############################################################################
 # install_obsidian.sh
-# Purpose: Installs Obsidian via official .deb for SquirrelWorks 1.1
+# Purpose: Installs Obsidian (official .deb) for SquirrelWorks 1.1
+#
+# GitHub "releases/latest" is unreliable here - Obsidian interleaves mobile
+# (APK) and desktop releases, so "latest" is often an Android build with no
+# .deb. Resolve the version from Obsidian's own desktop auto-update manifest
+# (raw.githubusercontent.com, not API-rate-limited) and build the asset URL.
+# Obsidian only ships a .deb for amd64.
 ###############################################################################
 set -euo pipefail
+LOG_TAG="OBSIDIAN-INSTALL"
 : "${INST_DIR:=/dockerstartup/install}"
-source "${INST_DIR}/ubuntu/install/common/00_apt_helper.sh"
+# shellcheck source=/dev/null
+source "${INST_DIR}/ubuntu/install/common/03_scaffold.sh"
 
-log() { echo "[OBSIDIAN-INSTALL] $*"; }
+OBSIDIAN_MANIFEST="https://raw.githubusercontent.com/obsidianmd/obsidian-releases/HEAD/desktop-releases.json"
+OBSIDIAN_FALLBACK_VERSION="1.13.7"   # bump occasionally; used only if the manifest is unreachable
 
 main() {
     log "======= Installing Obsidian ======="
+    require_arch amd64
 
-    ARCH="$(dpkg --print-architecture)"
-    # Map dpkg arch to Obsidian naming (usually amd64 or arm64)
     apt_update_if_needed
-    apt_install curl jq
+    apt_install jq ca-certificates
 
-    log "Step 1: Finding latest .deb release..."
-    RELEASE_JSON="$(curl -fsSL https://api.github.com/repos/obsidianmd/obsidian-releases/releases/latest)"
-    
-    # Filter for the .deb asset matching our architecture
-    DOWNLOAD_URL=$(echo "$RELEASE_JSON" | jq -r ".assets[] | select(.name | endswith(\".deb\")) | select(.name | contains(\"${ARCH}\")) | .browser_download_url" | head -n1)
-
-    if [ -z "${DOWNLOAD_URL}" ] || [ "${DOWNLOAD_URL}" = "null" ]; then
-        log "ERROR: Could not find .deb for ${ARCH}" >&2
-        exit 1
+    log "Resolving the latest desktop version..."
+    local version
+    version="$(curl -fsSL --retry 3 "${OBSIDIAN_MANIFEST}" 2>/dev/null | jq -r '.latestVersion // empty' || true)"
+    if [ -z "${version}" ]; then
+        version="${OBSIDIAN_FALLBACK_VERSION}"
+        log "WARNING: could not read the manifest; falling back to ${version}."
     fi
+    log "Target version: ${version}"
 
-    log "Step 2: Downloading and Installing..."
-    curl -fsSL "$DOWNLOAD_URL" -o /tmp/obsidian.deb
-    
-    # Using apt to install the local deb handles all electron/library dependencies
-    apt-get install -y /tmp/obsidian.deb
-    rm -f /tmp/obsidian.deb
+    install_deb "https://github.com/obsidianmd/obsidian-releases/releases/download/v${version}/obsidian_${version}_amd64.deb"
 
-    log "Step 3: Triggering UI and environment configuration..."
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    if [ -f "${SCRIPT_DIR}/configure_ui.sh" ]; then
-        bash "${SCRIPT_DIR}/configure_ui.sh"
-    fi
-
+    run_configure_ui
     log "Obsidian installation complete."
 }
 
